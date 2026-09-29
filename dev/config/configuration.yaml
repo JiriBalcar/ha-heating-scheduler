@@ -1,0 +1,30 @@
+# Local development instance: `uv run hass -c dev/config`, then open http://localhost:8123
+homeassistant:
+  name: Statek (dev)
+  latitude: 50.08
+  longitude: 14.42
+  elevation: 250
+  unit_system: metric
+  time_zone: Europe/Prague
+  country: CZ
+  currency: CZK
+  language: cs
+  auth_providers:
+    # Local browser only: log in without a password.
+    - type: trusted_networks
+      trusted_networks:
+        - 127.0.0.1
+        - ::1
+      allow_bypass_login: true
+    - type: homeassistant
+
+frontend:
+config:
+logger:
+  default: warning
+  logs:
+    custom_components.heating_scheduler: debug
+    custom_components.fake_trv: info
+
+# Simulated Sonoff TRVZB valves and room temperature sensors.
+fake_trv:

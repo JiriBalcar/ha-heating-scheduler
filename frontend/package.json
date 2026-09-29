@@ -1,0 +1,23 @@
+{
+  "name": "heating-scheduler-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sidebar panel and Lovelace card of the Heating Scheduler integration",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@mdi/js": "7.4.47",
+    "lit": "3.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  }
+}

@@ -16,6 +16,23 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest --cov --cov-report=term-missing
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Committed bundles match the source
+        run: git diff --exit-code -- ../custom_components/heating_scheduler/dist
+
   hassfest:
     runs-on: ubuntu-latest
     steps:
