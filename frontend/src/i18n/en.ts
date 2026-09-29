@@ -105,6 +105,7 @@ export const en = {
   "plans.delete_confirm_used": "Delete the plan {name}? {rooms} will follow the house plan.",
   "plans.edit": "Change plan",
   "plans.all_plans": "Plans",
+  "plans.house_badge": "House",
 
   "editor.tap_day": "Tap a day to change it.",
   "editor.copy_day": "Copy this day to…",

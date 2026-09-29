@@ -107,6 +107,7 @@ export const cs: Record<TextKey, string> = {
   "plans.delete_confirm_used": "Smazat plán {name}? {rooms} bude topit podle plánu domu.",
   "plans.edit": "Upravit plán",
   "plans.all_plans": "Plány",
+  "plans.house_badge": "Dům",
 
   "editor.tap_day": "Klepněte na den, který chcete změnit.",
   "editor.copy_day": "Kopírovat den do…",
