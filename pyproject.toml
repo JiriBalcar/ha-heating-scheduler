@@ -1,0 +1,66 @@
+[project]
+name = "heating-scheduler"
+version = "1.0.0"
+description = "Home Assistant integration: heating schedules, modes and manual changes for radiator valves"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.14.2"
+
+[dependency-groups]
+dev = [
+    "pytest-homeassistant-custom-component==0.13.367",
+    "hypothesis>=6.140",
+    "pytest-cov>=7.0",
+    "ruff>=0.13",
+    "mypy>=1.18",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["ignore::DeprecationWarning:josepy.*"]
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/heating_scheduler"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["frontend", "dev/config"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "C4", "DTZ",
+    "PERF", "PIE", "RET", "PL", "PTH", "TID", "TRY", "N", "S", "LOG", "G",
+]
+ignore = [
+    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
+    "TRY003", "TRY300", "RET504", "S101", "PLR0917",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLC0415", "S106", "S311", "DTZ001", "PLW0603", "SLF001"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"datetime.datetime.utcnow".msg = "Use dt_util.utcnow() or an aware datetime."
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+combine-as-imports = true
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+files = ["custom_components/heating_scheduler", "tests"]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_decorators = false

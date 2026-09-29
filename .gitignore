@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
+node_modules/
+frontend/coverage/
+.DS_Store
+
+# Local Home Assistant dev instance: keep only the checked-in config
+dev/config/*
+!dev/config/configuration.yaml
+!dev/config/custom_components/
+dev/config/custom_components/heating_scheduler
+dev/credentials.local.md
