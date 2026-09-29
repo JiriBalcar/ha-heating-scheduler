@@ -4,17 +4,29 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_ROOMS_CHANGED
 from .core.validation import ValidationError
 from .engine import HeatingEngine
+from .entity import async_sync_devices
+from .frontend import async_register_frontend, async_unregister_frontend
+from .services import async_setup_services
 from .storage import HeatingStorage
+from .websocket import async_setup_websocket
 
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CLIMATE,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -23,26 +35,37 @@ type HeatingConfigEntry = ConfigEntry[HeatingEngine]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register services and websocket commands once."""
+    async_setup_services(hass)
+    async_setup_websocket(hass)
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
-    """Start the engine and the platforms."""
+    """Start the engine, the platforms and the frontend."""
     engine = HeatingEngine(hass, entry, HeatingStorage(hass))
     try:
         await engine.async_setup()
     except ValidationError as err:
         raise ConfigEntryError(f"The stored configuration is invalid: {err}") from err
     entry.runtime_data = engine
+
+    @callback
+    def sync_devices() -> None:
+        async_sync_devices(hass, entry, engine)
+
+    sync_devices()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_ROOMS_CHANGED, sync_devices))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await async_register_frontend(hass)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
-    """Stop the engine and the platforms."""
+    """Stop the platforms, the engine and the frontend."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.async_unload()
+        async_unregister_frontend(hass)
     return unloaded
 
 

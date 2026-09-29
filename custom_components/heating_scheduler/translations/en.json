@@ -1,0 +1,186 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Heating Scheduler",
+        "description": "Set up the heating scheduler. You add rooms and radiator valves afterwards in the Heating panel."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Heating Scheduler is already set up."
+    }
+  },
+  "device": {
+    "house": {
+      "name": "Heating"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "mode": {
+        "name": "Heating mode",
+        "state": {
+          "comfort": "Warm",
+          "eco": "Saving",
+          "night": "Night",
+          "away": "Away",
+          "frost": "Frost guard",
+          "off": "Off",
+          "manual": "By hand"
+        }
+      }
+    },
+    "button": {
+      "resume": {
+        "name": "Back to plan"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Heating problem"
+      }
+    },
+    "select": {
+      "house_mode": {
+        "name": "House mode",
+        "state": {
+          "auto": "Normal",
+          "away": "Away",
+          "vacation": "Holiday",
+          "off": "Off"
+        }
+      }
+    },
+    "number": {
+      "temperature_comfort": {
+        "name": "Temperature Warm"
+      },
+      "temperature_eco": {
+        "name": "Temperature Saving"
+      },
+      "temperature_night": {
+        "name": "Temperature Night"
+      },
+      "temperature_away": {
+        "name": "Temperature Away"
+      },
+      "temperature_frost": {
+        "name": "Temperature Frost guard"
+      }
+    },
+    "climate": {
+      "thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "Warm",
+              "eco": "Saving",
+              "night": "Night",
+              "away": "Away",
+              "frost": "Frost guard"
+            }
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "house_mode_active": {
+      "message": "The house is in mode {house_mode}. Switch the house back to Normal first."
+    },
+    "invalid_duration": {
+      "message": "The chosen end is not valid."
+    },
+    "temperature_range": {
+      "message": "The temperature must be between 5 and 30 °C."
+    },
+    "not_found": {
+      "message": "Not found: {id}."
+    },
+    "not_loaded": {
+      "message": "Heating Scheduler is not loaded."
+    },
+    "vacation_order": {
+      "message": "The holiday must end after it starts."
+    },
+    "revision_conflict": {
+      "message": "The settings were changed elsewhere. Reload and try again."
+    }
+  },
+  "selector": {
+    "house_mode": {
+      "options": {
+        "auto": "Normal",
+        "away": "Away",
+        "vacation": "Holiday",
+        "off": "Off"
+      }
+    },
+    "vacation_mode": {
+      "options": {
+        "frost": "Frost guard",
+        "away": "Away"
+      }
+    }
+  },
+  "services": {
+    "set_override": {
+      "name": "Set temperature by hand",
+      "description": "Sets a room temperature by hand. Without a duration or an end, it lasts until the next change of the plan.",
+      "fields": {
+        "temperature": {
+          "name": "Temperature",
+          "description": "The wanted temperature in °C."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long the change lasts."
+        },
+        "until": {
+          "name": "Until",
+          "description": "When the change ends."
+        }
+      }
+    },
+    "clear_override": {
+      "name": "Back to plan",
+      "description": "Ends the manual change in a room."
+    },
+    "set_house_mode": {
+      "name": "Set house mode",
+      "description": "Changes the mode of the whole house.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "The new house mode."
+        }
+      }
+    },
+    "set_vacation": {
+      "name": "Set holiday",
+      "description": "Starts or plans a holiday. At the end, the house returns to its previous mode.",
+      "fields": {
+        "start": {
+          "name": "Start",
+          "description": "When the holiday starts. Empty: now."
+        },
+        "end": {
+          "name": "End",
+          "description": "When the holiday ends. Empty: until you cancel it."
+        },
+        "mode": {
+          "name": "Temperature",
+          "description": "The temperature during the holiday."
+        }
+      }
+    },
+    "cancel_vacation": {
+      "name": "Cancel holiday",
+      "description": "Cancels an active or planned holiday."
+    },
+    "reconcile_now": {
+      "name": "Check valves now",
+      "description": "Checks every radiator valve now and sends the correct temperature."
+    }
+  }
+}

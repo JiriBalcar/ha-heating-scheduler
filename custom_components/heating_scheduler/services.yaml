@@ -1,0 +1,67 @@
+set_override:
+  target:
+    entity:
+      integration: heating_scheduler
+      domain: climate
+  fields:
+    temperature:
+      required: true
+      example: 22.5
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    duration:
+      example: "02:00:00"
+      selector:
+        duration:
+    until:
+      example: "2026-10-05 18:00:00"
+      selector:
+        datetime:
+
+clear_override:
+  target:
+    entity:
+      integration: heating_scheduler
+      domain: climate
+
+set_house_mode:
+  fields:
+    mode:
+      required: true
+      example: away
+      selector:
+        select:
+          translation_key: house_mode
+          options:
+            - auto
+            - away
+            - vacation
+            - "off"
+
+set_vacation:
+  fields:
+    start:
+      example: "2026-10-10 08:00:00"
+      selector:
+        datetime:
+    end:
+      example: "2026-10-20 12:00:00"
+      selector:
+        datetime:
+    mode:
+      example: frost
+      selector:
+        select:
+          translation_key: vacation_mode
+          options:
+            - frost
+            - away
+
+cancel_vacation:
+
+reconcile_now:

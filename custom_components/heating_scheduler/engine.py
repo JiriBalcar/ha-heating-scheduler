@@ -20,6 +20,7 @@ from homeassistant.core import (
     HomeAssistant,
     callback,
 )
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
@@ -31,6 +32,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
     KNOB_SETTLE,
     OWN_CONTEXT_TTL,
     SIGNAL_ROOMS_CHANGED,
@@ -243,7 +245,8 @@ class HeatingEngine:
                 continue
             desired = Desired(target.temperature, target.source, target.mode)
             for entity_id in room.trvs:
-                self.workers[entity_id].set_desired(desired, retry=retry)
+                if (worker := self.workers.get(entity_id)) is not None:
+                    worker.set_desired(desired, retry=retry)
         self.targets = targets
         self._update_health(now)
         self._arm_timer(now)
@@ -295,6 +298,7 @@ class HeatingEngine:
             room.id: [
                 issue
                 for entity_id in room.trvs
+                if entity_id in self.workers
                 for issue in self.workers[entity_id].issues(now, settings, settings.dry_run)
             ]
             for room in self.config.rooms.values()
@@ -346,9 +350,16 @@ class HeatingEngine:
     # ----- TRV events and manual changes -----
 
     def _rebuild_workers(self) -> None:
-        wanted = {
-            entity_id: room.id for room in self.config.rooms.values() for entity_id in room.trvs
-        }
+        registry = er.async_get(self.hass)
+        wanted: dict[str, str] = {}
+        for room in self.config.rooms.values():
+            for entity_id in room.trvs:
+                entry = registry.async_get(entity_id)
+                if entry is not None and entry.platform == DOMAIN:
+                    # Never drive our own room thermostats as TRVs.
+                    _LOGGER.warning("Ignoring %s: it is a room thermostat, not a TRV", entity_id)
+                    continue
+                wanted[entity_id] = room.id
         for entity_id in list(self.workers):
             if wanted.get(entity_id) != self.workers[entity_id].room_id:
                 self.workers.pop(entity_id).stop()
@@ -427,7 +438,8 @@ class HeatingEngine:
             LogEntry(now, LogKind.MANUAL, entity_id=worker.entity_id, value=value),
         )
         for entity_id in room.trvs:
-            self.workers[entity_id].suspend()
+            if (other := self.workers.get(entity_id)) is not None:
+                other.suspend()
         self._hold(room.id)
         self.request_reconcile()
 
@@ -493,9 +505,7 @@ class HeatingEngine:
         if old_trvs != new_trvs:
             self._rebuild_workers()
         self._apply_tick_interval()
-        old_names = {room.id: room.name for room in old.rooms.values()}
-        new_names = {room.id: room.name for room in self.config.rooms.values()}
-        if old_names != new_names:
+        if old.rooms != self.config.rooms:
             async_dispatcher_send(self.hass, SIGNAL_ROOMS_CHANGED)
         self.request_reconcile(retry_failed=True)
 

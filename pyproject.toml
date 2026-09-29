@@ -12,6 +12,7 @@ dev = [
     "home-assistant-frontend==20260826.7",
     "hypothesis>=6.140",
     "pytest-cov>=7.0",
+    "pytest-timeout>=2.3",
     "ruff>=0.13",
     "mypy>=1.18",
 ]
@@ -23,6 +24,7 @@ package = false
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+timeout = 60
 filterwarnings = ["ignore::DeprecationWarning:josepy.*"]
 
 [tool.coverage.run]
@@ -41,7 +43,7 @@ select = [
 ]
 ignore = [
     "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004",
-    "TRY003", "TRY300", "RET504", "S101", "PLR0917",
+    "TRY003", "TRY300", "RET504", "S101", "PLR0917", "RUF012",
 ]
 
 [tool.ruff.lint.per-file-ignores]

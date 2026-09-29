@@ -1,0 +1,186 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Plánovač topení",
+        "description": "Nastaví plánovač topení. Místnosti a termostatické hlavice přidáte potom v panelu Topení."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Plánovač topení je už nastavený."
+    }
+  },
+  "device": {
+    "house": {
+      "name": "Topení"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "mode": {
+        "name": "Režim topení",
+        "state": {
+          "comfort": "Teplo",
+          "eco": "Úspora",
+          "night": "Noc",
+          "away": "Pryč",
+          "frost": "Proti mrazu",
+          "off": "Vypnuto",
+          "manual": "Ručně"
+        }
+      }
+    },
+    "button": {
+      "resume": {
+        "name": "Zpět na plán"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Problém s topením"
+      }
+    },
+    "select": {
+      "house_mode": {
+        "name": "Režim domu",
+        "state": {
+          "auto": "Normálně",
+          "away": "Pryč",
+          "vacation": "Dovolená",
+          "off": "Vypnuto"
+        }
+      }
+    },
+    "number": {
+      "temperature_comfort": {
+        "name": "Teplota Teplo"
+      },
+      "temperature_eco": {
+        "name": "Teplota Úspora"
+      },
+      "temperature_night": {
+        "name": "Teplota Noc"
+      },
+      "temperature_away": {
+        "name": "Teplota Pryč"
+      },
+      "temperature_frost": {
+        "name": "Teplota Proti mrazu"
+      }
+    },
+    "climate": {
+      "thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "Teplo",
+              "eco": "Úspora",
+              "night": "Noc",
+              "away": "Pryč",
+              "frost": "Proti mrazu"
+            }
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "house_mode_active": {
+      "message": "Dům je v režimu {house_mode}. Nejdřív přepněte dům na Normálně."
+    },
+    "invalid_duration": {
+      "message": "Zvolený konec není platný."
+    },
+    "temperature_range": {
+      "message": "Teplota musí být mezi 5 a 30 °C."
+    },
+    "not_found": {
+      "message": "Nenalezeno: {id}."
+    },
+    "not_loaded": {
+      "message": "Plánovač topení není načtený."
+    },
+    "vacation_order": {
+      "message": "Dovolená musí skončit až po svém začátku."
+    },
+    "revision_conflict": {
+      "message": "Nastavení se mezitím změnilo jinde. Načtěte stránku a zkuste to znovu."
+    }
+  },
+  "selector": {
+    "house_mode": {
+      "options": {
+        "auto": "Normálně",
+        "away": "Pryč",
+        "vacation": "Dovolená",
+        "off": "Vypnuto"
+      }
+    },
+    "vacation_mode": {
+      "options": {
+        "frost": "Proti mrazu",
+        "away": "Pryč"
+      }
+    }
+  },
+  "services": {
+    "set_override": {
+      "name": "Nastavit teplotu ručně",
+      "description": "Nastaví teplotu v místnosti ručně. Bez délky a konce platí do další změny v plánu.",
+      "fields": {
+        "temperature": {
+          "name": "Teplota",
+          "description": "Požadovaná teplota ve °C."
+        },
+        "duration": {
+          "name": "Délka",
+          "description": "Jak dlouho ruční změna platí."
+        },
+        "until": {
+          "name": "Do",
+          "description": "Kdy ruční změna skončí."
+        }
+      }
+    },
+    "clear_override": {
+      "name": "Zpět na plán",
+      "description": "Ukončí ruční změnu v místnosti."
+    },
+    "set_house_mode": {
+      "name": "Nastavit režim domu",
+      "description": "Přepne režim celého domu.",
+      "fields": {
+        "mode": {
+          "name": "Režim",
+          "description": "Nový režim domu."
+        }
+      }
+    },
+    "set_vacation": {
+      "name": "Nastavit dovolenou",
+      "description": "Zapne nebo naplánuje dovolenou. Na konci se dům vrátí do předchozího režimu.",
+      "fields": {
+        "start": {
+          "name": "Začátek",
+          "description": "Kdy dovolená začne. Bez zadání hned."
+        },
+        "end": {
+          "name": "Konec",
+          "description": "Kdy dovolená skončí. Bez zadání trvá, dokud ji nezrušíte."
+        },
+        "mode": {
+          "name": "Teplota",
+          "description": "Jaká teplota platí během dovolené."
+        }
+      }
+    },
+    "cancel_vacation": {
+      "name": "Zrušit dovolenou",
+      "description": "Zruší aktivní nebo naplánovanou dovolenou."
+    },
+    "reconcile_now": {
+      "name": "Zkontrolovat hlavice",
+      "description": "Hned zkontroluje všechny hlavice a pošle jim správnou teplotu."
+    }
+  }
+}

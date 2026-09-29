@@ -1,0 +1,71 @@
+{
+  "entity": {
+    "sensor": {
+      "mode": {
+        "default": "mdi:radiator",
+        "state": {
+          "comfort": "mdi:white-balance-sunny",
+          "eco": "mdi:leaf",
+          "night": "mdi:weather-night",
+          "away": "mdi:home-export-outline",
+          "frost": "mdi:snowflake",
+          "off": "mdi:radiator-off",
+          "manual": "mdi:hand-back-right"
+        }
+      }
+    },
+    "button": {
+      "resume": {
+        "default": "mdi:calendar-sync"
+      }
+    },
+    "select": {
+      "house_mode": {
+        "default": "mdi:home-thermometer",
+        "state": {
+          "auto": "mdi:home-thermometer",
+          "away": "mdi:home-export-outline",
+          "vacation": "mdi:bag-suitcase",
+          "off": "mdi:radiator-off"
+        }
+      }
+    },
+    "number": {
+      "temperature_comfort": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "temperature_eco": {
+        "default": "mdi:leaf"
+      },
+      "temperature_night": {
+        "default": "mdi:weather-night"
+      },
+      "temperature_away": {
+        "default": "mdi:home-export-outline"
+      },
+      "temperature_frost": {
+        "default": "mdi:snowflake"
+      }
+    }
+  },
+  "services": {
+    "set_override": {
+      "service": "mdi:hand-back-right"
+    },
+    "clear_override": {
+      "service": "mdi:calendar-sync"
+    },
+    "set_house_mode": {
+      "service": "mdi:home-thermometer"
+    },
+    "set_vacation": {
+      "service": "mdi:bag-suitcase"
+    },
+    "cancel_vacation": {
+      "service": "mdi:bag-suitcase-off"
+    },
+    "reconcile_now": {
+      "service": "mdi:sync"
+    }
+  }
+}
