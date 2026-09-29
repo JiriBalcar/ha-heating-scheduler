@@ -173,6 +173,14 @@ class Override:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeState:
+    """State that changes while running: overrides and the last effective house mode."""
+
+    overrides: Mapping[str, Override] = field(default_factory=dict)
+    house_mode: HouseMode | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Global settings."""
 

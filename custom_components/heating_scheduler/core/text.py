@@ -13,6 +13,12 @@ from .model import Reason, Source, TargetMode
 DEFAULT_LANGUAGE = "cs"
 LANGUAGES = ("cs", "en")
 
+# Names of the house plan and the house temperatures in a new installation.
+DEFAULT_NAMES: dict[str, tuple[str, str]] = {
+    "cs": ("Plán domu", "Teploty domu"),
+    "en": ("House plan", "House temperatures"),
+}
+
 MODE_NAMES: dict[str, dict[TargetMode, str]] = {
     "cs": {
         TargetMode.COMFORT: "Teplo",

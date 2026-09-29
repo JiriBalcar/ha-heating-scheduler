@@ -17,6 +17,7 @@ from .model import (
     OverrideOrigin,
     Plan,
     Room,
+    RuntimeState,
     Settings,
     Slot,
     TempSet,
@@ -292,15 +293,28 @@ def override_from_dict(data: Mapping[str, Any]) -> Override:
     )
 
 
-def state_to_dict(overrides: Mapping[str, Override]) -> JsonDict:
+def state_to_dict(state: RuntimeState) -> JsonDict:
     """Serialize runtime state."""
-    return {"overrides": {key: override_to_dict(item) for key, item in overrides.items()}}
+    return {
+        "overrides": {key: override_to_dict(item) for key, item in state.overrides.items()},
+        "house_mode": None if state.house_mode is None else state.house_mode.value,
+    }
 
 
-def state_from_dict(data: Mapping[str, Any]) -> dict[str, Override]:
-    """Parse runtime state."""
+def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
+    """Parse runtime state. Invalid overrides are dropped, they are only runtime data."""
     raw = _get(data, "overrides", dict)
-    return {key: override_from_dict(item) for key, item in raw.items()}
+    overrides: dict[str, Override] = {}
+    for key, item in raw.items():
+        try:
+            overrides[key] = override_from_dict(item)
+        except ValidationError:
+            continue
+    house_mode = _opt(data, "house_mode", str)
+    return RuntimeState(
+        overrides=overrides,
+        house_mode=None if house_mode is None else _enum(HouseMode, house_mode, "house mode"),
+    )
 
 
 def migrate_config(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:

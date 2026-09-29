@@ -105,6 +105,14 @@ def test_classify_setpoint_change(
     assert result is expected
 
 
+def test_mode_switch_write_hides_all_setpoint_changes() -> None:
+    switching = PendingWrite(commanded=None, previous=4.0, until=NOW + timedelta(minutes=1))
+    result = classify_setpoint_change(
+        old=4.0, new=20.0, own_context=False, pending=switching, now=NOW, step=0.5
+    )
+    assert result is Change.ECHO
+
+
 def test_expired_pending_write_does_not_hide_manual_change() -> None:
     expired = PendingWrite(commanded=21.0, previous=19.0, until=NOW - timedelta(seconds=1))
     result = classify_setpoint_change(

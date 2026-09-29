@@ -18,6 +18,7 @@ from custom_components.heating_scheduler.core.model import (
     OverrideOrigin,
     Plan,
     Room,
+    RuntimeState,
     Settings,
     Slot,
     TempSet,
@@ -236,7 +237,17 @@ def test_state_round_trip() -> None:
             None, utc(2026, 10, 5, 18), utc(2026, 10, 5, 14), OverrideOrigin.DEVICE, "climate.bed"
         ),
     }
-    assert state_from_dict(state_to_dict(overrides)) == overrides
+    state = RuntimeState(overrides, HouseMode.AWAY)
+    assert state_from_dict(state_to_dict(state)) == state
+    assert state_from_dict(state_to_dict(RuntimeState())) == RuntimeState()
+
+
+def test_state_drops_invalid_overrides() -> None:
+    data = state_to_dict(
+        RuntimeState({"a": Override(21.0, utc(2026, 1, 2), utc(2026, 1, 1), OverrideOrigin.USER)})
+    )
+    data["overrides"]["b"] = {"temperature": 21.0, "until": "not a date"}
+    assert list(state_from_dict(data).overrides) == ["a"]
 
 
 def test_migrations() -> None:

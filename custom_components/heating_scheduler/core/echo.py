@@ -24,9 +24,13 @@ class Change(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PendingWrite:
-    """A setpoint write to one TRV that is not settled yet."""
+    """A write to one TRV that is not settled yet.
 
-    commanded: float
+    `commanded` None means the write also changes the HVAC mode. TRVs can report
+    intermediate setpoints then, so every setpoint change counts as an echo.
+    """
+
+    commanded: float | None
     previous: float | None
     until: datetime
 
@@ -46,6 +50,8 @@ def classify_setpoint_change(
     if own_context:
         return Change.ECHO
     if pending is not None and now <= pending.until:
+        if pending.commanded is None:
+            return Change.ECHO
         # A late confirmation, possibly rounded by the TRV.
         if within(new, pending.commanded, normalize_step(step)):
             return Change.ECHO
