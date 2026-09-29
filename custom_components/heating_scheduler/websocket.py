@@ -229,7 +229,7 @@ async def ws_room_save(
         area_id=data.get("area_id") or None,
     )
     await engine.async_apply_config(put_room(engine.config, room), msg["revision"])
-    connection.send_result(msg["id"], {"room_id": room_id})
+    connection.send_result(msg["id"], {"room_id": room_id, "revision": engine.config.revision})
 
 
 @websocket_command(
@@ -246,7 +246,7 @@ async def ws_room_delete(
 ) -> None:
     """Delete a room."""
     await engine.async_apply_config(delete_room(engine.config, msg["room_id"]), msg["revision"])
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -263,7 +263,7 @@ async def ws_rooms_reorder(
 ) -> None:
     """Change the order of rooms."""
     await engine.async_apply_config(reorder_rooms(engine.config, msg["order"]), msg["revision"])
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -289,7 +289,7 @@ async def ws_plan_save(
         plan, name=plan.name.strip(), days=tuple(normalize_day(day) for day in plan.days)
     )
     await engine.async_apply_config(put_plan(engine.config, plan), msg["revision"])
-    connection.send_result(msg["id"], {"plan_id": plan_id})
+    connection.send_result(msg["id"], {"plan_id": plan_id, "revision": engine.config.revision})
 
 
 @websocket_command(
@@ -306,7 +306,7 @@ async def ws_plan_delete(
 ) -> None:
     """Delete a plan; its rooms follow the house plan."""
     await engine.async_apply_config(delete_plan(engine.config, msg["plan_id"]), msg["revision"])
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -330,7 +330,7 @@ async def ws_temp_set_save(
     temp_set = temp_set_from_dict(data)
     temp_set = replace(temp_set, name=temp_set.name.strip())
     await engine.async_apply_config(put_temp_set(engine.config, temp_set), msg["revision"])
-    connection.send_result(msg["id"], {"temp_set_id": set_id})
+    connection.send_result(msg["id"], {"temp_set_id": set_id, "revision": engine.config.revision})
 
 
 @websocket_command(
@@ -348,7 +348,7 @@ async def ws_temp_set_delete(
     """Delete a temperature set; its rooms use the house temperatures."""
     config = delete_temp_set(engine.config, msg["temp_set_id"])
     await engine.async_apply_config(config, msg["revision"])
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -366,7 +366,7 @@ async def ws_settings_save(
     """Change the settings."""
     settings = settings_from_dict(msg["settings"])
     await engine.async_apply_config(put_settings(engine.config, settings), msg["revision"])
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -423,7 +423,7 @@ async def ws_house_mode_set(
 ) -> None:
     """Select a house mode."""
     await engine.async_set_house_mode(HouseMode(msg["mode"]))
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command(
@@ -448,7 +448,7 @@ async def ws_vacation_set(
         None if end is None else datetime_from_str(end),
         None if mode is None else Mode(mode),
     )
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command({vol.Required("type"): f"{PREFIX}vacation/cancel"})
@@ -459,7 +459,7 @@ async def ws_vacation_cancel(
 ) -> None:
     """Cancel the vacation."""
     await engine.async_cancel_vacation()
-    connection.send_result(msg["id"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
 @websocket_command({vol.Required("type"): f"{PREFIX}log", vol.Required("room_id"): str})

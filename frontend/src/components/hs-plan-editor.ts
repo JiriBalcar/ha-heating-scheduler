@@ -22,7 +22,7 @@ import type { BoundaryMoveDetail, SegmentTapDetail } from "./hs-day-bar";
 import "./hs-day-bar";
 import { openBlockSheet } from "./hs-block-sheet";
 import { chooseCopyTargets } from "./hs-copy-dialog";
-import { confirmDialog, type HsDialog } from "./hs-dialog";
+import { confirmDialog, keepMineDialog, type HsDialog } from "./hs-dialog";
 import "./hs-dialog";
 import "./hs-icon";
 import "./hs-week-view";
@@ -47,6 +47,8 @@ export class HsPlanEditor extends LitElement {
   declare saving: boolean;
 
   private loadedId: string | null = null;
+  // The plan as loaded into the editor, to detect changes made elsewhere meanwhile.
+  private baseName = "";
   private original: Day[] = [];
 
   constructor() {
@@ -158,7 +160,7 @@ export class HsPlanEditor extends LitElement {
 
   private get dirty(): boolean {
     return (
-      this.name.trim() !== this.plan.name ||
+      this.name.trim() !== this.baseName ||
       this.days.some((day, index) => !sameDay(normalize(day), this.original[index] ?? []))
     );
   }
@@ -170,6 +172,7 @@ export class HsPlanEditor extends LitElement {
 
   private load() {
     this.loadedId = this.plan.id;
+    this.baseName = this.plan.name;
     this.original = fromPlan(this.plan);
     this.days = this.original.map((day) => day.map((slot) => ({ ...slot })));
     this.name = this.plan.name;
@@ -221,9 +224,22 @@ export class HsPlanEditor extends LitElement {
     return this.renderRoot.querySelector("#preview");
   }
 
+  /** True if the plan was changed elsewhere since it was loaded into the editor. */
+  private changedElsewhere(): boolean {
+    const current = fromPlan(this.plan);
+    return (
+      this.plan.name !== this.baseName ||
+      current.some((day, index) => !sameDay(day, this.original[index] ?? []))
+    );
+  }
+
   private async save() {
     const dialog = this.preview();
-    this.preview()?.close();
+    dialog?.close();
+    if (this.changedElsewhere() && !(await keepMineDialog(this, this.t))) {
+      this.load();
+      return;
+    }
     this.saving = true;
     try {
       await storeFor(this.hass).call("plan/save", {
@@ -234,6 +250,7 @@ export class HsPlanEditor extends LitElement {
           days: toPlanDays(this.days.map((day) => normalize(day))),
         },
       });
+      this.baseName = this.name.trim();
       this.original = this.days.map((day) => normalize(day));
       this.days = this.original.map((day) => day.map((slot) => ({ ...slot })));
       toast(this, this.t("editor.saved"));

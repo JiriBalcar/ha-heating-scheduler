@@ -8,12 +8,17 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import { TEMPERATURE_MODES, type HomeAssistant, type Mode, type Snapshot, type TempSetData } from "../types";
 import { define } from "./define";
-import { confirmDialog } from "./hs-dialog";
+import { confirmDialog, keepMineDialog } from "./hs-dialog";
 import "./hs-icon";
 
 interface Draft {
   name: string;
   temperatures: Partial<Record<Mode, number>>;
+}
+
+function sameDraft(a: Draft, b: Draft): boolean {
+  const keys = new Set([...Object.keys(a.temperatures), ...Object.keys(b.temperatures)]) as Set<Mode>;
+  return a.name.trim() === b.name.trim() && [...keys].every((k) => a.temperatures[k] === b.temperatures[k]);
 }
 
 function clamp(value: number): number {
@@ -34,6 +39,8 @@ export class HsAdvTemps extends LitElement {
   declare busy: boolean;
 
   private revision = -1;
+  // The server version each draft started from.
+  private base: Record<string, Draft> = {};
 
   constructor() {
     super();
@@ -126,10 +133,22 @@ export class HsAdvTemps extends LitElement {
     if (changed.has("snapshot") && this.snapshot && this.snapshot.revision !== this.revision) {
       this.revision = this.snapshot.revision;
       const drafts: Record<string, Draft> = {};
+      const base: Record<string, Draft> = {};
       for (const set of this.snapshot.temp_sets) {
-        drafts[set.id] = { name: set.name, temperatures: { ...set.temperatures } };
+        const server: Draft = { name: set.name, temperatures: { ...set.temperatures } };
+        const draft = this.drafts[set.id];
+        const previous = this.base[set.id];
+        if (draft && previous && !sameDraft(draft, previous)) {
+          // Unsaved edits stay; their base stays too, to detect changes made elsewhere.
+          drafts[set.id] = draft;
+          base[set.id] = previous;
+        } else {
+          drafts[set.id] = server;
+          base[set.id] = server;
+        }
       }
       this.drafts = drafts;
+      this.base = base;
     }
   }
 
@@ -139,8 +158,8 @@ export class HsAdvTemps extends LitElement {
 
   private dirty(set: TempSetData): boolean {
     const draft = this.drafts[set.id];
-    if (!draft) return false;
-    return draft.name.trim() !== set.name || JSON.stringify(draft.temperatures) !== JSON.stringify(set.temperatures);
+    const base = this.base[set.id];
+    return Boolean(draft && base && !sameDraft(draft, base));
   }
 
   private patch(id: string, change: (draft: Draft) => Draft) {
@@ -156,22 +175,32 @@ export class HsAdvTemps extends LitElement {
     });
   }
 
-  private async run(command: string, data: Record<string, unknown>) {
+  private async run(command: string, data: Record<string, unknown>): Promise<boolean> {
     this.busy = true;
     try {
       await storeFor(this.hass).call(command, { revision: this.snapshot.revision, ...data });
+      return true;
     } catch (error) {
       toast(this, errorText(error, this.t));
+      return false;
     } finally {
       this.busy = false;
     }
   }
 
-  private save(set: TempSetData) {
+  private async save(set: TempSetData) {
     const draft = this.drafts[set.id]!;
-    void this.run("temp_set/save", {
+    const base = this.base[set.id];
+    const server: Draft = { name: set.name, temperatures: set.temperatures };
+    if (base && !sameDraft(server, base) && !(await keepMineDialog(this, this.t))) {
+      this.drafts = { ...this.drafts, [set.id]: server };
+      this.base = { ...this.base, [set.id]: server };
+      return;
+    }
+    const saved = await this.run("temp_set/save", {
       temp_set: { id: set.id, name: draft.name.trim(), temperatures: draft.temperatures },
     });
+    if (saved) this.base = { ...this.base, [set.id]: { ...draft, name: draft.name.trim() } };
   }
 
   private async deleteSet(set: TempSetData) {
@@ -257,7 +286,7 @@ export class HsAdvTemps extends LitElement {
       })}
       <span class="muted">${t("adv.temps.save_hint")}</span>
       <div class="buttons">
-        <button class="btn primary" ?disabled=${this.busy || !this.dirty(set)} @click=${() => this.save(set)}>
+        <button class="btn primary" ?disabled=${this.busy || !this.dirty(set)} @click=${() => void this.save(set)}>
           ${t("common.save")}
         </button>
         ${isHouse

@@ -34,7 +34,6 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     KNOB_SETTLE,
-    OWN_CONTEXT_TTL,
     SIGNAL_ROOMS_CHANGED,
     SIGNAL_UPDATE,
     WRITE_CONCURRENCY,
@@ -81,7 +80,6 @@ class HeatingEngine:
         self.workers: dict[str, TrvWorker] = {}
         self.log = EventLog(self._schedule_log_save)
         self.semaphore = asyncio.Semaphore(WRITE_CONCURRENCY)
-        self._own_contexts: dict[str, datetime] = {}
         self._holds: dict[str, CALLBACK_TYPE] = {}
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -164,10 +162,11 @@ class HeatingEngine:
         return self.config.settings.dry_run
 
     def new_context(self) -> Context:
-        """Return a new context and remember it as ours."""
-        context = Context()
-        self._own_contexts[context.id] = dt_util.utcnow() + OWN_CONTEXT_TTL
-        return context
+        """Return a new context for our writes (shown as ours in the logbook).
+
+        Echo detection does not rely on it: see core/echo.py.
+        """
+        return Context()
 
     def log_event(self, room_id: str, entry: LogEntry) -> None:
         """Add a log entry for a room."""
@@ -341,10 +340,7 @@ class HeatingEngine:
         )
 
     @callback
-    def _on_tick(self, now: datetime) -> None:
-        self._own_contexts = {
-            key: expires for key, expires in self._own_contexts.items() if expires > now
-        }
+    def _on_tick(self, _now: datetime) -> None:
         self.request_reconcile(retry_failed=True)
 
     # ----- TRV events and manual changes -----
@@ -374,11 +370,6 @@ class HeatingEngine:
                 self.hass, list(wanted), self._on_trv_event
             )
 
-    def _is_own(self, context: Context) -> bool:
-        return context.id in self._own_contexts or (
-            context.parent_id is not None and context.parent_id in self._own_contexts
-        )
-
     @callback
     def _on_trv_event(self, event: Event[EventStateChangedData]) -> None:
         entity_id = event.data["entity_id"]
@@ -388,19 +379,33 @@ class HeatingEngine:
         old_state = event.data["old_state"]
         new_state = event.data["new_state"]
         now = dt_util.utcnow()
+        old_value = setpoint_of(old_state) if is_available(old_state) else None
+        new_value = setpoint_of(new_state) if is_available(new_state) else None
         change = classify_setpoint_change(
-            old=setpoint_of(old_state) if is_available(old_state) else None,
-            new=setpoint_of(new_state) if is_available(new_state) else None,
-            own_context=self._is_own(event.context),
+            old=old_value,
+            new=new_value,
             pending=worker.pending,
             now=now,
             step=step_of(new_state),
         )
+        worker.settle(new_state, now)
         worker.on_state_change(old_state, new_state)
-        if change is Change.MANUAL and self._started:
-            value = setpoint_of(new_state)
-            assert value is not None
-            self._manual_change(worker, value, now)
+        if not self._started:
+            return
+        if change is Change.MANUAL:
+            assert new_value is not None
+            self._manual_change(worker, new_value, now)
+            return
+        moved = (
+            old_state is not None
+            and new_state is not None
+            and is_available(old_state)
+            and is_available(new_state)
+            and (old_value != new_value or old_state.state != new_state.state)
+        )
+        if moved and worker.room_id not in self._holds:
+            # A late or cancelled write may have left the TRV away from its target.
+            worker.check_after_report()
 
     def _manual_change(self, worker: TrvWorker, value: float, now: datetime) -> None:
         """A person (or another automation) changed the setpoint on a TRV."""
@@ -571,9 +576,19 @@ class HeatingEngine:
         self.request_reconcile()
 
     async def async_set_house_mode(self, mode: HouseMode) -> None:
-        """Select a house mode. Selecting vacation starts an open-ended vacation now."""
+        """Select a house mode.
+
+        Selecting vacation starts a planned vacation now (keeping its end), or an
+        open-ended vacation if none is planned. An active vacation stays as it is.
+        """
         if mode is HouseMode.VACATION:
-            await self.async_set_vacation(None, None, None)
+            vacation = self.config.house.vacation
+            if vacation is not None and self.config.house.vacation_active(dt_util.utcnow()):
+                return
+            if vacation is not None:
+                await self.async_set_vacation(None, vacation.end, vacation.mode)
+            else:
+                await self.async_set_vacation(None, None, None)
             return
         house = self.config.house
         vacation = house.vacation

@@ -1,4 +1,5 @@
 // Lovelace card: one room, or all rooms, optionally with the house mode.
+import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { define } from "./components/define";
 import "./components/hs-house-strip";
@@ -123,7 +124,9 @@ export class HeatingSchedulerCard extends LitElement {
         ${this.config.show_house
           ? html`<hs-house-strip .hass=${this.hass} .snapshot=${snapshot}></hs-house-strip>`
           : nothing}
-        ${rooms.map(
+        ${repeat(
+          rooms,
+          (room) => room.id,
           (room) =>
             html`<hs-room-tile
               .hass=${this.hass}

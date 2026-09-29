@@ -253,26 +253,164 @@ async def test_late_echo_with_new_context_is_not_an_override(
     assert trv.temperature_calls == [21.0]
 
 
-async def test_late_confirmation_then_stale_report_is_not_an_override(
+async def test_late_confirmation_with_new_context_confirms_the_write(
     hass: HomeAssistant,
     hass_storage: dict[str, Any],
     climate: FakeClimate,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    from homeassistant.core import Context
-
     store(hass_storage, two_rooms())
     for entity_id in ("climate.living_trv_1", "climate.living_trv_2"):
         await climate.add(entity_id, setpoint=21.0)
-    trv = await climate.add("climate.bedroom_trv", setpoint=18.0, delay=5)
+    trv = await climate.add("climate.bedroom_trv", setpoint=18.0, delay=6)
     entry = await setup_entry(hass)
-    await advance(hass, freezer, 5)
+    engine = engine_of(entry)
+    await advance(hass, freezer, 6)
     assert trv.setpoint == 21.0
-    # A stale report of the value before our write arrives with a new context.
-    trv.setpoint = 18.0
-    trv.write(Context())
+    assert engine.state.overrides == {}
+    assert [write.confirmed for write in engine.workers["climate.bedroom_trv"].pending] == [True]
+
+
+async def test_knob_back_to_previous_after_confirmation_is_manual(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """At 22:00 the plan lowers the room; ten seconds later the person turns it back up."""
+    store(hass_storage, two_rooms())
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    trv = standard_trvs["climate.bedroom_trv"]
+    freezer.move_to(prague(2026, 10, 5, 22))
+    await advance(hass, freezer, 0)
+    assert trv.setpoint == 18.0
+    await advance(hass, freezer, 10)
+    trv.knob(21.0)
     await settle(hass)
-    assert engine_of(entry).state.overrides == {}
+    assert engine.state.overrides["bedroom"].temperature == 21.0
+    await advance(hass, freezer, 300, steps=5)
+    assert trv.setpoint == 21.0
+
+
+async def test_knob_within_five_seconds_of_our_write_is_manual(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """HA stamps the knob report with our context (5 s window); the value tells the truth."""
+    store(hass_storage, two_rooms())
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    trv = standard_trvs["climate.bedroom_trv"]
+    freezer.move_to(prague(2026, 10, 5, 22))
+    await advance(hass, freezer, 0)
+    await advance(hass, freezer, 3)
+    trv.setpoint = 23.0
+    trv.async_write_ha_state()  # still within the 5 s context window of our write
+    await settle(hass)
+    assert engine.state.overrides["bedroom"].temperature == 23.0
+    assert trv.setpoint == 23.0
+
+
+async def test_late_confirmation_after_second_knob_turn_is_not_an_override(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    climate: FakeClimate,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    store(hass_storage, two_rooms())
+    first = await climate.add("climate.living_trv_1", setpoint=21.0)
+    second = await climate.add("climate.living_trv_2", setpoint=21.0, delay=8)
+    await climate.add("climate.bedroom_trv", setpoint=21.0)
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    first.knob(22.0)
+    await settle(hass)
+    await advance(hass, freezer, 3)  # knob settled: the second valve is sent 22 (lands at +8 s)
+    assert second.temperature_calls == [22.0]
+    await advance(hass, freezer, 3)
+    first.knob(23.0)  # the person turns again
+    await settle(hass)
+    await advance(hass, freezer, 5)  # the second valve's 22 lands with a new context
+    await advance(hass, freezer, 3)
+    assert engine.state.overrides["living"].temperature == 23.0
+    assert first.setpoint == 23.0
+    await advance(hass, freezer, 10)
+    assert second.setpoint == 23.0
+
+
+async def test_app_change_during_plan_write_keeps_its_duration(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    climate: FakeClimate,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    from custom_components.heating_scheduler.core.overrides import ExpiryKind
+
+    store(hass_storage, two_rooms())
+    for entity_id in ("climate.living_trv_1", "climate.living_trv_2"):
+        await climate.add(entity_id, setpoint=18.0, delay=8)
+    await climate.add("climate.bedroom_trv", setpoint=21.0)
+    entry = await setup_entry(hass)  # 21 goes out to the living room, lands at +8 s
+    engine = engine_of(entry)
+    await advance(hass, freezer, 2)
+    item = await engine.async_set_override(
+        "living", 23.0, ExpiryKind.DURATION, duration=timedelta(hours=2)
+    )
+    await settle(hass)
+    await advance(hass, freezer, 20, steps=4)
+    assert engine.state.overrides["living"] == item
+    assert all(
+        climate.trvs[e].setpoint == 23.0 for e in ("climate.living_trv_1", "climate.living_trv_2")
+    )
+
+
+async def test_cancelled_write_that_lands_late_is_corrected(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    climate: FakeClimate,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    store(hass_storage, two_rooms())
+    for entity_id in ("climate.living_trv_1", "climate.living_trv_2"):
+        await climate.add(entity_id, setpoint=21.0)
+    trv = await climate.add("climate.bedroom_trv", setpoint=21.0, delay=8)
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    await engine.async_set_house_mode(HouseMode.AWAY)
+    await settle(hass)
+    await advance(hass, freezer, 3)
+    await engine.async_set_house_mode(HouseMode.AUTO)
+    await settle(hass)
+    await advance(hass, freezer, 6)  # the cancelled 16 lands now
+    await advance(hass, freezer, 10)  # our correction lands (8 s delay)
+    assert trv.setpoint == 21.0
+    assert engine.state.overrides == {}
+
+
+async def test_cancelled_off_that_lands_late_is_corrected(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    climate: FakeClimate,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    store(hass_storage, two_rooms())
+    for entity_id in ("climate.living_trv_1", "climate.living_trv_2"):
+        await climate.add(entity_id, setpoint=21.0)
+    trv = await climate.add("climate.bedroom_trv", setpoint=21.0, delay=8)
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    await engine.async_set_house_mode(HouseMode.OFF)
+    await settle(hass)
+    await advance(hass, freezer, 3)
+    await engine.async_set_house_mode(HouseMode.AUTO)
+    await settle(hass)
+    await advance(hass, freezer, 6)  # the cancelled "off" lands now
+    await advance(hass, freezer, 10)
+    assert trv.mode == "heat"
+    assert trv.setpoint == 21.0
 
 
 async def test_knob_during_pending_write_is_a_manual_change(
@@ -497,6 +635,24 @@ async def test_vacation_survives_restart(
     assert engine.targets["bedroom"].source is Source.VACATION
     assert engine.targets["bedroom"].temperature == 16.0
     assert engine.targets["bedroom"].valid_until == prague(2026, 10, 12, 12)
+
+
+async def test_selecting_vacation_starts_the_planned_one_with_its_end(
+    hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
+) -> None:
+    store(hass_storage, two_rooms())
+    entry = await setup_entry(hass)
+    engine = engine_of(entry)
+    await engine.async_set_vacation(prague(2026, 10, 10), prague(2026, 10, 20), Mode.AWAY)
+    await engine.async_set_house_mode(HouseMode.VACATION)
+    vacation = engine.config.house.vacation
+    assert vacation is not None
+    assert vacation.start == dt_util.utcnow()
+    assert vacation.end == prague(2026, 10, 20)
+    assert vacation.mode is Mode.AWAY
+    # Selecting it again while active changes nothing.
+    await engine.async_set_house_mode(HouseMode.VACATION)
+    assert engine.config.house.vacation == vacation
 
 
 async def test_selecting_a_mode_ends_active_vacation_but_keeps_planned_one(

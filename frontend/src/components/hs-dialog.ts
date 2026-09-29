@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { mdiClose } from "@mdi/js";
+import type { Translate } from "../i18n";
 import { baseStyles } from "../styles";
 import { define } from "./define";
 import "./hs-icon";
@@ -209,5 +210,15 @@ export async function confirmDialog(host: HTMLElement, options: ConfirmOptions):
       { once: true },
     );
     void dialog.show();
+  });
+}
+
+/** Ask what to do when the edited item was changed elsewhere. Resolves true to keep mine. */
+export function keepMineDialog(host: HTMLElement, t: Translate): Promise<boolean> {
+  return confirmDialog(host, {
+    heading: t("common.conflict_title"),
+    message: t("common.conflict_message"),
+    confirm: t("common.overwrite"),
+    cancel: t("common.discard_mine"),
   });
 }

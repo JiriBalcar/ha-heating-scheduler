@@ -38,6 +38,8 @@ export class HsRoomTile extends LitElement {
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private sentAt = 0;
+  // The room the pending value belongs to, fixed at the first tap.
+  private pendingRoom: string | null = null;
 
   constructor() {
     super();
@@ -187,6 +189,15 @@ export class HsRoomTile extends LitElement {
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("room") && this.pendingRoom !== null && this.room.id !== this.pendingRoom) {
+      // The element now shows another room: send what was chosen for the old one.
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+        void this.send();
+      }
+      this.pending = null;
+    }
     if (changed.has("room") && this.pending !== null && !this.timer && !this.sending) {
       const confirmed = this.room.target?.temperature === this.pending;
       if (confirmed || Date.now() - this.sentAt > 4000) this.pending = null;
@@ -203,6 +214,7 @@ export class HsRoomTile extends LitElement {
 
   private step(delta: number) {
     const base = this.pending ?? this.room.target?.temperature ?? this.comfort() - delta;
+    if (this.pending === null) this.pendingRoom = this.room.id;
     this.pending = clamp(base + delta);
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
@@ -213,10 +225,11 @@ export class HsRoomTile extends LitElement {
 
   private async send() {
     const value = this.pending;
+    const roomId = this.pendingRoom ?? this.room.id;
     if (value === null) return;
     this.sending = true;
     try {
-      await storeFor(this.hass).call("override/set", { room_id: this.room.id, temperature: value });
+      await storeFor(this.hass).call("override/set", { room_id: roomId, temperature: value });
       this.sentAt = Date.now();
     } catch (error) {
       this.pending = null;

@@ -1,3 +1,4 @@
+import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing } from "lit";
 import { mdiPlusCircle } from "@mdi/js";
 import { languageOf, translator } from "../i18n";
@@ -71,7 +72,9 @@ export class HsHomeView extends LitElement {
             </button>
           </div>`
         : html`<div class="rooms">
-            ${this.snapshot.rooms.map(
+            ${repeat(
+              this.snapshot.rooms,
+              (room) => room.id,
               (room) =>
                 html`<hs-room-tile
                   .hass=${this.hass}

@@ -104,6 +104,7 @@ async def test_room_create_update_delete_and_conflict(hass: HomeAssistant, ws: W
         room={"name": " Office ", "trvs": [], "temperature_entity": None},
     )
     room_id = result["room_id"]
+    assert result["revision"] == 1
     assert engine.config.rooms[room_id].name == "Office"
     assert engine.config.revision == 1
     assert await ws.error("room/save", revision=0, room={"name": "Late", "trvs": []}) == (
@@ -196,7 +197,7 @@ async def test_settings(hass: HomeAssistant, ws: Ws) -> None:
         "vacation_mode": "away",
         "dry_run": True,
     }
-    await ws.ok("settings/save", revision=0, settings=settings)
+    assert (await ws.ok("settings/save", revision=0, settings=settings)) == {"revision": 1}
     assert engine.config.settings.max_override.total_seconds() == 7200
     assert engine.config.settings.dry_run is True
     settings["safety_interval_minutes"] = 0

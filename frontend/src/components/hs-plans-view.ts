@@ -162,12 +162,12 @@ export class HsPlansView extends LitElement {
     const revision = this.snapshot.revision;
     const name = uniqueName(room.name, this.snapshot.plans.map((plan) => plan.name));
     const created = await this.run(async () => {
-      const result = await store.call<{ plan_id: string }>("plan/save", {
+      const result = await store.call<{ plan_id: string; revision: number }>("plan/save", {
         revision,
         plan: { name, days: source.days },
       });
       await store.call("room/save", {
-        revision: revision + 1,
+        revision: result.revision,
         room: roomPayload(room, { plan_id: result.plan_id }),
       });
       return result.plan_id;

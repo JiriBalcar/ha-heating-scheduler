@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 import logging
@@ -33,7 +33,7 @@ from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import PENDING_GRACE, SERVICE_CALL_TIMEOUT, VERIFY_TIMEOUTS
-from .core.echo import PendingWrite
+from .core.echo import PendingWrite, settle_pending
 from .core.model import MIN_TEMPERATURE, Settings, Source, TargetMode
 from .core.setpoint import device_setpoint, in_sync, normalize_step, same_value, within
 from .health import UNAVAILABLE_GRACE, Issue, IssueKind
@@ -145,7 +145,8 @@ class TrvWorker:
         self.room_id = room_id
         self.desired: Desired | None = None
         self.phase = Phase.IDLE
-        self.pending: PendingWrite | None = None
+        # Writes whose reports may still arrive, oldest first (see core/echo.py).
+        self.pending: list[PendingWrite] = []
         # (commanded, reported): the value the TRV settled on for a commanded value.
         self.accepted: tuple[float, float] | None = None
         self.mismatch_since: datetime | None = None
@@ -180,16 +181,40 @@ class TrvWorker:
         if not self._running():
             self._evaluate()
 
+    def check_after_report(self) -> None:
+        """A report arrived outside a write cycle: write again if the TRV left its target.
+
+        A failed or waiting worker is left to the safety tick and to availability events.
+        """
+        if self.phase is Phase.IDLE and not self._running():
+            self._evaluate()
+
     def suspend(self) -> None:
-        """Stop the running cycle: a person just changed the setpoint by hand."""
+        """Stop the running cycle: a person just changed the setpoint by hand.
+
+        Pending writes stay: a command already sent can still be confirmed late, and that
+        confirmation must not look like a person.
+        """
         self._cancel()
-        self.pending = None
         self.mismatch_since = None
         self._set_phase(Phase.IDLE)
 
     def stop(self) -> None:
         """Stop the worker for good."""
         self._cancel()
+
+    def settle(self, new_state: State | None, now: datetime) -> None:
+        """Update pending writes with a new report of the TRV."""
+        if not self.pending:
+            return
+        available = is_available(new_state)
+        self.pending = settle_pending(
+            self.pending,
+            reported=setpoint_of(new_state) if available else None,
+            hvac_mode=new_state.state if available and new_state is not None else None,
+            now=now,
+            step=step_of(new_state),
+        )
 
     def on_state_change(self, old_state: State | None, new_state: State | None) -> None:
         """React to a state change of the TRV entity."""
@@ -372,11 +397,15 @@ class TrvWorker:
         """Send the plan. Return False if a service call failed."""
         context = self._host.new_context()
         now = dt_util.utcnow()
-        self.pending = PendingWrite(
-            commanded=None if plan.hvac_mode is not None else plan.temperature,
-            previous=plan.previous,
-            until=now + remaining + PENDING_GRACE,
-        )
+        self.pending = [
+            *(write for write in self.pending if write.until >= now),
+            PendingWrite(
+                commanded=plan.temperature,
+                previous=plan.previous,
+                until=now + remaining + PENDING_GRACE,
+                mode_switch=plan.hvac_mode is not None,
+            ),
+        ]
         self.last_write = now
         self._log(LogKind.WRITE, value=plan.temperature, hvac_mode=plan.hvac_mode)
         try:
@@ -443,14 +472,13 @@ class TrvWorker:
                 continue
 
     def _settled(self, plan: WritePlan | None) -> None:
-        now = dt_util.utcnow()
         if plan is not None:
-            actual = setpoint_of(self._hass.states.get(self.entity_id))
+            state = self._hass.states.get(self.entity_id)
+            actual = setpoint_of(state)
             if plan.temperature is not None and actual is not None:
                 self.accepted = (plan.temperature, actual)
             self._log(LogKind.VERIFIED, value=actual, hvac_mode=plan.hvac_mode)
-        if self.pending is not None:
-            self.pending = replace(self.pending, until=now + PENDING_GRACE)
+            self.settle(state, dt_util.utcnow())
         self.mismatch_since = None
         self.last_error = None
         self.failed_since = None
@@ -458,8 +486,6 @@ class TrvWorker:
 
     def _failed(self) -> None:
         now = dt_util.utcnow()
-        if self.pending is not None:
-            self.pending = replace(self.pending, until=now + PENDING_GRACE)
         self.failed_since = self.failed_since or now
         _LOGGER.warning(
             "%s did not accept the setpoint after %d attempts: %s",

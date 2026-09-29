@@ -12,10 +12,13 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from datetime import time  # noqa: E402
+
 from custom_components.heating_scheduler.core.model import (  # noqa: E402
     Config,
     Mode,
     Room,
+    Slot,
     TempSet,
 )
 from custom_components.heating_scheduler.core.schedule_ops import (  # noqa: E402
@@ -24,8 +27,6 @@ from custom_components.heating_scheduler.core.schedule_ops import (  # noqa: E40
     uniform_plan,
 )
 from custom_components.heating_scheduler.core.serde import config_to_dict  # noqa: E402
-from custom_components.heating_scheduler.core.model import Slot  # noqa: E402
-from datetime import time  # noqa: E402
 
 STORAGE = ROOT / "dev" / "config" / ".storage"
 
@@ -70,7 +71,9 @@ def main() -> None:
                 temperature_entity="sensor.koupelna_teplota",
             ),
             "kuchyn": Room("kuchyn", "Kuchyň", ("climate.kuchyn_hlavice",)),
-            "hoste": Room("hoste", "Pokoj pro hosty", ("climate.pokoj_hoste_hlavice",), plan_id="plan_hoste"),
+            "hoste": Room(
+                "hoste", "Pokoj pro hosty", ("climate.pokoj_hoste_hlavice",), plan_id="plan_hoste"
+            ),
         },
         plans={
             "house": default_house_plan("Plán domu"),

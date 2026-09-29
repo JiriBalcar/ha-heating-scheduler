@@ -10,6 +10,7 @@ from custom_components.heating_scheduler.core.echo import (
     Change,
     PendingWrite,
     classify_setpoint_change,
+    settle_pending,
 )
 from custom_components.heating_scheduler.core.model import Override, OverrideOrigin
 from custom_components.heating_scheduler.core.overrides import (
@@ -74,51 +75,89 @@ def test_in_sync_accepts_value_the_trv_settled_on() -> None:
     assert not in_sync(20.0, 21.5, 0.5, 21.0)
 
 
-def pending(commanded: float = 21.0, previous: float | None = 19.0) -> PendingWrite:
-    return PendingWrite(commanded=commanded, previous=previous, until=NOW + timedelta(minutes=5))
+def pending(
+    commanded: float | None = 21.0,
+    previous: float | None = 19.0,
+    *,
+    confirmed: bool = False,
+    mode_switch: bool = False,
+) -> PendingWrite:
+    return PendingWrite(
+        commanded=commanded,
+        previous=previous,
+        until=NOW + timedelta(minutes=5),
+        mode_switch=mode_switch,
+        confirmed=confirmed,
+    )
 
 
 @pytest.mark.parametrize(
-    ("old", "new", "own", "write", "expected"),
+    ("old", "new", "writes", "expected"),
     [
-        (None, 21.0, False, None, Change.IGNORE),
-        (21.0, None, False, None, Change.IGNORE),
-        (21.0, 21.0, False, None, Change.IGNORE),
-        (19.0, 21.0, True, None, Change.ECHO),  # our context
-        (19.0, 21.0, False, pending(), Change.ECHO),  # late confirmation, new context
-        (19.0, 21.5, False, pending(), Change.ECHO),  # TRV rounded our value
-        (21.0, 19.0, False, pending(), Change.ECHO),  # stale report of the old value
-        (19.0, 23.0, False, pending(), Change.MANUAL),  # knob during our write
-        (19.0, 21.0, False, None, Change.MANUAL),  # no write pending
+        (None, 21.0, [], Change.IGNORE),
+        (21.0, None, [], Change.IGNORE),
+        (21.0, 21.0, [], Change.IGNORE),
+        (19.0, 21.0, [pending()], Change.ECHO),  # late confirmation, any context
+        (19.0, 21.5, [pending()], Change.ECHO),  # TRV rounded our value
+        (21.0, 19.0, [pending()], Change.ECHO),  # stale report of the old value
+        (19.0, 23.0, [pending()], Change.MANUAL),  # knob during our write
+        (19.0, 21.0, [], Change.MANUAL),  # no write pending
+        # Once confirmed, only our exact value is an echo.
+        (21.0, 19.0, [pending(confirmed=True)], Change.MANUAL),
+        (21.0, 21.5, [pending(confirmed=True)], Change.MANUAL),
+        (22.0, 21.0, [pending(confirmed=True)], Change.ECHO),
+        # A write that also switches the HVAC mode hides intermediate setpoints.
+        (4.0, 19.0, [pending(21.0, 4.0, mode_switch=True)], Change.ECHO),
+        (4.0, 19.0, [pending(21.0, 4.0, mode_switch=True, confirmed=True)], Change.MANUAL),
+        (20.0, 4.0, [pending(None, 20.0, mode_switch=True)], Change.ECHO),
+        # An older write can still land after a newer one was sent.
+        (23.0, 22.0, [pending(22.0, 21.0), pending(23.0, 22.0)], Change.ECHO),
     ],
 )
 def test_classify_setpoint_change(
     old: float | None,
     new: float | None,
-    own: bool,
-    write: PendingWrite | None,
+    writes: list[PendingWrite],
     expected: Change,
 ) -> None:
-    result = classify_setpoint_change(
-        old=old, new=new, own_context=own, pending=write, now=NOW, step=0.5
-    )
+    result = classify_setpoint_change(old=old, new=new, pending=writes, now=NOW, step=0.5)
     assert result is expected
-
-
-def test_mode_switch_write_hides_all_setpoint_changes() -> None:
-    switching = PendingWrite(commanded=None, previous=4.0, until=NOW + timedelta(minutes=1))
-    result = classify_setpoint_change(
-        old=4.0, new=20.0, own_context=False, pending=switching, now=NOW, step=0.5
-    )
-    assert result is Change.ECHO
 
 
 def test_expired_pending_write_does_not_hide_manual_change() -> None:
     expired = PendingWrite(commanded=21.0, previous=19.0, until=NOW - timedelta(seconds=1))
-    result = classify_setpoint_change(
-        old=19.0, new=21.0, own_context=False, pending=expired, now=NOW, step=0.5
-    )
+    result = classify_setpoint_change(old=19.0, new=21.0, pending=[expired], now=NOW, step=0.5)
     assert result is Change.MANUAL
+
+
+def test_settle_confirms_and_drops_older_writes() -> None:
+    older = pending(22.0, 21.0)
+    newer = pending(23.0, 22.0)
+    # The older command lands: it is confirmed, the newer one still waits.
+    after_older = settle_pending([older, newer], reported=22.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert [(w.commanded, w.confirmed) for w in after_older] == [(22.0, True), (23.0, False)]
+    # The newer command lands: only it remains.
+    after_newer = settle_pending(after_older, reported=23.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert [(w.commanded, w.confirmed) for w in after_newer] == [(23.0, True)]
+
+
+def test_settle_needs_a_move_for_rounded_confirmation() -> None:
+    write = pending(21.5, 21.0)
+    # The TRV still reports its old value, which is one step away: not a confirmation.
+    unchanged = settle_pending([write], reported=21.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert unchanged[0].confirmed is False
+    rounded = settle_pending([write], reported=22.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert rounded[0].confirmed is True
+
+
+def test_settle_off_write_and_expiry() -> None:
+    off = pending(None, 20.0, mode_switch=True)
+    heat = settle_pending([off], reported=20.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert heat[0].confirmed is False
+    switched = settle_pending([off], reported=20.0, hvac_mode="off", now=NOW, step=0.5)
+    assert switched[0].confirmed is True
+    late = NOW + timedelta(minutes=6)
+    assert settle_pending([off], reported=20.0, hvac_mode="off", now=late, step=0.5) == []
 
 
 def test_next_change_is_capped_by_max_duration() -> None:

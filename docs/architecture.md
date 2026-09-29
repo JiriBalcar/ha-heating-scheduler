@@ -100,12 +100,22 @@ those modes are undone.
 ## Manual-change detection
 
 - Only the `temperature` attribute of managed TRVs counts.
-- Echo: our context, or a pending write with the new value within one step of the
-  commanded value, or equal to the value before the write (stale report).
-- Otherwise the change becomes an override for the room: until the next plan change,
-  capped by the max duration (default 4 h). After 3 s without further knob changes, the
-  value goes to the other TRVs of the room.
+- The context does not decide: Home Assistant stamps every state write of a TRV with our
+  service context for 5 s (also a knob change), and a late confirmation has a new context.
+  Writes still carry our own `Context`, for attribution only.
+- Each TRV keeps a list of pending writes (a newer write does not cancel an older one that
+  may still land). A report is an echo if it matches one of them: the commanded value (one
+  step of rounding allowed until confirmed), or, before confirmation, the previous value
+  (stale report). While a write also switches the HVAC mode, every setpoint change is an
+  echo until the TRV confirms. After confirmation, only the commanded value is an echo.
+- Anything else is a manual change and becomes an override for the room: until the next
+  plan change, capped by the max duration (default 4 h). After 3 s without further knob
+  changes, the value goes to the other TRVs of the room.
 - In house modes away / vacation / off, a manual change is logged and undone.
+- After an echo that moved the setpoint or HVAC mode (for example a cancelled write that
+  landed late), an idle worker checks the TRV again and corrects it at once.
+- Config commands return the new revision. Editors detect whether the edited item itself
+  changed elsewhere and ask before overwriting; unrelated changes do not block saving.
 
 ## Persistence
 

@@ -201,8 +201,11 @@ export class HsAdvRooms extends LitElement {
           } as RoomData,
           {},
         );
-        await store.call("room/save", { revision, room: { ...room, id: null } });
-        revision += 1;
+        const result = await store.call<{ revision: number }>("room/save", {
+          revision,
+          room: { ...room, id: null },
+        });
+        revision = result.revision;
       }
       this.importDialog()?.close();
     } catch (error) {

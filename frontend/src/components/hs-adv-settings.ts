@@ -4,8 +4,14 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, SettingsData, Snapshot } from "../types";
 import { define } from "./define";
+import { keepMineDialog } from "./hs-dialog";
+import "./hs-dialog";
 
 const OVERRIDE_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
+
+function same(a: SettingsData, b: SettingsData): boolean {
+  return (Object.keys(a) as (keyof SettingsData)[]).every((key) => a[key] === b[key]);
+}
 const SAFETY_MINUTES = [1, 2, 5, 10, 15, 30, 60];
 const MISMATCH_MINUTES = [10, 20, 30, 60, 120, 240];
 
@@ -23,6 +29,8 @@ export class HsAdvSettings extends LitElement {
   declare busy: boolean;
 
   private revision = -1;
+  // The server settings the draft started from.
+  private base: SettingsData | null = null;
 
   constructor() {
     super();
@@ -75,7 +83,10 @@ export class HsAdvSettings extends LitElement {
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has("snapshot") && this.snapshot && this.snapshot.revision !== this.revision) {
       this.revision = this.snapshot.revision;
-      this.draft = { ...this.snapshot.settings };
+      if (!this.base || !this.draft || same(this.draft, this.base)) {
+        this.draft = { ...this.snapshot.settings };
+        this.base = { ...this.snapshot.settings };
+      }
     }
   }
 
@@ -84,16 +95,23 @@ export class HsAdvSettings extends LitElement {
   }
 
   private get dirty(): boolean {
-    return JSON.stringify(this.draft) !== JSON.stringify(this.snapshot.settings);
+    return this.base !== null && !same(this.draft, this.base);
   }
 
   private async save() {
+    const server = this.snapshot.settings;
+    if (this.base && !same(server, this.base) && !(await keepMineDialog(this, this.t))) {
+      this.draft = { ...server };
+      this.base = { ...server };
+      return;
+    }
     this.busy = true;
     try {
       await storeFor(this.hass).call("settings/save", {
         revision: this.snapshot.revision,
         settings: this.draft,
       });
+      this.base = { ...this.draft };
       toast(this, this.t("adv.settings.saved"));
     } catch (error) {
       toast(this, errorText(error, this.t));

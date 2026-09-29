@@ -18,6 +18,10 @@ export const cs: Record<TextKey, string> = {
   "common.yes": "Ano",
   "common.no": "Ne",
   "common.loading": "Načítám…",
+  "common.conflict_title": "Změněno jinde",
+  "common.conflict_message": "Někdo jiný to mezitím změnil. Ponechat vaši verzi a přepsat jeho změny?",
+  "common.overwrite": "Ponechat moje",
+  "common.discard_mine": "Zahodit moje",
   "common.not_loaded": "Plánovač topení neběží. Zkontrolujte integraci v Nastavení.",
 
   "mode.comfort": "Teplo",

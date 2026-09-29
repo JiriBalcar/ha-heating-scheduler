@@ -16,6 +16,10 @@ export const en = {
   "common.yes": "Yes",
   "common.no": "No",
   "common.loading": "Loading…",
+  "common.conflict_title": "Changed elsewhere",
+  "common.conflict_message": "Somebody else changed this meanwhile. Keep your version and overwrite theirs?",
+  "common.overwrite": "Keep mine",
+  "common.discard_mine": "Discard mine",
   "common.not_loaded": "The heating scheduler is not running. Check the integration in Settings.",
 
   "mode.comfort": "Warm",

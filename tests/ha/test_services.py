@@ -110,22 +110,26 @@ async def test_house_mode_and_vacation_services(
 
 
 async def test_reconcile_now_retries_failed_writes(
-    hass: HomeAssistant, hass_storage: dict[str, Any], climate: FakeClimate
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    climate: FakeClimate,
+    freezer: Any,
 ) -> None:
+    from .conftest import advance
+
     store(hass_storage, two_rooms())
     await climate.add("climate.living_trv_1", setpoint=21.0)
     await climate.add("climate.living_trv_2", setpoint=21.0)
-    trv = await climate.add("climate.bedroom_trv", setpoint=18.0)
+    trv = await climate.add("climate.bedroom_trv", setpoint=18.0, respond=False)
     entry = await setup_entry(hass)
-    trv.setpoint = 17.0
+    for seconds in (30, 60, 120):
+        await advance(hass, freezer, seconds)
+    assert engine_of(entry).workers["climate.bedroom_trv"].phase.value == "failed"
+    trv.respond = True
     trv.calls.clear()
-    # Change the value behind our back with our own context: no override, but out of sync.
-    engine = engine_of(entry)
-    trv.write(engine.new_context())
-    await settle(hass)
-    assert trv.calls == []
     await call(hass, "reconcile_now", {})
     assert trv.temperature_calls == [21.0]
+    assert trv.setpoint == 21.0
 
 
 async def test_services_fail_when_not_loaded(
