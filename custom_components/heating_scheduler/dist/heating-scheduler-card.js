@@ -1,4 +1,4 @@
-import{a as c,b as t,c as o,d as h,q as l,r as d,s as u,t as a,x as p}from"./chunks/chunk-PK2CBGYI.js";var m=class extends h{constructor(){super();this.unsubscribe=null;this.messageTimer=null;this.snapshot=null,this.message="",this.addEventListener("hs-toast",s=>{this.message=s.detail,this.messageTimer&&clearTimeout(this.messageTimer),this.messageTimer=setTimeout(()=>this.message="",6e3)})}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0},message:{state:!0}}}static{this.styles=[d,c`
+import{D as p,a as c,b as t,c as o,d as h,u as l,v as d,w as a,y as u}from"./chunks/chunk-3RYDTNEX.js";var m=class extends h{constructor(){super();this.unsubscribe=null;this.messageTimer=null;this.snapshot=null,this.message="",this.addEventListener("hs-toast",s=>{this.message=s.detail,this.messageTimer&&clearTimeout(this.messageTimer),this.messageTimer=setTimeout(()=>this.message="",6e3)})}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0},message:{state:!0}}}static{this.styles=[u,c`
       :host {
         display: block;
       }
@@ -18,7 +18,7 @@ import{a as c,b as t,c as o,d as h,q as l,r as d,s as u,t as a,x as p}from"./chu
         color: #fff;
         font-size: 16px;
       }
-    `]}setConfig(s){if(!s||typeof s!="object")throw new Error("Invalid configuration");if(s.room!==void 0&&typeof s.room!="string")throw new Error("room must be a room id");this.config={...s}}getCardSize(){let s=this.config?.room?1:this.snapshot?.rooms.length??2;return(this.config?.show_house?3:0)+s*(this.config?.compact?3:5)}getGridOptions(){return{columns:12,min_columns:6,rows:"auto"}}static getConfigElement(){return document.createElement("heating-scheduler-card-editor")}static getStubConfig(){return{show_house:!0}}connectedCallback(){super.connectedCallback(),this.hass&&!this.unsubscribe&&this.subscribe()}disconnectedCallback(){super.disconnectedCallback(),this.unsubscribe?.(),this.unsubscribe=null}willUpdate(s){s.has("hass")&&this.hass&&!this.unsubscribe&&this.isConnected&&this.subscribe()}subscribe(){this.unsubscribe=p(this.hass).subscribe(s=>this.snapshot=s)}render(){if(!this.hass||!this.config)return o;let s=a(u(this.hass)),e=this.snapshot;if(!e)return t`<div class="card status">${s("common.loading")}</div>`;let i=this.config.room?e.rooms.filter(n=>n.id===this.config.room):e.rooms;return t`
+    `]}setConfig(s){if(!s||typeof s!="object")throw new Error("Invalid configuration");if(s.room!==void 0&&typeof s.room!="string")throw new Error("room must be a room id");this.config={...s}}getCardSize(){let s=this.config?.room?1:this.snapshot?.rooms.length??2;return(this.config?.show_house?3:0)+s*(this.config?.compact?3:5)}getGridOptions(){return{columns:12,min_columns:6,rows:"auto"}}static getConfigElement(){return document.createElement("heating-scheduler-card-editor")}static getStubConfig(){return{show_house:!0}}connectedCallback(){super.connectedCallback(),this.hass&&!this.unsubscribe&&this.subscribe()}disconnectedCallback(){super.disconnectedCallback(),this.unsubscribe?.(),this.unsubscribe=null}willUpdate(s){s.has("hass")&&this.hass&&!this.unsubscribe&&this.isConnected&&this.subscribe()}subscribe(){this.unsubscribe=p(this.hass).subscribe(s=>this.snapshot=s)}render(){if(!this.hass||!this.config)return o;let s=a(d(this.hass)),e=this.snapshot;if(!e)return t`<div class="card status">${s("common.loading")}</div>`;let i=this.config.room?e.rooms.filter(n=>n.id===this.config.room):e.rooms;return t`
       <div class="stack">
         ${this.config.show_house?t`<hs-house-strip .hass=${this.hass} .snapshot=${e}></hs-house-strip>`:o}
         ${i.map(n=>t`<hs-room-tile
@@ -29,7 +29,7 @@ import{a as c,b as t,c as o,d as h,q as l,r as d,s as u,t as a,x as p}from"./chu
             ></hs-room-tile>`)}
         ${this.message?t`<div class="message" role="alert">${this.message}</div>`:o}
       </div>
-    `}},g=class extends h{constructor(){super();this.unsubscribe=null;this.snapshot=null}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0}}}static{this.styles=[d,c`
+    `}},g=class extends h{constructor(){super();this.unsubscribe=null;this.snapshot=null}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0}}}static{this.styles=[u,c`
       .form {
         display: flex;
         flex-direction: column;
@@ -46,7 +46,7 @@ import{a as c,b as t,c as o,d as h,q as l,r as d,s as u,t as a,x as p}from"./chu
         width: 24px;
         height: 24px;
       }
-    `]}setConfig(s){this.config={...s}}disconnectedCallback(){super.disconnectedCallback(),this.unsubscribe?.(),this.unsubscribe=null}willUpdate(s){s.has("hass")&&this.hass&&!this.unsubscribe&&(this.unsubscribe=p(this.hass).subscribe(e=>this.snapshot=e))}update_(s){let e={...this.config,...s};for(let i of Object.keys(e))(e[i]===void 0||e[i]===""||e[i]===!1)&&delete e[i];this.config=e,this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:e},bubbles:!0,composed:!0}))}render(){if(!this.hass||!this.config)return o;let s=a(u(this.hass));return t`
+    `]}setConfig(s){this.config={...s}}disconnectedCallback(){super.disconnectedCallback(),this.unsubscribe?.(),this.unsubscribe=null}willUpdate(s){s.has("hass")&&this.hass&&!this.unsubscribe&&(this.unsubscribe=p(this.hass).subscribe(e=>this.snapshot=e))}update_(s){let e={...this.config,...s};for(let i of Object.keys(e))(e[i]===void 0||e[i]===""||e[i]===!1)&&delete e[i];this.config=e,this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:e},bubbles:!0,composed:!0}))}render(){if(!this.hass||!this.config)return o;let s=a(d(this.hass));return t`
       <div class="form">
         <label class="field">
           <span>${s("card.room")}</span>

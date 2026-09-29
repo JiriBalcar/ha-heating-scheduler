@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { mdiDelete, mdiPencil, mdiPlusCircle } from "@mdi/js";
 import { languageOf, translator, type Translate } from "../i18n";
+import { roomPayload, uniqueName } from "../payload";
 import { fromPlan } from "../schedule/ops";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
@@ -11,28 +12,6 @@ import "./hs-dialog";
 import "./hs-icon";
 import "./hs-plan-editor";
 import "./hs-week-view";
-
-export function roomPayload(room: RoomData, patch: Partial<RoomData> = {}) {
-  const merged = { ...room, ...patch };
-  return {
-    id: merged.id,
-    name: merged.name,
-    trvs: merged.trvs,
-    plan_id: merged.plan_id,
-    temp_set_id: merged.temp_set_id,
-    temperature_entity: merged.temperature_entity,
-    area_id: merged.area_id,
-  };
-}
-
-export function uniqueName(base: string, taken: string[]): string {
-  const used = new Set(taken.map((name) => name.trim().toLowerCase()));
-  if (!used.has(base.trim().toLowerCase())) return base;
-  for (let n = 2; ; n += 1) {
-    const candidate = `${base} ${n}`;
-    if (!used.has(candidate.toLowerCase())) return candidate;
-  }
-}
 
 /** Which plan each room follows, the list of plans, and the plan editor. */
 export class HsPlansView extends LitElement {
