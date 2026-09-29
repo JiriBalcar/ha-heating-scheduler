@@ -132,9 +132,27 @@ The configuration has a revision; websocket writes must send the revision they e
 
 ## Frontend
 
-- TypeScript + Lit 3, built with esbuild into `dist/`: an entry for the panel and one for
-  the Lovelace card, with a shared chunk (custom elements are defined once).
-- The panel is registered with `panel_custom`; the card is loaded with `add_extra_js_url`.
-- Own components only; icons are bundled SVG paths.
+- TypeScript + Lit 3 (no decorators), built with esbuild into `dist/`: an entry for the
+  panel and one for the Lovelace card, with a shared chunk, so custom elements are defined
+  once. The bundles are committed; CI checks that they match the source.
+- The panel is registered with `panel_custom` (`require_admin: false`); the card is loaded
+  with `add_extra_js_url`. URLs carry a hash of the bundles for cache busting.
+- Own components only (native `<dialog>`, native date/time inputs, bundled MDI paths).
+- One websocket subscription per connection (`store.ts`) feeds the panel and every card.
 - Panel strings are bundled (cs, en) and chosen from the user's HA language; Czech is the
   default. Entity, service and error strings use HA translation files.
+- All times are shown in the house's time zone (plans are house wall time).
+- Filled buttons use a fixed dark blue (`--hs-accent`) so white text passes WCAG AA in the
+  default light and dark themes; mode colours are fixed and always come with an icon and a word.
+- Pure plan-editing operations live in `frontend/src/schedule/ops.ts` (vitest).
+
+## Testing
+
+- `tests/core/`: pure unit tests and hypothesis property tests of `resolve()`.
+- `tests/ha/`: `pytest-homeassistant-custom-component`. Fake TRVs are real climate entities
+  on a mock platform, so Home Assistant keeps the service context on them for 5 seconds,
+  like on Zigbee2MQTT entities. They can confirm late, round values, lose commands and go
+  offline.
+- `frontend/test/`: vitest for formatting, time zones, translations and plan operations.
+- `dev/`: a local Home Assistant with simulated TRVZB valves (1–8 s confirmation delay) and
+  room sensors, for manual checks in a browser.
