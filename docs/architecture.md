@@ -193,7 +193,10 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
 - **Card loader (decision, 2026-09-30).** HA's service worker serves an old copy of the page,
   and so an old card URL, for a while after an update. The loader therefore imports the main
   bundle by the URL in HA's live panel list, and the card and the panel always run the same
-  code. The loader itself is small and rarely changes.
+  code. The loader itself is small and rarely changes. HA loads extra modules (and Lovelace
+  resources) only when the page loads, so a page opened before the integration was installed has
+  no card until it reloads. The panel bundle therefore defines the card too: opening the panel
+  once brings the cards back.
 - **Element registration.** HA's app installs a scoped custom element registry polyfill; the
   card loader can run before it. Our elements are defined only after HA has defined its root
   element (`components/define.ts`); an earlier definition breaks all our elements.

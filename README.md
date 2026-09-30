@@ -226,6 +226,10 @@ The card editor lists the rooms and zones by name. Home Assistant shows a `selec
 as a dropdown; for big buttons on a dashboard, use this card with `show_rooms: false` instead of
 the house mode entity. A tap on the house tile opens a dialog like the one of an alarm panel.
 
+A dashboard shows "Custom element doesn't exist: heating-scheduler-card" when the page was opened
+before the integration was installed. Reload the page (in the Home Assistant app: close the app
+completely and open it again), or open **Topení / Heating** in the sidebar once.
+
 ## Development
 
 ```bash
