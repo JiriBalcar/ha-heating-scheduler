@@ -15,6 +15,8 @@ for phones and tablets, and a Lovelace card.
 - Rooms share plans and temperature sets, so you set them once.
 - House modes: Normal, Away, Holiday (planned in advance), Off. For the whole house, or
   per zone: for example, the first floor is away and the ground floor heats as usual.
+- **Boost**: one tap heats every room at its valves' maximum for a set time (default 1 h),
+  for example when you come back from a holiday.
 - Manual changes on the valve knob or in the app last until the next change of the plan.
 - The integration **reconciles** instead of firing actions at fixed times: after a restart,
   a missed timer or a valve that was offline for hours, every valve gets the right value.
@@ -111,6 +113,12 @@ najednou. Když mají zóny různé režimy, ukazuje **Různě** a vypíše rež
 Během režimů Pryč, Dovolená a Vypnuto nejde teplota v místnosti měnit. Nejdřív přepněte dům
 (nebo jeho zónu) na **Normálně**.
 
+**Přijel jsem a doma je zima.** Klepněte na dlaždici **Zatopit naplno** a potvrďte. Všechny
+místnosti topí naplno (hlavice na maximum), obvykle 1 hodinu. Potom se samy vrátí k plánu.
+Když byl dům Pryč, na dovolené nebo vypnutý, přepne se na **Normálně**. Během zatápění naplno
+nejde teplota v místnosti měnit. Tlačítko **Ukončit** zatápění ukončí hned. Délku změníte
+v **Rozšířené → Nastavení**.
+
 **Problém s hlavicí**: na ikoně místnosti je oranžový vykřičník, pod názvem místnosti je
 napsané, co se děje (například „Hlavice neodpovídá“), a nahoře se ukáže upozornění.
 Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
@@ -138,6 +146,10 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 - **Zones** (for example floors): each zone has its own tile above its rooms, and its mode
   applies only to its rooms. **Whole house** switches every zone; while the zones differ,
   it shows **Mixed** and lists the mode of each.
+- **Boost**: tap the **Boost** tile and confirm. Every room heats at its valves' maximum for
+  the time set in **Advanced → Settings** (default 1 h), then the plans continue. A boost
+  switches Away, Holiday and Off to Normal. During a boost, room temperatures are fixed.
+  **Stop** ends it early.
 - A **valve problem** shows as an orange exclamation mark on the room's icon, in words under
   the room's name ("A valve does not respond"), and in an alert above the tiles; tap the icon
   for an explanation.
@@ -151,9 +163,11 @@ For every room the integration computes the target with a pure function:
 
 1. The mode of the room's zone wins: **Off**, **Holiday** or **Away**. Without zones, the
    whole house is one zone.
-2. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
+2. Otherwise a **boost** wins: every room at the highest temperature its valves allow, until
+   the boost ends.
+3. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
    the next change of the plan, and at most the longest manual change (default 4 h).
-3. Otherwise the room's **plan** decides, with the room's temperatures.
+4. Otherwise the room's **plan** decides, with the room's temperatures.
 
 It then brings every valve to that value. It recomputes on start, at the next change of
 any room, on every change of settings, every 5 minutes, and when a valve comes back online.
@@ -165,18 +179,23 @@ twice is used once.
 A change of a zone's mode ends the manual changes in that zone. When a holiday ends, the zone
 returns to the mode it had when the holiday started.
 
+Starting a boost switches every zone to Normal. When any zone leaves Normal (Away, Off, or a
+holiday, also a planned one that starts), the boost ends. During a boost, a turn of a valve
+knob is undone.
+
 ## Entities
 
 Entity ids depend on the Home Assistant language; English names are shown.
 
 | Entity | Per | Purpose |
 |---|---|---|
-| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change, `off` = off. The preset is the mode; a manual change shows the mode with its temperature, or Manual. |
+| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change or boost, `off` = off. The preset is the mode; a manual change shows the mode with its temperature, or Manual; a boost shows Boost. |
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |
 | `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off for every zone. Mixed (`mixed`) while the zones have different modes; it cannot be selected, and the attribute `zones` shows the mode of each. |
 | `select.heating_mode_<zone>` | zone | The mode of one zone. Only when there are two or more zones. |
+| `switch.heating_boost` | house | On while a boost runs. On starts a boost for the length in the settings; off ends it. Attributes: `until`, `duration_minutes`. |
 | `number.heating_temperature_*` | house | House temperatures of Warm, Saving, Night, Away, Frost guard. |
 
 Tip: hide the valves themselves from voice assistants and use the room thermostats.
@@ -190,6 +209,7 @@ Tip: hide the valves themselves from voice assistants and use the room thermosta
 | `heating_scheduler.set_house_mode` | `mode`: `auto`, `away`, `vacation`, `off`; optional `zone` |
 | `heating_scheduler.set_vacation` | optional `start`, `end`, `mode` (`frost` or `away`), `zone` |
 | `heating_scheduler.cancel_vacation` | optional `zone` |
+| `heating_scheduler.boost` | optional `duration`, 15 minutes to 4 hours (default: the setting). To end a boost, turn off `switch.heating_boost`. |
 | `heating_scheduler.reconcile_now` | — |
 
 `zone` is the name of a zone (in any case) or its id. Without it, the action applies to every
@@ -215,6 +235,14 @@ data:
   end: "2026-10-17 18:00:00"
 ```
 
+Example: heat every room at full power for 2 hours.
+
+```yaml
+action: heating_scheduler.boost
+data:
+  duration: "02:00:00"
+```
+
 ## Lovelace card
 
 The card is loaded automatically. Add **Heating Scheduler** from the card picker, or:
@@ -231,6 +259,7 @@ compact: false         # optional: − / + next to the room name
 The card editor lists the rooms and zones by name. Home Assistant shows a `select` entity only
 as a dropdown; for big buttons on a dashboard, use this card with `show_rooms: false` instead of
 the house mode entity. A tap on the house tile opens a dialog like the one of an alarm panel.
+A card for the whole house also shows the **Boost** tile under the house tile.
 
 A dashboard shows "Custom element doesn't exist: heating-scheduler-card" when the page was opened
 before the integration was installed. Reload the page (in the Home Assistant app: close the app

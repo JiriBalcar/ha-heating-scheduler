@@ -1,6 +1,7 @@
 // Colours and icons of modes. Colours are HA theme colours; they always come with an icon and a word.
 import {
   mdiBagSuitcase,
+  mdiFire,
   mdiHandBackRight,
   mdiHomeExportOutline,
   mdiHomeSwitchOutline,
@@ -22,6 +23,7 @@ export const MODE_COLORS: Record<TargetMode, string> = {
   frost: "var(--cyan-color, #00bcd4)",
   off: "var(--grey-color, #9e9e9e)",
   manual: "var(--purple-color, #9c27b0)",
+  boost: "var(--red-color, #f44336)",
 };
 
 export const MODE_ICONS: Record<TargetMode, string> = {
@@ -32,6 +34,7 @@ export const MODE_ICONS: Record<TargetMode, string> = {
   frost: mdiSnowflake,
   off: mdiRadiatorOff,
   manual: mdiHandBackRight,
+  boost: mdiFire,
 };
 
 export const HOUSE_COLORS: Record<HouseMode, string> = {

@@ -5,6 +5,7 @@ import { baseStyles } from "../styles";
 import type { HomeAssistant, RoomData, Snapshot } from "../types";
 import { roomsOf } from "../zones";
 import { define } from "./define";
+import "./hs-boost-card";
 import "./hs-house-card";
 import "./hs-house-hints";
 import "./hs-room-card";
@@ -91,17 +92,19 @@ export class HsHomeView extends LitElement {
           </ha-card>
         </div>`;
     }
+    const boost = html`<hs-boost-card .hass=${this.hass} .snapshot=${snapshot}></hs-boost-card>`;
     if (snapshot.zones.length < 2) {
       return html`${alert}
         <div class="grid">
           <hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>
-          ${this.rooms(snapshot.rooms)}
+          ${boost} ${this.rooms(snapshot.rooms)}
         </div>`;
     }
     return html`${alert}
       <div class="zones">
         <div class="grid">
           <hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>
+          ${boost}
         </div>
         ${repeat(
           snapshot.zones,

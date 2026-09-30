@@ -56,6 +56,7 @@ class TargetMode(StrEnum):
     FROST = "frost"
     OFF = "off"
     MANUAL = "manual"
+    BOOST = "boost"
 
 
 class HouseMode(StrEnum):
@@ -78,6 +79,7 @@ class Source(StrEnum):
     HOUSE_AWAY = "house_away"
     VACATION = "vacation"
     HOUSE_OFF = "house_off"
+    BOOST = "boost"
 
 
 class OverrideOrigin(StrEnum):
@@ -184,10 +186,20 @@ class Override:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeState:
-    """State that changes while running: overrides and the last effective mode of each zone."""
+    """State that changes while running: overrides, the last effective mode of each zone, and
+    the end of a boost (every room at its valves' maximum) while one runs."""
 
     overrides: Mapping[str, Override] = field(default_factory=dict)
     house_modes: Mapping[str, HouseMode] = field(default_factory=dict)
+    boost_until: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RoomBoost:
+    """A boost for one room: the highest temperature its valves take, until `until`."""
+
+    until: datetime
+    temperature: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +211,7 @@ class Settings:
     mismatch_alert: timedelta = timedelta(minutes=20)
     vacation_mode: Mode = Mode.FROST
     dry_run: bool = False
+    boost: timedelta = timedelta(hours=1)
 
 
 def _default_zones() -> dict[str, Zone]:

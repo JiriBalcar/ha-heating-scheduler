@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatDateTime,
+  formatDuration,
   formatTemp,
   formatUntil,
   nextText,
@@ -37,6 +38,12 @@ describe("time zones", () => {
     expect(zonedParts(NOW, "Europe/Prague")).toEqual({
       year: 2026, month: 10, day: 5, hour: 12, minute: 0, weekday: 0,
     });
+  });
+});
+
+describe("durations", () => {
+  it("are short", () => {
+    expect([30, 60, 90, 240].map(formatDuration)).toEqual(["30 min", "1 h", "1 h 30 min", "4 h"]);
   });
 });
 

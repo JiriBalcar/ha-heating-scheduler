@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 // Component tests for the findings of the code review of 2026-09-30 (F05-F07).
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../src/card";
 import "../src/components/hs-adv-rooms";
 import "../src/components/hs-adv-settings";
 import "../src/components/hs-block-sheet";
+import "../src/components/hs-boost-card";
 import "../src/components/hs-copy-dialog";
 import "../src/components/hs-holiday-dialog";
 import "../src/components/hs-house-card";
@@ -60,7 +61,9 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
       mismatch_alert_minutes: 20,
       vacation_mode: "frost",
       dry_run: false,
+      boost_minutes: 60,
     },
+    boost_until: null,
     plans: [PLAN],
     temp_sets: [{ id: "house", name: "House", temperatures: { comfort: 21 }, used_by: [] }],
     rooms: [],
@@ -79,6 +82,7 @@ beforeAll(async () => {
       "hs-adv-rooms",
       "hs-adv-settings",
       "hs-block-sheet",
+      "hs-boost-card",
       "hs-copy-dialog",
       "hs-holiday-dialog",
       "hs-house-hints",
@@ -328,6 +332,92 @@ describe("card", () => {
     await card.updateComplete;
     expect(card.shadowRoot.querySelectorAll("hs-house-card")).toHaveLength(1);
     expect(card.shadowRoot.querySelectorAll("hs-room-card")).toHaveLength(0);
+  });
+
+  it("shows the boost tile for the whole house, not for a zone", async () => {
+    const tiles = async (config: Record<string, unknown>) => {
+      const hass = fakeHass(async () => undefined);
+      const card = document.createElement("hs-card") as Any;
+      card.setConfig({ type: "custom:heating-scheduler-card", show_rooms: false, ...config });
+      card.hass = hass;
+      document.body.appendChild(card);
+      hass.push(snapshot(1, { zones: ZONES, rooms: [BEDROOM, KITCHEN] }));
+      await card.updateComplete;
+      return card.shadowRoot.querySelectorAll("hs-boost-card").length;
+    };
+    expect(await tiles({})).toBe(1);
+    expect(await tiles({ zone: "up" })).toBe(0);
+  });
+});
+
+describe("boost tile", () => {
+  afterEach(() => {
+    delete window.loadCardHelpers;
+    vi.useRealTimers();
+  });
+
+  /** A boost tile whose question gets `answer`, with the questions asked and the commands sent. */
+  async function boostTile(data: Snapshot, answer: boolean) {
+    const asked: Any[] = [];
+    const sent: Any[] = [];
+    window.loadCardHelpers = async () =>
+      ({ showConfirmationDialog: async (_element: HTMLElement, params: Any) => (asked.push(params), answer) }) as Any;
+    const element = await mount("hs-boost-card", {
+      snapshot: data,
+      hass: fakeHass(async (message) => void sent.push(message)),
+    });
+    return { element, asked, sent };
+  }
+
+  it("offers the length from the settings and says that Away ends", async () => {
+    const { element, asked, sent } = await boostTile(snapshot(1, { zones: ZONES }), true);
+    expect(text(element.shadowRoot, '[slot="secondary"]')).toBe("Every room at full heat for 1 h");
+    expect(text(element.shadowRoot, "ha-control-button")).toBe("Start");
+    const button = element.shadowRoot.querySelector("ha-control-button");
+    button.click();
+    await element.updateComplete;
+    expect(button.disabled).toBe(true); // Until the new state: no second question.
+    await vi.waitFor(() => expect(sent).toEqual([{ type: "heating_scheduler/boost/start" }]));
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+    expect(asked.map((params) => [params.text, params.confirmText])).toEqual([
+      ["Heat every room at full power for 1 h? Away, Holiday and Off end.", "Yes, heat"],
+    ]);
+  });
+
+  it("sends nothing when the question is declined", async () => {
+    const base = snapshot(1);
+    const { element, asked, sent } = await boostTile(
+      snapshot(1, { settings: { ...base.settings, boost_minutes: 90 } }),
+      false,
+    );
+    await element.toggle();
+    expect(asked.map((params) => params.text)).toEqual(["Heat every room at full power for 1 h 30 min?"]);
+    expect(sent).toEqual([]);
+  });
+
+  it("shows the end of a running boost and stops it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T10:00:00Z")); // 12:00 in Prague
+    const { element, asked, sent } = await boostTile(snapshot(1, { boost_until: "2026-10-05T11:00:00Z" }), true);
+    expect(text(element.shadowRoot, '[slot="secondary"]')).toBe("Full heat until 1:00 PM");
+    expect(text(element.shadowRoot, "ha-control-button")).toBe("Stop");
+    await element.toggle();
+    expect(asked.map((params) => params.confirmText)).toEqual(["Yes, stop"]);
+    expect(sent).toEqual([{ type: "heating_scheduler/boost/stop" }]);
+  });
+
+  it("keeps − / + of the rooms off while it runs", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T10:00:00Z"));
+    const until = "2026-10-05T11:00:00Z";
+    const boosted: RoomData = {
+      ...KITCHEN,
+      target: { mode: "boost", temperature: 35, source: "boost", valid_until: until, next: null },
+    };
+    const data = snapshot(1, { zones: ZONES, rooms: [boosted], boost_until: until });
+    const tile = await mount("hs-room-card", { snapshot: data, room: boosted });
+    expect(tile.shadowRoot.querySelector("ha-control-number-buttons").disabled).toBe(true);
+    expect(text(tile.shadowRoot, '[slot="secondary"]')).toBe("19.0 °C · Boost until 1:00 PM");
   });
 });
 

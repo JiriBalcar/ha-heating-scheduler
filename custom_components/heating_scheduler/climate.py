@@ -40,6 +40,8 @@ PARALLEL_UPDATES = 0
 PRESETS = [mode.value for mode in TEMPERATURE_MODES]
 # A manual change at a temperature that no mode has.
 MANUAL_PRESET = TargetMode.MANUAL.value
+# A boost of the whole house; offered only while one runs.
+BOOST_PRESET = TargetMode.BOOST.value
 
 
 async def async_setup_entry(
@@ -61,7 +63,6 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     _attr_name = None
     _attr_translation_key = "thermostat"
     _attr_hvac_modes = [HVACMode.AUTO, HVACMode.HEAT, HVACMode.OFF]
-    _attr_preset_modes = [*PRESETS, MANUAL_PRESET]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
@@ -140,7 +141,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
             return None
         if target.temperature is None:
             return HVACMode.OFF
-        if target.source is Source.MANUAL:
+        if target.source in (Source.MANUAL, Source.BOOST):
             return HVACMode.HEAT
         return HVACMode.AUTO
 
@@ -160,6 +161,12 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         return HVACAction.IDLE
 
     @property
+    def preset_modes(self) -> list[str]:
+        """Return the modes, "manual", and "boost" while a boost runs."""
+        presets = [*PRESETS, MANUAL_PRESET]
+        return [*presets, BOOST_PRESET] if self._engine.boost_until is not None else presets
+
+    @property
     def preset_mode(self) -> str | None:
         """Return the current mode if it has a temperature.
 
@@ -169,6 +176,8 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         target = self.target
         if target is None or target.temperature is None:
             return None
+        if target.source is Source.BOOST:
+            return BOOST_PRESET
         if target.source is Source.MANUAL:
             for mode, temperature in self._temperatures().items():
                 if mode in TEMPERATURE_MODES and temperature == target.temperature:
@@ -234,6 +243,8 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         if preset_mode == MANUAL_PRESET:
             await self.async_set_hvac_mode(HVACMode.HEAT)
             return
+        if preset_mode == BOOST_PRESET:
+            return  # Only listed while the boost runs.
         await self._override(self._temperatures()[Mode(preset_mode)])
 
     async def async_turn_on(self) -> None:

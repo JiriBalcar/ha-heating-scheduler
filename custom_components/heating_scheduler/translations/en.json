@@ -26,7 +26,8 @@
           "away": "Away",
           "frost": "Frost guard",
           "off": "Off",
-          "manual": "By hand"
+          "manual": "By hand",
+          "boost": "Boost"
         }
       }
     },
@@ -88,10 +89,16 @@
               "night": "Night",
               "away": "Away",
               "frost": "Frost guard",
-              "manual": "Manual"
+              "manual": "Manual",
+              "boost": "Boost"
             }
           }
         }
+      }
+    },
+    "switch": {
+      "boost": {
+        "name": "Boost"
       }
     }
   },
@@ -119,6 +126,12 @@
     },
     "mixed": {
       "message": "Mixed is not a mode. Choose Normal, Away, Holiday or Off."
+    },
+    "boost_active": {
+      "message": "A boost is running. Stop it first."
+    },
+    "boost_duration": {
+      "message": "A boost lasts from 15 minutes to 4 hours."
     }
   },
   "selector": {
@@ -209,6 +222,16 @@
     "reconcile_now": {
       "name": "Check valves now",
       "description": "Checks every radiator valve now and sends the correct temperature."
+    },
+    "boost": {
+      "name": "Boost",
+      "description": "Heats every room at its valves' maximum for a while. Ends Away, Holiday and Off first.",
+      "fields": {
+        "duration": {
+          "name": "Duration",
+          "description": "How long. Empty: the length in the settings."
+        }
+      }
     }
   }
 }

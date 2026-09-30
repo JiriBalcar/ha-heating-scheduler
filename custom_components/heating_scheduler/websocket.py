@@ -162,6 +162,7 @@ def snapshot(engine: HeatingEngine) -> dict[str, Any]:
             for zone in config.zones.values()
         ],
         "settings": settings_to_dict(config.settings),
+        "boost_until": None if engine.boost_until is None else datetime_to_str(engine.boost_until),
         "plans": [
             {**plan_to_dict(plan), "used_by": rooms_using_plan(config, plan.id)}
             for plan in config.plans.values()
@@ -629,6 +630,28 @@ async def ws_log(
     connection.send_result(msg["id"], {"entries": entries})
 
 
+@websocket_command({vol.Required("type"): f"{PREFIX}boost/start"})
+@async_response
+@_guarded
+async def ws_boost_start(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """Start a boost for the length in the settings (ends Away, Holiday and Off)."""
+    await engine.async_start_boost()
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
+
+
+@websocket_command({vol.Required("type"): f"{PREFIX}boost/stop"})
+@async_response
+@_guarded
+async def ws_boost_stop(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """End the boost."""
+    await engine.async_stop_boost()
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
+
+
 @websocket_command({vol.Required("type"): f"{PREFIX}reconcile"})
 @async_response
 @_guarded
@@ -737,6 +760,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_house_mode_set,
         ws_vacation_set,
         ws_vacation_cancel,
+        ws_boost_start,
+        ws_boost_stop,
         ws_zone_save,
         ws_zone_delete,
         ws_zones_reorder,

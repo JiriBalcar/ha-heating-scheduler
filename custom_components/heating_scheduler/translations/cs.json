@@ -26,7 +26,8 @@
           "away": "Pryč",
           "frost": "Proti mrazu",
           "off": "Vypnuto",
-          "manual": "Ručně"
+          "manual": "Ručně",
+          "boost": "Naplno"
         }
       }
     },
@@ -88,10 +89,16 @@
               "night": "Noc",
               "away": "Pryč",
               "frost": "Proti mrazu",
-              "manual": "Ručně"
+              "manual": "Ručně",
+              "boost": "Naplno"
             }
           }
         }
+      }
+    },
+    "switch": {
+      "boost": {
+        "name": "Zatopit naplno"
       }
     }
   },
@@ -119,6 +126,12 @@
     },
     "mixed": {
       "message": "Různě není režim. Vyberte Normálně, Pryč, Dovolená nebo Vypnuto."
+    },
+    "boost_active": {
+      "message": "Právě se zatápí naplno. Nejdřív to ukončete."
+    },
+    "boost_duration": {
+      "message": "Zatopení naplno trvá 15 minut až 4 hodiny."
     }
   },
   "selector": {
@@ -209,6 +222,16 @@
     "reconcile_now": {
       "name": "Zkontrolovat hlavice",
       "description": "Hned zkontroluje všechny hlavice a pošle jim správnou teplotu."
+    },
+    "boost": {
+      "name": "Zatopit naplno",
+      "description": "Zatopí ve všech místnostech naplno, hlavice na maximum. Nejdřív ukončí Pryč, dovolenou a vypnuté topení.",
+      "fields": {
+        "duration": {
+          "name": "Doba",
+          "description": "Jak dlouho. Prázdné: délka z nastavení."
+        }
+      }
     }
   }
 }

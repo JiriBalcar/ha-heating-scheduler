@@ -248,6 +248,7 @@ def settings_to_dict(settings: Settings) -> JsonDict:
         "mismatch_alert_minutes": _minutes(settings.mismatch_alert),
         "vacation_mode": settings.vacation_mode.value,
         "dry_run": settings.dry_run,
+        "boost_minutes": _minutes(settings.boost),
     }
 
 
@@ -259,6 +260,8 @@ def settings_from_dict(data: Mapping[str, Any]) -> Settings:
         mismatch_alert=timedelta(minutes=_get(data, "mismatch_alert_minutes", int)),
         vacation_mode=_enum(Mode, _get(data, "vacation_mode", str), "vacation mode"),
         dry_run=_get(data, "dry_run", bool),
+        # Added after 2.1; older stores use the default.
+        boost=timedelta(minutes=_opt(data, "boost_minutes", int) or 60),
     )
 
 
@@ -318,6 +321,7 @@ def state_to_dict(state: RuntimeState) -> JsonDict:
     return {
         "overrides": {key: override_to_dict(item) for key, item in state.overrides.items()},
         "house_modes": {key: mode.value for key, mode in state.house_modes.items()},
+        "boost_until": None if state.boost_until is None else datetime_to_str(state.boost_until),
     }
 
 
@@ -336,7 +340,13 @@ def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
             house_modes[key] = _enum(HouseMode, value, "house mode")
         except ValidationError:
             continue
-    return RuntimeState(overrides=overrides, house_modes=house_modes)
+    boost_until: datetime | None = None
+    try:
+        raw_boost = _opt(data, "boost_until", str)
+        boost_until = None if raw_boost is None else datetime_from_str(raw_boost)
+    except ValidationError:
+        pass
+    return RuntimeState(overrides=overrides, house_modes=house_modes, boost_until=boost_until)
 
 
 def migrate_config(

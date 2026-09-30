@@ -10,7 +10,8 @@
               "night": "mdi:weather-night",
               "away": "mdi:home-export-outline",
               "frost": "mdi:snowflake",
-              "manual": "mdi:hand-back-right"
+              "manual": "mdi:hand-back-right",
+              "boost": "mdi:fire"
             }
           }
         }
@@ -26,7 +27,8 @@
           "away": "mdi:home-export-outline",
           "frost": "mdi:snowflake",
           "off": "mdi:radiator-off",
-          "manual": "mdi:hand-back-right"
+          "manual": "mdi:hand-back-right",
+          "boost": "mdi:fire"
         }
       }
     },
@@ -72,6 +74,14 @@
       "temperature_frost": {
         "default": "mdi:snowflake"
       }
+    },
+    "switch": {
+      "boost": {
+        "default": "mdi:fire",
+        "state": {
+          "off": "mdi:fire-off"
+        }
+      }
     }
   },
   "services": {
@@ -92,6 +102,9 @@
     },
     "reconcile_now": {
       "service": "mdi:sync"
+    },
+    "boost": {
+      "service": "mdi:fire"
     }
   }
 }

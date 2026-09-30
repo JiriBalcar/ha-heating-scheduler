@@ -14,6 +14,7 @@ from custom_components.heating_scheduler.core.model import (
     Override,
     OverrideOrigin,
     Room,
+    RoomBoost,
     Source,
     Target,
     TargetMode,
@@ -121,6 +122,33 @@ def test_house_mode_beats_manual_change(house: HouseState) -> None:
     target = resolve(now, house, STANDARD, TEMPS, manual(25.0, now + timedelta(hours=2)), PRAGUE)
     assert target.mode is not TargetMode.MANUAL
     assert target.source is not Source.MANUAL
+
+
+def test_boost_beats_manual_change_and_plan_and_ends() -> None:
+    now = prague(2026, 10, 5, 12)
+    boost = RoomBoost(prague(2026, 10, 5, 13), 35.0)
+    override = manual(18.0, now + timedelta(hours=2))
+    target = resolve(now, AUTO, STANDARD, TEMPS, override, PRAGUE, boost)
+    assert (target.mode, target.temperature, target.source) == (
+        TargetMode.BOOST,
+        35.0,
+        Source.BOOST,
+    )
+    assert target.valid_until == prague(2026, 10, 5, 13)
+    after = resolve(boost.until, AUTO, STANDARD, TEMPS, override, PRAGUE, boost)
+    assert after.source is Source.MANUAL
+    assert target.next == Target(after.mode, after.temperature, after.source)
+
+
+def test_a_planned_holiday_that_starts_during_a_boost_wins() -> None:
+    now = prague(2026, 10, 5, 12)
+    start = prague(2026, 10, 5, 13)
+    house = HouseState(vacation=Vacation(start, None, Mode.FROST))
+    boost = RoomBoost(prague(2026, 10, 5, 14), 35.0)
+    target = resolve(now, house, STANDARD, TEMPS, None, PRAGUE, boost)
+    assert target.source is Source.BOOST
+    assert target.valid_until == start
+    assert target.next == Target(TargetMode.FROST, TEMPS[Mode.FROST], Source.VACATION)
 
 
 def test_manual_change_beats_plan_and_ends() -> None:

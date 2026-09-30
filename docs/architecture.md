@@ -58,19 +58,31 @@ tests/core/  tests/ha/
   (`zone_id`). There is always at least one zone: a new installation has one zone for the
   whole house, and the last zone cannot be deleted. Deleting a zone moves its rooms to the
   first remaining zone. Zones have an order, which the UI and the selects follow.
+- **Boost (decision, 2026-09-30, user request)**: one end time for the whole house
+  (`boost_until` in the state store). While it runs, each room's target is the highest
+  `max_temp` of its valves (35 °C if no valve reports one); the usual clamping gives each
+  valve its own maximum. The length comes from the settings (default 1 h, 15 min to 4 h; the
+  panel offers 30 min to 4 h) or from the `boost` service. A boost means someone is home:
+  starting one switches every zone that is not Normal to Normal (this also ends a running
+  holiday). When any zone leaves Normal (Away, Off, a holiday, also a planned one that
+  starts), housekeeping ends the boost. A boost that ended while HA was stopped is dropped at
+  start.
 
 ## resolve()
 
 ```python
-resolve(now, house, plan, temperatures, override, tz) -> RoomTarget(
+resolve(now, house, plan, temperatures, override, tz, boost=None) -> RoomTarget(
     mode, temperature, reason, valid_until, next)
 ```
 
 `house` is the house state of the room's zone.
 
-Precedence **(decision)**: house mode `off` / `vacation` / `away` → manual change
-(override) → the room's plan. A manual change never beats a house mode; knob changes in
-those modes are undone.
+Precedence **(decision)**: house mode `off` / `vacation` / `away` → boost → manual change
+(override) → the room's plan. A boost starts only when every zone is Normal, so a house mode
+wins over it only when a planned holiday starts during the boost; the holiday start is a
+change instant, so the timer runs then and housekeeping ends the boost. A manual change never
+beats a house mode or a boost; knob changes then are undone, and changes from the app or a
+service are refused (`boost_active` during a boost).
 
 - `valid_until` is the next instant where (mode, temperature, source) changes, within
   8 days; `next` is the target after it.
@@ -89,7 +101,8 @@ those modes are undone.
 - Reconcile is a synchronous computation. Triggers coalesce into one run per event-loop
   iteration: HA started, next-event timer, any config / house / override change, safety
   tick (default 5 min), TRV available again, time zone change.
-- Housekeeping first: drop expired overrides, clear the finished vacation of each zone.
+- Housekeeping first: drop expired overrides, end an expired boost, clear the finished
+  vacation of each zone.
 - A change of a zone's effective mode clears the overrides of that zone's rooms
   **(decision)**. The state store keeps the last effective mode of each zone, so a change
   while HA was stopped also clears them.
@@ -136,7 +149,8 @@ those modes are undone.
 - Anything else is a manual change and becomes an override for the room: until the next
   plan change, capped by the max duration (default 4 h). After 3 s without further knob
   changes, the value goes to the other TRVs of the room.
-- In house modes away / vacation / off, a manual change is logged and undone.
+- In house modes away / vacation / off, and during a boost, a manual change is logged and
+  undone.
 - After an echo that moved the setpoint or HVAC mode (for example a cancelled write that
   landed late), an idle worker checks the TRV again and corrects it at once.
 - Config commands return the new revision. Editors detect whether the edited item itself
@@ -147,7 +161,7 @@ those modes are undone.
 | Store key | Content | Save |
 |---|---|---|
 | `heating_scheduler.config` | zones with their house state, rooms, plans, temperature sets, settings | immediately |
-| `heating_scheduler.state` | overrides, last effective mode of each zone | 2 s delay, flushed on stop |
+| `heating_scheduler.state` | overrides, last effective mode of each zone, boost end | 2 s delay, flushed on stop |
 | `heating_scheduler.log` | last 100 events per room | 60 s delay |
 
 The configuration has a revision; websocket writes must send the revision they edited.
@@ -164,7 +178,10 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   and the mode sensor show a new room temperature at once.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
-- House: `select` (house mode), five `number` entities (house temperatures). The house mode
+- Room thermostat: `heat` during a manual change or a boost. The preset `boost` is listed
+  only while a boost runs; HA allows 100 capability changes per hour, and a boost makes two.
+- House: `select` (house mode), `switch` (boost; attributes `until`, `duration_minutes`), five
+  `number` entities (house temperatures). The house mode
   select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision
   2026-09-30) and the attribute `zones` holds the mode of each zone. `mixed` is one of the
   options only then, because a select's state must be an option; selecting it is an error.
@@ -173,8 +190,9 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   select: HA caches an entity's name and new translation placeholders do not clear it, so the
   select clears it itself.
 - Services: `set_override`, `clear_override` (target: room thermostat), `set_house_mode`,
-  `set_vacation`, `cancel_vacation`, `reconcile_now`. The house services take an optional
-  `zone` (name in any case, or id); without it they apply to every zone.
+  `set_vacation`, `cancel_vacation`, `boost` (optional `duration`), `reconcile_now`. The house
+  services take an optional `zone` (name in any case, or id); without it they apply to every
+  zone.
 - Create zones from floors (`zones/from_floors`) uses HA's floor registry. A room's area is
   its own `area_id`, or else the area of its first valve that has one (the entity's area,
   else its device's area). A zone with the floor's name is reused. Zones that the import
@@ -251,6 +269,12 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   HA's one height (the house selector is 42 px, like the room tiles). A valve problem shows in
   the room tile's status line in the warning colour, and in one alert above the tiles. Holiday
   tapped during a holiday opens the Holiday dialog with its dates, to change them.
+- **Boost tile (decision, 2026-09-30).** The overview has a Boost tile after the Whole house
+  tile; a card for the whole house has it under the house tile. A tap on the tile or its
+  button asks first, in HA's dialog box. The button stays off from the tap to the new state:
+  HA's dialog box needs about a second to close, and a second tap in that time would ask
+  again over it. During a boost, room tiles show Boost in red with a fire icon, and − / + are
+  off.
 - **Rows in narrow cards.** `ha-settings-row` gives the label and the control half the width
   each. A container query on the card stacks the control under the label when the card is
   narrow (the threshold depends on the control), as HA's own narrow layout does; HA's `narrow`

@@ -52,9 +52,9 @@ export interface CardConfig {
 }
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";
-export type TargetMode = Mode | "manual";
+export type TargetMode = Mode | "manual" | "boost";
 export type HouseMode = "auto" | "away" | "vacation" | "off";
-export type Source = "plan" | "manual" | "house_away" | "vacation" | "house_off";
+export type Source = "plan" | "manual" | "house_away" | "vacation" | "house_off" | "boost";
 
 export const MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost", "off"];
 export const TEMPERATURE_MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost"];
@@ -146,6 +146,7 @@ export interface SettingsData {
   mismatch_alert_minutes: number;
   vacation_mode: "frost" | "away";
   dry_run: boolean;
+  boost_minutes: number;
 }
 
 /** The house mode and holiday of a zone. */
@@ -168,6 +169,8 @@ export interface Snapshot {
   time_zone: string;
   zones: ZoneData[];
   settings: SettingsData;
+  /** The end of the boost while one runs. */
+  boost_until: string | null;
   plans: PlanData[];
   temp_sets: TempSetData[];
   rooms: RoomData[];

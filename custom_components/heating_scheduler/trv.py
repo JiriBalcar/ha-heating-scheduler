@@ -366,6 +366,13 @@ class TrvWorker:
             ),
         )
 
+    def max_temperature(self) -> float | None:
+        """Return the highest setpoint the TRV takes, in °C, if it says."""
+        state = self._hass.states.get(self.entity_id)
+        if state is None:
+            return None
+        return to_celsius(_number(state.attributes.get(ATTR_MAX_TEMP)), self.unit)
+
     def _plan(self, state: State) -> WritePlan | None:
         """Return what to send so the TRV matches `desired`, or None if it already does."""
         desired = self.desired

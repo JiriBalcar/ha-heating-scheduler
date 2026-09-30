@@ -51,6 +51,7 @@ from .core.model import (
     Override,
     OverrideOrigin,
     Room,
+    RoomBoost,
     RoomTarget,
     RuntimeState,
     Vacation,
@@ -60,13 +61,16 @@ from .core.overrides import ExpiryKind, override_until
 from .core.resolve import next_plan_change, resolve, room_inputs
 from .core.schedule_ops import default_config
 from .core.text import DEFAULT_NAMES, language
-from .core.validation import ValidationError, check_temperature, validate_config
+from .core.validation import SETTINGS_LIMITS, ValidationError, check_temperature, validate_config
 from .health import Issue
 from .log import EventLog, LogEntry, LogKind
 from .storage import HeatingStorage
 from .trv import Desired, TrvWorker, is_available, step_of, to_celsius
 
 _LOGGER = logging.getLogger(__name__)
+
+# The boost temperature of a room whose valves do not say their maximum (HA's default).
+BOOST_FALLBACK_TEMPERATURE = 35.0
 
 
 class HeatingEngine:
@@ -120,9 +124,14 @@ class HeatingEngine:
             if room_id in config.rooms and item.until > now
         }
         house_modes = {key: mode for key, mode in stored.house_modes.items() if key in config.zones}
-        self.state = RuntimeState(overrides, house_modes)
-        if overrides != dict(stored.overrides):
-            # Overrides that expired while Home Assistant was down are dropped.
+        boost = (
+            stored.boost_until
+            if stored.boost_until is not None and stored.boost_until > now
+            else None
+        )
+        self.state = RuntimeState(overrides, house_modes, boost)
+        if overrides != dict(stored.overrides) or boost != stored.boost_until:
+            # Overrides and a boost that ended while Home Assistant was down are dropped.
             await self.storage.async_save_state(self.state)
 
         self.log.load(await self.storage.async_load_log())
@@ -266,10 +275,25 @@ class HeatingEngine:
     def _resolve_room(self, room: Room, now: datetime, tz: Any) -> RoomTarget:
         plan, temperatures = room_inputs(room, self.config.plans, self.config.temp_sets)
         house = self.config.zone_of(room).house
-        return resolve(now, house, plan, temperatures, self.state.overrides.get(room.id), tz)
+        override = self.state.overrides.get(room.id)
+        return resolve(now, house, plan, temperatures, override, tz, self._room_boost(room, now))
+
+    def _room_boost(self, room: Room, now: datetime) -> RoomBoost | None:
+        """Return the boost of a room: the highest setpoint any of its valves takes."""
+        until = self.state.boost_until
+        if until is None or until <= now or not room.trvs:
+            return None
+        limits = [
+            limit
+            for entity_id in room.trvs
+            if (worker := self.workers.get(entity_id)) is not None
+            and (limit := worker.max_temperature()) is not None
+        ]
+        # Each valve is then limited to its own maximum; HA's default maximum otherwise.
+        return RoomBoost(until, max(limits, default=BOOST_FALLBACK_TEMPERATURE))
 
     def _housekeeping(self, now: datetime) -> None:
-        """Drop expired overrides, end finished holidays, react to zone mode changes."""
+        """Drop expired overrides, end finished holidays and boosts, react to zone mode changes."""
         config = self.config
         for zone in config.zones.values():
             vacation = zone.house.vacation
@@ -277,6 +301,11 @@ class HeatingEngine:
                 config = put_zone_house(config, zone.id, HouseState(zone.house.mode, None))
         if config is not self.config:
             self._commit_config_soon(config)
+
+        boost_until = self.state.boost_until
+        if boost_until is not None and boost_until <= now:
+            boost_until = None
+            self._log_boost(LogKind.BOOST_ENDED, now)
 
         overrides = dict(self.state.overrides)
         for room_id, item in list(overrides.items()):
@@ -286,7 +315,8 @@ class HeatingEngine:
                     room_id, LogEntry(now, LogKind.OVERRIDE_EXPIRED, value=item.temperature)
                 )
 
-        # A change of a zone's mode ends the manual changes in that zone's rooms.
+        # A change of a zone's mode ends the manual changes in that zone's rooms. Away,
+        # Holiday or Off in any zone ends a boost: nobody is home there.
         house_modes: dict[str, HouseMode] = {}
         for zone in self.config.zones.values():
             effective = zone.house.effective_mode(now)
@@ -294,6 +324,9 @@ class HeatingEngine:
             previous = self.state.house_modes.get(zone.id)
             if previous is None or effective is previous:
                 continue
+            if effective is not HouseMode.AUTO and boost_until is not None:
+                boost_until = None
+                self._log_boost(LogKind.BOOST_ENDED, now)
             for room in self.config.rooms.values():
                 if self.config.zone_of(room).id != zone.id or room.id not in overrides:
                     continue
@@ -307,7 +340,7 @@ class HeatingEngine:
                         detail=f"house mode {effective.value}",
                     ),
                 )
-        new_state = RuntimeState(overrides, house_modes)
+        new_state = RuntimeState(overrides, house_modes, boost_until)
         if new_state != self.state:
             self.state = new_state
             self._save_state()
@@ -451,8 +484,9 @@ class HeatingEngine:
             return
         house = self.config.zone_of(room).house
         house_mode = house.effective_mode(now)
-        if house_mode is not HouseMode.AUTO:
-            # The zone's house mode wins: undo the change.
+        boosting = self.boost_until is not None
+        if house_mode is not HouseMode.AUTO or boosting:
+            # A boost or the zone's house mode wins: undo the change.
             self.log.add(
                 room.id,
                 LogEntry(
@@ -460,7 +494,7 @@ class HeatingEngine:
                     LogKind.MANUAL_IGNORED,
                     entity_id=worker.entity_id,
                     value=value,
-                    detail=f"house mode {house_mode.value}",
+                    detail="boost" if boosting else f"house mode {house_mode.value}",
                 ),
             )
             worker.reevaluate()
@@ -590,6 +624,8 @@ class HeatingEngine:
                 f"the zone is in mode {house_mode.value}",
                 house_mode=house_mode.value,
             )
+        if self.boost_until is not None:
+            raise ValidationError("boost_active", "a boost is running")
         if temperature is not None:
             check_temperature(temperature)
         tz = dt_util.get_default_time_zone()
@@ -708,6 +744,52 @@ class HeatingEngine:
         if expected_revision is not None and expected_revision != self.config.revision:
             raise ValidationError("revision_conflict", "the configuration was changed elsewhere")
         await self._async_commit(config)
+
+    @property
+    def boost_until(self) -> datetime | None:
+        """Return the end of the boost while one runs."""
+        until = self.state.boost_until
+        return until if until is not None and until > dt_util.utcnow() else None
+
+    async def async_start_boost(self, duration: timedelta | None = None) -> None:
+        """Heat every room at its valves' maximum for `duration` (the setting by default).
+
+        A boost means someone is home: it ends Away, Holiday and Off in every zone first.
+        """
+        length = duration if duration is not None else self.config.settings.boost
+        low, high = SETTINGS_LIMITS["boost"]
+        if not low <= length <= high:
+            raise ValidationError("boost_duration", "the boost length is out of range")
+        now = dt_util.utcnow()
+        leaving = [
+            zone.id
+            for zone in self.config.zones.values()
+            if zone.house.effective_mode(now) is not HouseMode.AUTO
+        ]
+        if leaving:
+            await self.async_set_house_mode(HouseMode.AUTO, leaving)
+        self.state = replace(self.state, boost_until=now + length)
+        self._save_state()
+        self._log_boost(LogKind.BOOST_STARTED, now)
+        self.request_reconcile()
+
+    async def async_stop_boost(self) -> None:
+        """End the boost now."""
+        if self._end_boost(dt_util.utcnow()):
+            self.request_reconcile()
+
+    def _end_boost(self, now: datetime) -> bool:
+        """End a running boost; return True if one ran."""
+        if self.state.boost_until is None:
+            return False
+        self.state = replace(self.state, boost_until=None)
+        self._save_state()
+        self._log_boost(LogKind.BOOST_ENDED, now)
+        return True
+
+    def _log_boost(self, kind: LogKind, now: datetime) -> None:
+        for room in self.config.rooms.values():
+            self.log.add(room.id, LogEntry(now, kind))
 
     @callback
     def reconcile_now(self) -> None:

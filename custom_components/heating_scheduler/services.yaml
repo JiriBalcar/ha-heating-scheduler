@@ -78,3 +78,10 @@ cancel_vacation:
         text:
 
 reconcile_now:
+
+boost:
+  fields:
+    duration:
+      example: "01:00:00"
+      selector:
+        duration:

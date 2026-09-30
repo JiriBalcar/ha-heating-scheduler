@@ -28,6 +28,8 @@ class LogKind(StrEnum):
     OVERRIDE_EXPIRED = "override_expired"
     UNAVAILABLE = "unavailable"
     AVAILABLE = "available"
+    BOOST_STARTED = "boost_started"  # every room at its valves' maximum
+    BOOST_ENDED = "boost_ended"
 
 
 @dataclass(frozen=True, slots=True)

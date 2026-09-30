@@ -36,6 +36,7 @@ SETTINGS_LIMITS: Mapping[str, tuple[timedelta, timedelta]] = {
     "max_override": (timedelta(minutes=15), timedelta(hours=24)),
     "safety_interval": (timedelta(minutes=1), timedelta(minutes=60)),
     "mismatch_alert": (timedelta(minutes=5), timedelta(hours=24)),
+    "boost": (timedelta(minutes=15), timedelta(hours=4)),
 }
 
 

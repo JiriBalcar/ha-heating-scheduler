@@ -2,6 +2,7 @@
 import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { define } from "./components/define";
+import "./components/hs-boost-card";
 import "./components/hs-house-card";
 import "./components/hs-house-hints";
 import "./components/hs-room-card";
@@ -63,7 +64,9 @@ export class HeatingSchedulerCard extends LitElement {
 
   getCardSize(): number {
     const rooms = this.config?.show_rooms === false ? 0 : this.config?.room ? 1 : (this.snapshot?.rooms.length ?? 2);
-    return (this.showHouse ? 3 : 0) + rooms * (this.config?.compact ? 3 : 5);
+    // The house tile, and the boost tile in a card for the whole house.
+    const house = this.showHouse ? (this.config?.zone ? 3 : 6) : 0;
+    return house + rooms * (this.config?.compact ? 3 : 5);
   }
 
   /** The house tile shows when the card asks for it, and always when it shows no rooms. */
@@ -108,7 +111,8 @@ export class HeatingSchedulerCard extends LitElement {
       <div class="stack">
         ${this.showHouse
           ? html`<hs-house-hints .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-hints>
-              <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>`
+              <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>
+              ${zone ? nothing : html`<hs-boost-card .hass=${this.hass} .snapshot=${snapshot}></hs-boost-card>`}`
           : nothing}
         ${repeat(
           rooms,

@@ -1,4 +1,5 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { formatDuration } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
@@ -14,6 +15,7 @@ function same(a: SettingsData, b: SettingsData): boolean {
 }
 const SAFETY_MINUTES = [1, 2, 5, 10, 15, 30, 60];
 const MISMATCH_MINUTES = [10, 20, 30, 60, 120, 240];
+const BOOST_MINUTES = [30, 60, 90, 120, 180, 240];
 
 /** Global settings. */
 export class HsAdvSettings extends LitElement {
@@ -130,12 +132,12 @@ export class HsAdvSettings extends LitElement {
     }
   }
 
-  /** A setting row with a dropdown of hours or minutes. */
+  /** A setting row with a dropdown of hours, minutes, or a length ("1 h 30 min"). */
   private choice(
     heading: string,
     values: number[],
     current: number,
-    unit: "hours" | "minutes",
+    unit: "hours" | "minutes" | "duration",
     onChange: (value: number) => void,
     description?: string,
   ) {
@@ -143,7 +145,10 @@ export class HsAdvSettings extends LitElement {
     const all = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
     const options = all.map((value) => ({
       value: String(value),
-      label: t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
+      label:
+        unit === "duration"
+          ? formatDuration(value)
+          : t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
     }));
     return html`<ha-settings-row>
       <span slot="heading">${heading}</span>
@@ -177,6 +182,9 @@ export class HsAdvSettings extends LitElement {
         )}
         ${this.choice(t("adv.settings.mismatch_alert"), MISMATCH_MINUTES, draft.mismatch_alert_minutes, "minutes", (m) =>
           this.set("mismatch_alert_minutes", m),
+        )}
+        ${this.choice(t("adv.settings.boost"), BOOST_MINUTES, draft.boost_minutes, "duration", (m) =>
+          this.set("boost_minutes", m),
         )}
         <ha-settings-row>
           <span slot="heading">${t("adv.settings.vacation_mode")}</span>

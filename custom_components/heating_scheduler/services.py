@@ -24,6 +24,7 @@ SERVICE_SET_HOUSE_MODE = "set_house_mode"
 SERVICE_SET_VACATION = "set_vacation"
 SERVICE_CANCEL_VACATION = "cancel_vacation"
 SERVICE_RECONCILE_NOW = "reconcile_now"
+SERVICE_BOOST = "boost"
 
 SET_OVERRIDE_SCHEMA: VolDictType = {
     vol.Required("temperature"): vol.All(
@@ -48,6 +49,8 @@ SET_VACATION_SCHEMA = vol.Schema(
     }
 )
 CANCEL_VACATION_SCHEMA = vol.Schema({vol.Optional("zone"): cv.string})
+
+BOOST_SCHEMA = vol.Schema({vol.Optional("duration"): cv.positive_time_period})
 
 
 def _engine(hass: HomeAssistant) -> HeatingEngine:
@@ -124,6 +127,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
     async def reconcile_now(_call: ServiceCall) -> None:
         _engine(hass).reconcile_now()
 
+    async def boost(call: ServiceCall) -> None:
+        try:
+            await _engine(hass).async_start_boost(call.data.get("duration"))
+        except ValidationError as err:
+            raise service_error(err) from err
+
     hass.services.async_register(
         DOMAIN, SERVICE_SET_HOUSE_MODE, set_house_mode, schema=SET_HOUSE_MODE_SCHEMA
     )
@@ -134,3 +143,4 @@ def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_CANCEL_VACATION, cancel_vacation, schema=CANCEL_VACATION_SCHEMA
     )
     hass.services.async_register(DOMAIN, SERVICE_RECONCILE_NOW, reconcile_now)
+    hass.services.async_register(DOMAIN, SERVICE_BOOST, boost, schema=BOOST_SCHEMA)
