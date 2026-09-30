@@ -42,11 +42,18 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> bool:
-    """Start the engine, the platforms and the frontend."""
+    """Register the frontend, then start the engine and the platforms.
+
+    Home Assistant serves its page while integrations still start (after a restart, the app
+    reconnects at once), and a page loads the card only if its module was registered when the
+    page was made. So the frontend comes first.
+    """
+    await async_register_frontend(hass)
     engine = HeatingEngine(hass, entry, HeatingStorage(hass))
     try:
         await engine.async_setup()
     except ValidationError as err:
+        async_unregister_frontend(hass)
         raise ConfigEntryError(f"The stored configuration is invalid: {err}") from err
     entry.runtime_data = engine
 
@@ -57,7 +64,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> b
     sync_devices()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_ROOMS_CHANGED, sync_devices))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    await async_register_frontend(hass)
     return True
 
 

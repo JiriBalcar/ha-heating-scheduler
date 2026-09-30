@@ -203,3 +203,5 @@ async def test_broken_stored_config_fails_setup(
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is config_entries.ConfigEntryState.SETUP_ERROR
+    # The frontend, registered first, goes again.
+    assert PANEL_URL_PATH not in hass.data.get("frontend_panels", {})
