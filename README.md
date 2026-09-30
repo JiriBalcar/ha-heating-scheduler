@@ -171,7 +171,7 @@ Entity ids depend on the Home Assistant language; English names are shown.
 
 | Entity | Per | Purpose |
 |---|---|---|
-| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change, `off` = off. |
+| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change, `off` = off. The preset is the mode; a manual change shows the mode with its temperature, or Manual. |
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |

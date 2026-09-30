@@ -87,7 +87,8 @@
               "eco": "Úspora",
               "night": "Noc",
               "away": "Pryč",
-              "frost": "Proti mrazu"
+              "frost": "Proti mrazu",
+              "manual": "Ručně"
             }
           }
         }

@@ -87,7 +87,8 @@
               "eco": "Saving",
               "night": "Night",
               "away": "Away",
-              "frost": "Frost guard"
+              "frost": "Frost guard",
+              "manual": "Manual"
             }
           }
         }

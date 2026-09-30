@@ -140,7 +140,19 @@ async def test_thermostat_modes_presets_and_turn_on_off(
     trv = standard_trvs["climate.living_trv_1"]
     await call(hass, "climate", "set_preset_mode", {"entity_id": THERMOSTAT, "preset_mode": "eco"})
     assert trv.setpoint == 19.0
-    assert hass.states.get(THERMOSTAT).state == "heat"  # type: ignore[union-attr]
+    state = hass.states.get(THERMOSTAT)
+    assert state is not None and state.state == "heat"
+    # The picked preset stays shown; a temperature of no mode shows "manual".
+    assert state.attributes["preset_mode"] == "eco"
+    presets = ["comfort", "eco", "night", "away", "frost", "manual"]
+    assert state.attributes["preset_modes"] == presets
+    await call(hass, "climate", "set_temperature", {"entity_id": THERMOSTAT, "temperature": 23.5})
+    assert hass.states.get(THERMOSTAT).attributes["preset_mode"] == "manual"  # type: ignore[union-attr]
+    manual = {"entity_id": THERMOSTAT, "preset_mode": "manual"}
+    await call(hass, "climate", "set_preset_mode", manual)
+    assert trv.setpoint == 23.5
+    await call(hass, "climate", "set_preset_mode", {"entity_id": THERMOSTAT, "preset_mode": "eco"})
+    assert trv.setpoint == 19.0
     await call(hass, "climate", "set_hvac_mode", {"entity_id": THERMOSTAT, "hvac_mode": "auto"})
     assert trv.setpoint == 21.0
     await call(hass, "climate", "turn_off", {"entity_id": THERMOSTAT})

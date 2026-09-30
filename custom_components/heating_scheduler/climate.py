@@ -26,6 +26,7 @@ from .core.model import (
     TEMPERATURE_MODES,
     Mode,
     Source,
+    TargetMode,
 )
 from .core.overrides import ExpiryKind
 from .core.resolve import effective_temperatures
@@ -37,6 +38,8 @@ from .errors import service_error
 PARALLEL_UPDATES = 0
 
 PRESETS = [mode.value for mode in TEMPERATURE_MODES]
+# A manual change at a temperature that no mode has.
+MANUAL_PRESET = TargetMode.MANUAL.value
 
 
 async def async_setup_entry(
@@ -58,7 +61,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     _attr_name = None
     _attr_translation_key = "thermostat"
     _attr_hvac_modes = [HVACMode.AUTO, HVACMode.HEAT, HVACMode.OFF]
-    _attr_preset_modes = PRESETS
+    _attr_preset_modes = [*PRESETS, MANUAL_PRESET]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
@@ -158,11 +161,20 @@ class RoomThermostat(RoomEntity, ClimateEntity):
 
     @property
     def preset_mode(self) -> str | None:
-        """Return the current mode if it has a temperature."""
+        """Return the current mode if it has a temperature.
+
+        A manual change shows the mode with the same temperature (a preset picked here stays
+        shown), or "manual". Without a preset in the list, HA shows an empty preset field.
+        """
         target = self.target
-        if target is None or target.mode.value not in PRESETS:
+        if target is None or target.temperature is None:
             return None
-        return target.mode.value
+        if target.source is Source.MANUAL:
+            for mode, temperature in self._temperatures().items():
+                if mode in TEMPERATURE_MODES and temperature == target.temperature:
+                    return mode.value
+            return MANUAL_PRESET
+        return target.mode.value if target.mode.value in PRESETS else None
 
     # ----- actions -----
 
@@ -215,7 +227,13 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         return self._temperatures()[Mode.COMFORT]
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Use the temperature of a mode by hand until the next plan change."""
+        """Use the temperature of a mode by hand until the next plan change.
+
+        "manual" keeps the current temperature by hand.
+        """
+        if preset_mode == MANUAL_PRESET:
+            await self.async_set_hvac_mode(HVACMode.HEAT)
+            return
         await self._override(self._temperatures()[Mode(preset_mode)])
 
     async def async_turn_on(self) -> None:

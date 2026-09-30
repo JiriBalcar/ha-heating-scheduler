@@ -9,7 +9,8 @@
               "eco": "mdi:leaf",
               "night": "mdi:weather-night",
               "away": "mdi:home-export-outline",
-              "frost": "mdi:snowflake"
+              "frost": "mdi:snowflake",
+              "manual": "mdi:hand-back-right"
             }
           }
         }
