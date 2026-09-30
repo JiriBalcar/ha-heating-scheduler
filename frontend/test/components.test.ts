@@ -5,8 +5,11 @@ import "../src/card";
 import "../src/components/hs-adv-rooms";
 import "../src/components/hs-adv-settings";
 import "../src/components/hs-block-sheet";
+import "../src/components/hs-copy-dialog";
+import "../src/components/hs-holiday-dialog";
 import "../src/components/hs-house-card";
 import "../src/components/hs-house-dialog";
+import "../src/components/hs-house-hints";
 import "../src/components/hs-plan-editor";
 import "../src/components/hs-room-card";
 import "../src/components/hs-temps-view";
@@ -76,6 +79,9 @@ beforeAll(async () => {
       "hs-adv-rooms",
       "hs-adv-settings",
       "hs-block-sheet",
+      "hs-copy-dialog",
+      "hs-holiday-dialog",
+      "hs-house-hints",
       "hs-card",
       "hs-house-card",
       "hs-house-dialog",
@@ -270,7 +276,7 @@ describe("zones on the overview", () => {
   it("speaks of the zone, not the whole house", async () => {
     const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
     expect(await secondary("hs-house-card", { snapshot: data, zone: ZONES[1] })).toBe(
-      "This part of the house is set to Away.",
+      "This part of the house is set to Away",
     );
     expect(await secondary("hs-room-card", { snapshot: data, room: BEDROOM })).toBe("19.0 °C · 1st floor: Away");
   });
@@ -291,7 +297,7 @@ describe("house dialog", () => {
     await dialog.updateComplete;
     await dialog.updateComplete;
     expect(text(dialog.shadowRoot, ".state")).toBe("Away");
-    expect(text(dialog.shadowRoot, ".detail")).toBe("The rooms are kept at 16.0 °C.");
+    expect(text(dialog.shadowRoot, ".detail")).toBe("The rooms are kept at 16.0 °C");
     expect(dialog.shadowRoot.querySelector("ha-control-select").value).toBe("away");
   });
 });
@@ -344,16 +350,113 @@ describe("temperature sets", () => {
         reset: item.querySelector("ha-icon-button") !== null,
       };
     };
-    expect(row(0)).toEqual({ text: "own", value: 23, reset: true });
-    expect(row(1)).toEqual({ text: "as house", value: 19, reset: false });
+    expect(row(0)).toEqual({ text: "Own", value: 23, reset: true });
+    expect(row(1)).toEqual({ text: "As house", value: 19, reset: false });
 
     const change = new CustomEvent("value-changed", { detail: { value: 19.5 } });
     rows()[1].querySelector("ha-control-number-buttons").dispatchEvent(change);
     await view.updateComplete;
-    expect(row(1)).toEqual({ text: "own", value: 19.5, reset: true });
+    expect(row(1)).toEqual({ text: "Own", value: 19.5, reset: true });
 
     rows()[0].querySelector("ha-icon-button").click();
     await view.updateComplete;
-    expect(row(0)).toEqual({ text: "as house", value: 21, reset: false });
+    expect(row(0)).toEqual({ text: "As house", value: 21, reset: false });
+  });
+});
+
+describe("house hints", () => {
+  const hints = async (props: Record<string, unknown>) => {
+    const element = await mount("hs-house-hints", props);
+    return {
+      hidden: element.hidden as boolean,
+      texts: [...element.shadowRoot.querySelectorAll(".hint span")].map((span: Element) => span.textContent?.trim()),
+    };
+  };
+
+  it("show one hint for the whole house, one per zone while the zones differ, and none in Normal", async () => {
+    const away = [
+      { ...ZONES[0]!, house: AWAY },
+      { ...ZONES[1]!, house: AWAY },
+    ];
+    expect(await hints({ snapshot: snapshot(1, { zones: away }) })).toEqual({
+      hidden: false,
+      texts: ["The whole house is set to Away. When you are back, switch to Normal."],
+    });
+    expect(await hints({ snapshot: snapshot(1, { zones: ZONES }) })).toEqual({
+      hidden: false,
+      texts: ["1st floor is set to Away. When you are back, switch to Normal."],
+    });
+    expect(await hints({ snapshot: snapshot(1) })).toEqual({ hidden: true, texts: [] });
+  });
+
+  it("show a planned holiday of a zone with its name", async () => {
+    const planned: HouseData = {
+      mode: "auto",
+      effective: "auto",
+      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "frost", active: false },
+    };
+    const zones = [ZONES[0]!, { ...ZONES[1]!, house: planned }];
+    const result = await hints({ snapshot: snapshot(1, { zones }), zone: zones[1] });
+    expect(result.texts).toEqual(["1st floor: holiday planned from Sat 10 Oct 8:00 AM to Mon 12 Oct 12:00 PM"]);
+  });
+
+  it("are not repeated in the house tiles", async () => {
+    const tile = await mount("hs-house-card", { snapshot: snapshot(1, { zones: ZONES }), zone: ZONES[1] });
+    expect(tile.shadowRoot.querySelector("ha-alert")).toBeNull();
+  });
+});
+
+describe("room tile status", () => {
+  it("says first when a valve has a problem, and is short in the compact card", async () => {
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
+    const broken = { ...BEDROOM, issues: [{ kind: "unavailable" as const, entity_id: "climate.bed", since: null }] };
+    const tile = await mount("hs-room-card", { snapshot: data, room: broken });
+    const status = tile.shadowRoot.querySelector('[slot="secondary"]');
+    expect(status.textContent.trim()).toBe("19.0 °C · A valve does not respond");
+    expect(status.classList.contains("problem")).toBe(true);
+    const warm = { ...KITCHEN, target: { mode: "comfort" as const, temperature: 21, source: "plan" as const, valid_until: "2026-10-05T20:00:00Z", next: null } };
+    const compact = await mount("hs-room-card", { snapshot: data, room: warm, compact: true });
+    expect(text(compact.shadowRoot, '[slot="secondary"]')).toBe("19.0 °C · Warm");
+  });
+});
+
+describe("holiday dialog", () => {
+  it("opens with the dates of a planned holiday, to change them", async () => {
+    const planned: HouseData = {
+      mode: "auto",
+      effective: "auto",
+      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "away", active: false },
+    };
+    const zone = { ...ZONES[1]!, house: planned };
+    const dialog = await mount("hs-holiday-dialog", {});
+    dialog.showDialog({ snapshot: snapshot(1, { zones: [ZONES[0]!, zone] }), zone });
+    await dialog.updateComplete;
+    expect(dialog.data).toEqual({
+      leave: "later",
+      start_date: "2026-10-10",
+      start_time: "08:00",
+      end_date: "2026-10-12",
+      end_time: "12:00",
+      mode: "away",
+    });
+  });
+});
+
+describe("copy dialog", () => {
+  it("chooses days with large rows; the source day cannot be chosen", async () => {
+    const chosen: number[][] = [];
+    const dialog = await mount("hs-copy-dialog", {});
+    dialog.showDialog({ source: 2, resolve: (days: number[]) => chosen.push(days) });
+    await dialog.updateComplete;
+    const rows = () => [...dialog.shadowRoot.querySelectorAll("ha-md-list-item")] as Any[];
+    expect(rows()).toHaveLength(7);
+    expect(rows()[2].hasAttribute("disabled")).toBe(true);
+    rows()[0].click();
+    rows()[4].click();
+    await dialog.updateComplete;
+    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual(["true", "false", "true", "false", "true", "false", "false"]);
+    dialog.copy();
+    dialog.shadowRoot.querySelector("ha-dialog").dispatchEvent(new Event("closed"));
+    expect(chosen).toEqual([[0, 4]]);
   });
 });

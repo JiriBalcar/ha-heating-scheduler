@@ -6,11 +6,13 @@ import type { HomeAssistant, RoomData, Snapshot } from "../types";
 import { roomsOf } from "../zones";
 import { define } from "./define";
 import "./hs-house-card";
+import "./hs-house-hints";
 import "./hs-room-card";
 
 /**
  * The simple view, laid out like a dashboard: the house mode and one tile per room. With two or
- * more zones, a whole-house tile comes first, then each zone's tile with the zone's rooms.
+ * more zones, a whole-house tile comes first, then each zone's tile with the zone's rooms. Above
+ * the tiles, once: valve problems and the house hints (back to Normal, a planned holiday).
  */
 export class HsHomeView extends LitElement {
   static override properties = {
@@ -36,9 +38,13 @@ export class HsHomeView extends LitElement {
         align-items: start;
         gap: var(--ha-space-2, 8px);
       }
-      ha-alert {
+      ha-alert,
+      hs-house-hints {
         display: block;
         margin-bottom: var(--ha-space-4, 16px);
+      }
+      hs-house-hints[hidden] {
+        display: none;
       }
       .empty {
         padding: var(--ha-space-4, 16px);
@@ -67,9 +73,14 @@ export class HsHomeView extends LitElement {
     if (!this.snapshot) return nothing;
     const t = translator(languageOf(this.hass));
     const snapshot = this.snapshot;
-    const alert = snapshot.settings.dry_run
+    const problems = snapshot.rooms.filter((room) => room.issues.length > 0).map((room) => room.name);
+    const alert = html`${snapshot.settings.dry_run
       ? html`<ha-alert alert-type="warning">${t("adv.dry_run_banner")}</ha-alert>`
-      : nothing;
+      : nothing}
+    ${problems.length
+      ? html`<ha-alert alert-type="warning">${t("home.problems", { rooms: problems.join(", ") })}</ha-alert>`
+      : nothing}
+    <hs-house-hints .hass=${this.hass} .snapshot=${snapshot}></hs-house-hints>`;
     if (snapshot.rooms.length === 0) {
       return html`${alert}
         <div class="grid">

@@ -3,6 +3,7 @@ import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, SettingsData, Snapshot } from "../types";
+import { reportUnsaved } from "../unsaved";
 import { define } from "./define";
 import { keepMineDialog } from "./hs-dialog";
 
@@ -51,6 +52,19 @@ export class HsAdvSettings extends LitElement {
       ha-select {
         min-width: 140px;
       }
+      ha-card {
+        container-type: inline-size;
+      }
+      /* HA gives a row's label and its control half the width each. In a narrow card the control
+         goes under the label, as in HA's own narrow layout. */
+      @container (max-width: 500px) {
+        ha-settings-row {
+          flex-direction: column;
+          align-items: stretch;
+          padding-bottom: var(--ha-space-3, 12px);
+          --settings-row-content-padding-block: 0;
+        }
+      }
       .card-actions {
         display: flex;
         justify-content: flex-end;
@@ -80,6 +94,16 @@ export class HsAdvSettings extends LitElement {
 
   private get dirty(): boolean {
     return this.base !== null && !same(this.draft, this.base);
+  }
+
+  private reportedUnsaved = false;
+
+  protected override updated(): void {
+    const unsaved = this.dirty;
+    if (unsaved !== this.reportedUnsaved) {
+      this.reportedUnsaved = unsaved;
+      reportUnsaved(this, unsaved);
+    }
   }
 
   private async save() {

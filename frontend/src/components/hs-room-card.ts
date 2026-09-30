@@ -58,6 +58,9 @@ export class HsRoomCard extends LitElement {
       ha-tile-icon {
         --tile-icon-color: var(--tile-color);
       }
+      .problem {
+        color: var(--warning-color);
+      }
       ha-tile-badge {
         position: absolute;
         top: 3px;
@@ -170,7 +173,10 @@ export class HsRoomCard extends LitElement {
     openProblemDialog(this, this.room);
   }
 
-  /** "20.2 °C · Night until 6:00 → Warm 21.5 °C" */
+  /**
+   * "20.2 °C · Night until 6:00 → Warm 21.5 °C". A valve problem comes first: "20.2 °C · A valve
+   * does not respond". The compact card has room only for the temperature and the mode.
+   */
   private status(): string {
     const room = this.room;
     const target = room.target;
@@ -179,9 +185,14 @@ export class HsRoomCard extends LitElement {
     const parts: string[] = [];
     const current = roomTemperature(room, this.hass);
     if (current !== null) parts.push(formatTemp(current, ctx));
-    if (room.trvs.length === 0) parts.push(t("room.no_trvs"));
+    const issue = room.issues[0];
+    if (issue) parts.push(t(`room.issue.${issue.kind}`));
+    else if (room.trvs.length === 0) parts.push(t("room.no_trvs"));
     else if (this.pending !== null) parts.push(modeLabel("manual", t));
-    else if (target?.source === "plan") {
+    else if (this.compact) {
+      const manual = target?.source === "manual";
+      parts.push(modeLabel(manual ? "manual" : (target?.mode ?? "off"), t));
+    } else if (target?.source === "plan") {
       // "Warm until 22:00 → Night 18.0 °C"
       const now = new Date();
       const mode = modeLabel(target.mode, t);
@@ -251,7 +262,7 @@ export class HsRoomCard extends LitElement {
           </ha-tile-icon>
           <ha-tile-info slot="info">
             <span slot="primary">${room.name}</span>
-            <span slot="secondary">${this.status()}</span>
+            <span slot="secondary" class=${room.issues.length ? "problem" : ""}>${this.status()}</span>
           </ha-tile-info>
           ${this.compact
             ? html`<div slot="features-inline" class="features inline">${control}</div>`

@@ -77,6 +77,20 @@ export class HsPlansView extends LitElement {
       }
       ha-select {
         width: 220px;
+        max-width: 100%;
+      }
+      .rooms {
+        container-type: inline-size;
+      }
+      /* HA gives a row's label and its control half the width each. In a narrow card the control
+         goes under the label, as in HA's own narrow layout. */
+      @container (max-width: 760px) {
+        ha-settings-row {
+          flex-direction: column;
+          align-items: stretch;
+          padding-bottom: var(--ha-space-3, 12px);
+          --settings-row-content-padding-block: 0;
+        }
       }
       .own {
         min-width: 130px;

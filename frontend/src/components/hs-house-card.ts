@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing } from "lit";
-import { formatContext, formatDateTime, plannedText } from "../format";
+import { formatContext, formatDateTime } from "../format";
 import { showDialog } from "../ha";
 import { languageOf, translator } from "../i18n";
 import { HOUSE_COLORS, HOUSE_ICONS, MIXED_ICON } from "../modes";
@@ -14,13 +14,13 @@ import {
 } from "../types";
 import { commonMode, wholeHouse } from "../zones";
 import { define } from "./define";
-import { hint, hintStyles } from "./hint";
-import { cancelPlannedHoliday, chooseHouseMode, sendHouseCommand } from "./house-actions";
+import { chooseHouseMode } from "./house-actions";
 import "./hs-house-dialog";
 
 /**
- * The house mode as an HA tile: Normal / Away / Holiday / Off, and what is planned. A tap on the
- * tile opens the house dialog with big buttons, like HA's alarm panel dialog.
+ * The house mode as an HA tile: Normal / Away / Holiday / Off. A tap on the tile opens the house
+ * dialog with big buttons, like HA's alarm panel dialog. Hints (back to Normal, a planned holiday)
+ * are shown once above the tiles (hs-house-hints), so every tile has one height.
  * With a `zone`, the tile shows and sets that zone; without one, the whole house (every zone).
  */
 export class HsHouseCard extends LitElement {
@@ -43,7 +43,6 @@ export class HsHouseCard extends LitElement {
 
   static override styles = [
     baseStyles,
-    hintStyles,
     css`
       :host {
         display: block;
@@ -61,7 +60,7 @@ export class HsHouseCard extends LitElement {
       ha-control-select {
         --control-select-color: var(--tile-color);
         --control-select-padding: 0;
-        --control-select-thickness: 56px;
+        --control-select-thickness: var(--feature-height, 42px);
         --control-select-border-radius: var(--ha-border-radius-lg, 12px);
         --control-select-button-border-radius: var(--ha-border-radius-lg, 12px);
       }
@@ -94,8 +93,12 @@ export class HsHouseCard extends LitElement {
   private async selected(event: CustomEvent<{ value: HouseMode }>) {
     const select = event.currentTarget as HTMLElement & { value?: string };
     const mode = event.detail.value;
-    if (mode !== this.effective) await this.run(() => chooseHouseMode(this, this.hass, this.snapshot, this.zone, mode));
-    // The selector shows what the house really does until the new state arrives.
+    // The selector shows what the house really does, also while a question is open.
+    select.value = this.effective ?? undefined;
+    // Holiday again opens the holiday dialog, to change the dates.
+    if (mode !== this.effective || mode === "vacation") {
+      await this.run(() => chooseHouseMode(this, this.hass, this.snapshot, this.zone, mode));
+    }
     select.value = this.effective ?? undefined;
     this.requestUpdate();
   }
@@ -120,30 +123,6 @@ export class HsHouseCard extends LitElement {
     if (house.effective === "away") return t(this.zone ? "house.banner.away_zone" : "house.banner.away");
     if (house.effective === "off") return t(this.zone ? "house.banner.off_zone" : "house.banner.off");
     return t("house.auto");
-  }
-
-  private back() {
-    const t = this.t;
-    const effective = this.effective;
-    if (effective === null || effective === "auto") return nothing;
-    return hint(
-      effective === "off" ? t("house.off_hint") : t("house.back_hint"),
-      effective === "off" ? t("house.heating_on") : t("house.home_again"),
-      () => this.run(() => sendHouseCommand(this, this.hass, "house_mode/set", { mode: "auto", zone_id: this.zone?.id })),
-      this.busy,
-    );
-  }
-
-  private planned() {
-    const vacation = this.house?.vacation;
-    if (!vacation || vacation.active) return nothing;
-    const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-    return hint(
-      plannedText(vacation, ctx, this.t),
-      this.t("house.cancel_planned"),
-      () => this.run(() => cancelPlannedHoliday(this, this.hass, this.zone)),
-      this.busy,
-    );
   }
 
   override render() {
@@ -173,7 +152,6 @@ export class HsHouseCard extends LitElement {
               .disabled=${this.busy}
               @value-changed=${this.selected}
             ></ha-control-select>
-            ${this.back()} ${this.planned()}
           </div>
         </ha-tile-container>
       </ha-card>

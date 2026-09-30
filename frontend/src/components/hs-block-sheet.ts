@@ -57,7 +57,7 @@ export class HsBlockSheet extends HsHaDialog<BlockParams> {
       --control-button-icon-color: var(--mode-color);
       --control-button-focus-color: var(--mode-color);
       --control-button-padding: var(--ha-space-1, 4px);
-      font-size: var(--ha-font-size-s, 12px);
+      font-size: var(--ha-font-size-m, 14px);
     }
     .modes ha-control-button.selected {
       --control-button-background-color: var(--mode-color);

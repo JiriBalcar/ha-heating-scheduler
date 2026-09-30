@@ -154,6 +154,7 @@ const WEEKDAYS_UNTIL: Record<Lang, string[]> = {
   cs: ["pondělí", "úterý", "středy", "čtvrtka", "pátku", "soboty", "neděle"],
   en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
 };
+const TOMORROW: Record<Lang, string> = { cs: "zítra", en: "tomorrow" };
 const WEEKDAYS_SHORT: Record<Lang, string[]> = {
   cs: ["po", "út", "st", "čt", "pá", "so", "ne"],
   en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -168,11 +169,17 @@ function formatDay(p: ZonedParts, lang: Lang): string {
 export function formatUntil(iso: string, now: Date, ctx: FormatContext): string {
   const until = new Date(iso);
   const clock = formatClock(until, ctx);
-  const delta = until.getTime() - now.getTime();
-  if (delta < 24 * 3600 * 1000) return clock;
   const p = zonedParts(until, ctx.timeZone);
-  if (delta < 7 * 24 * 3600 * 1000) return `${WEEKDAYS_UNTIL[ctx.lang][p.weekday]} ${clock}`;
+  // Calendar days in the house's time zone: "17:35" alone would read as today's.
+  const days = dayNumber(p) - dayNumber(zonedParts(now, ctx.timeZone));
+  if (days <= 0) return clock;
+  if (days === 1) return `${TOMORROW[ctx.lang]} ${clock}`;
+  if (days < 7) return `${WEEKDAYS_UNTIL[ctx.lang][p.weekday]} ${clock}`;
   return `${formatDay(p, ctx.lang)} ${clock}`;
+}
+
+function dayNumber(p: ZonedParts): number {
+  return Math.round(Date.UTC(p.year, p.month - 1, p.day) / (24 * 3600 * 1000));
 }
 
 /** A full date with weekday: "po 12. 10. 14:00" / "Mon 12 Oct 14:00". */

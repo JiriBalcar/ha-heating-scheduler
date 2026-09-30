@@ -94,7 +94,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     if (!this.room) return null;
     const current = this.snapshot.rooms.find((room) => room.id === this.room!.id);
     if (!current) return null;
-    const fields = ["name", "trvs", "plan_id", "temp_set_id", "temperature_entity", "area_id"] as const;
+    const fields = ["name", "trvs", "plan_id", "temp_set_id", "temperature_entity", "area_id", "zone_id"] as const;
     const same = fields.every((field) => JSON.stringify(current[field]) === JSON.stringify(this.room![field]));
     return same ? null : current;
   }

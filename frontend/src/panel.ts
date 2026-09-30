@@ -7,6 +7,7 @@ import "./card";
 // The panel defines the card too, so opening the panel once brings the cards back.
 import "./card-loader";
 import { define } from "./components/define";
+import { confirmDialog } from "./components/hs-dialog";
 import "./components/hs-advanced-view";
 import "./components/hs-home-view";
 import "./components/hs-plans-view";
@@ -16,6 +17,7 @@ import { languageOf, translator } from "./i18n";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
 import type { HomeAssistant, Snapshot } from "./types";
+import { UNSAVED_EVENT } from "./unsaved";
 
 interface Route {
   prefix: string;
@@ -23,6 +25,13 @@ interface Route {
 }
 
 type Tab = "home" | "plans" | "temperatures" | "advanced";
+
+function tabOf(path: string): Tab {
+  if (path.startsWith("/plans")) return "plans";
+  if (path.startsWith("/temperatures")) return "temperatures";
+  if (path.startsWith("/advanced")) return "advanced";
+  return "home";
+}
 
 export class HeatingSchedulerPanel extends LitElement {
   static override properties = {
@@ -47,6 +56,10 @@ export class HeatingSchedulerPanel extends LitElement {
   private unsubscribe: (() => void) | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
   private clock: ReturnType<typeof setInterval> | null = null;
+  /** Views with unsaved edits (see ./unsaved). */
+  private unsaved = new Set<Element>();
+  /** The path of the view on screen. It stays while the user is asked about unsaved edits. */
+  private shownPath: string | null = null;
 
   constructor() {
     super();
@@ -55,6 +68,11 @@ export class HeatingSchedulerPanel extends LitElement {
     this.ready = false;
     this.tick = 0;
     this.addEventListener("hs-navigate", (event) => this.navigate((event as CustomEvent<string>).detail));
+    this.addEventListener(UNSAVED_EVENT, (event) => {
+      const source = event.composedPath()[0] as Element;
+      if ((event as CustomEvent<boolean>).detail) this.unsaved.add(source);
+      else this.unsaved.delete(source);
+    });
     void whenDefined(HA_ELEMENTS).then((missing) => {
       if (missing.length) console.warn(`Heating Scheduler: Home Assistant did not load ${missing.join(", ")}`);
       this.ready = true;
@@ -99,6 +117,41 @@ export class HeatingSchedulerPanel extends LitElement {
 
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has("hass") && this.hass && !this.unsubscribe && this.isConnected) this.subscribe();
+    if (changed.has("route")) this.routeChanged();
+  }
+
+  private hasUnsaved(): boolean {
+    for (const element of this.unsaved) if (!element.isConnected) this.unsaved.delete(element);
+    return this.unsaved.size > 0;
+  }
+
+  /** A tab switch would drop unsaved edits: keep the view, put its URL back, and ask. */
+  private routeChanged() {
+    const path = this.route?.path ?? "";
+    const shown = this.shownPath;
+    if (shown !== null && tabOf(path) !== tabOf(shown) && this.hasUnsaved()) {
+      void Promise.resolve().then(() => {
+        history.replaceState(null, "", `${this.urlPrefix}${shown}`);
+        window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: true } }));
+      });
+      void this.askToLeave(path);
+      return;
+    }
+    this.shownPath = path;
+  }
+
+  private async askToLeave(target: string) {
+    const t = translator(languageOf(this.hass));
+    const ok = await confirmDialog(this, {
+      heading: t("common.unsaved_title"),
+      message: t("editor.discard"),
+      confirm: t("editor.discard_button"),
+      cancel: t("common.back"),
+      danger: true,
+    });
+    if (!ok) return;
+    this.unsaved.clear();
+    this.navigate(target);
   }
 
   private subscribe() {
@@ -118,14 +171,11 @@ export class HeatingSchedulerPanel extends LitElement {
   }
 
   private get path(): string {
-    return this.route?.path ?? "";
+    return this.shownPath ?? this.route?.path ?? "";
   }
 
   private get tab(): Tab {
-    if (this.path.startsWith("/plans")) return "plans";
-    if (this.path.startsWith("/temperatures")) return "temperatures";
-    if (this.path.startsWith("/advanced")) return "advanced";
-    return "home";
+    return tabOf(this.path);
   }
 
   private view() {

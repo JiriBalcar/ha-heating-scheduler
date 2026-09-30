@@ -76,6 +76,17 @@ export class HsHaDialog<P> extends LitElement {
   }
 }
 
+/**
+ * Wait until HA has closed its dialog box and taken the box's entry off the browser history (at
+ * most 2 s). HA answers before the box closes, and then goes back in the history, which would undo
+ * a navigation made in between (for example "Discard" and leave).
+ */
+async function dialogBoxGone(): Promise<void> {
+  for (let tries = 0; tries < 40 && (history.state as { dialog?: string } | null)?.dialog === "dialog-box"; tries += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
 export interface ConfirmOptions {
   heading: string;
   message: string;
@@ -91,13 +102,15 @@ export interface ConfirmOptions {
 export async function confirmDialog(host: HTMLElement, options: ConfirmOptions): Promise<boolean> {
   const dialogs = await haDialogs();
   if (!dialogs) return window.confirm(`${options.heading}\n\n${options.message}`);
-  return dialogs.showConfirmationDialog(host, {
+  const confirmed = await dialogs.showConfirmationDialog(host, {
     title: options.heading,
     text: options.message,
     confirmText: options.confirm,
     dismissText: options.cancel,
     destructive: options.danger,
   });
+  await dialogBoxGone();
+  return confirmed;
 }
 
 /** Ask what to do when the edited item was changed elsewhere. Resolves true to keep mine. */
@@ -122,18 +135,24 @@ export interface PromptOptions {
 export async function promptDialog(host: HTMLElement, options: PromptOptions): Promise<string | null> {
   const dialogs = await haDialogs();
   if (!dialogs) return window.prompt(options.heading, options.value);
-  return dialogs.showPromptDialog(host, {
+  const answer = await dialogs.showPromptDialog(host, {
     title: options.heading,
     inputLabel: options.label,
     defaultValue: options.value,
     confirmText: options.confirm,
     dismissText: options.cancel,
   });
+  await dialogBoxGone();
+  return answer;
 }
 
 /** Tell something in HA's own alert dialog. */
 export async function alertDialog(host: HTMLElement, heading: string, message: string): Promise<void> {
   const dialogs = await haDialogs();
-  if (dialogs) await dialogs.showAlertDialog(host, { title: heading, text: message });
-  else window.alert(`${heading}\n\n${message}`);
+  if (!dialogs) {
+    window.alert(`${heading}\n\n${message}`);
+    return;
+  }
+  await dialogs.showAlertDialog(host, { title: heading, text: message });
+  await dialogBoxGone();
 }

@@ -1,4 +1,5 @@
 import { css, html, nothing } from "lit";
+import { mdiCheckboxBlankOutline, mdiCheckboxMarked } from "@mdi/js";
 import { showDialog } from "../ha";
 import { languageOf, translator, type TextKey } from "../i18n";
 import { ALL_DAYS, WEEKEND, WORKDAYS } from "../schedule/ops";
@@ -23,7 +24,16 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
       display: flex;
       flex-wrap: wrap;
       gap: var(--ha-space-2, 8px);
-      margin-bottom: var(--ha-space-4, 16px);
+      margin-bottom: var(--ha-space-2, 8px);
+    }
+    ha-md-list-item {
+      --md-list-item-leading-space: 0;
+    }
+    ha-svg-icon[slot="start"] {
+      color: var(--secondary-text-color);
+    }
+    .chosen ha-svg-icon[slot="start"] {
+      color: var(--primary-color);
     }
   `;
 
@@ -45,8 +55,8 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
     this.chosen = days.filter((day) => day !== source);
   }
 
-  private changed(event: CustomEvent<{ value: { days?: string[] } }>) {
-    this.chosen = (event.detail.value.days ?? []).map(Number);
+  private toggle(day: number) {
+    this.chosen = this.chosen.includes(day) ? this.chosen.filter((item) => item !== day) : [...this.chosen, day];
   }
 
   private copy() {
@@ -58,46 +68,36 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
     if (!this.args) return nothing;
     const t = this.t;
     const source = this.args.source;
-    const schema = [
-      {
-        name: "days",
-        selector: {
-          select: {
-            multiple: true,
-            mode: "list",
-            options: ALL_DAYS.map((day) => ({
-              value: String(day),
-              label: t(`day.${day}` as TextKey),
-              disabled: day === source,
-            })),
-          },
-        },
-      },
-    ];
     return html`
       <ha-dialog
         .open=${this.open}
-        header-title=${t("editor.copy_title", { day: t(`day.${source}` as TextKey) })}
+        header-title=${t("editor.copy_title", { day: t(`day.acc.${source}` as TextKey) })}
         @closed=${this.onClosed}
       >
         <div class="quick">
-          <ha-button appearance="outlined" size="small" @click=${() => this.pick(WORKDAYS)}>
+          <ha-button appearance="outlined" @click=${() => this.pick(WORKDAYS)}>
             ${t("editor.workdays")}
           </ha-button>
-          <ha-button appearance="outlined" size="small" @click=${() => this.pick(WEEKEND)}>
+          <ha-button appearance="outlined" @click=${() => this.pick(WEEKEND)}>
             ${t("editor.weekend")}
           </ha-button>
-          <ha-button appearance="outlined" size="small" @click=${() => this.pick(ALL_DAYS)}>
+          <ha-button appearance="outlined" @click=${() => this.pick(ALL_DAYS)}>
             ${t("editor.all_days")}
           </ha-button>
         </div>
-        <ha-form
-          .hass=${this.hass}
-          .data=${{ days: this.chosen.map(String) }}
-          .schema=${schema}
-          .computeLabel=${() => ""}
-          @value-changed=${this.changed}
-        ></ha-form>
+        ${ALL_DAYS.map((day) => {
+          const chosen = day === source || this.chosen.includes(day);
+          return html`<ha-md-list-item
+            type="button"
+            class=${chosen ? "chosen" : ""}
+            aria-pressed=${chosen ? "true" : "false"}
+            ?disabled=${day === source}
+            @click=${() => this.toggle(day)}
+          >
+            <ha-svg-icon slot="start" .path=${chosen ? mdiCheckboxMarked : mdiCheckboxBlankOutline}></ha-svg-icon>
+            <span slot="headline">${t(`day.${day}` as TextKey)}</span>
+          </ha-md-list-item>`;
+        })}
         <ha-dialog-footer slot="footer">
           <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
             ${t("common.cancel")}

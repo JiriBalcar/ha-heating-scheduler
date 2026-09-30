@@ -15,6 +15,11 @@ const PHASE_COLORS: Record<TrvStatus["phase"], string> = {
 };
 
 /** Every valve: wanted and actual setpoint, phase, last write, errors. */
+/** The phase to show: an offline valve waits ("Nedostupná") even before it counts as a problem. */
+function phase(trv: TrvStatus): TrvStatus["phase"] {
+  return trv.available ? trv.phase : "waiting";
+}
+
 export class HsAdvHealth extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -91,7 +96,13 @@ export class HsAdvHealth extends LitElement {
     if (!this.snapshot || !this.hass) return nothing;
     const t = this.t;
     const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-    const allOk = this.snapshot.rooms.every((room) => room.issues.length === 0);
+    // An offline valve is reported as a problem only after a while; the list shows it at once.
+    const allOk = this.snapshot.rooms.every(
+      (room) => room.issues.length === 0 && room.trv_status.every((trv) => trv.available),
+    );
+    // HVAC modes in HA's own words ("Topení"), as HA shows them for climate entities.
+    const hvacMode = (mode: string | null) =>
+      mode ? this.hass.localize?.(`component.climate.entity_component._.state.${mode}`) || mode : "—";
     const name = (id: string) => {
       const friendly = this.hass.states[id]?.attributes.friendly_name;
       return typeof friendly === "string" ? friendly : id;
@@ -116,14 +127,14 @@ export class HsAdvHealth extends LitElement {
                 <span slot="headline">${name(trv.entity_id)}</span>
                 <span slot="supporting-text">
                   ${t("adv.health.wanted")} ${formatTemp(trv.desired, ctx)} · ${t("adv.health.valve")}
-                  ${formatTemp(trv.setpoint, ctx)} · ${t("adv.health.mode")} ${trv.hvac_mode ?? "—"}
+                  ${formatTemp(trv.setpoint, ctx)} · ${t("adv.health.mode")} ${trv.available ? hvacMode(trv.hvac_mode) : "—"}
                 </span>
                 <span slot="supporting-text">
                   ${t("adv.health.last_write")}: ${trv.last_write ? formatDateTime(trv.last_write, ctx) : "—"}
                 </span>
                 <span slot="end" class="phase">
-                  <span class="dot" style="background:${PHASE_COLORS[trv.phase]}"></span>
-                  ${t(`adv.health.phase.${trv.phase}`)}
+                  <span class="dot" style="background:${PHASE_COLORS[phase(trv)]}"></span>
+                  ${t(`adv.health.phase.${phase(trv)}`)}
                 </span>
               </ha-md-list-item>
               ${room.issues

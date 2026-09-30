@@ -42,7 +42,9 @@ describe("time zones", () => {
 
 describe("until", () => {
   it("uses time, weekday or date", () => {
-    expect(formatUntil("2026-10-06T04:00:00Z", NOW, cs)).toBe("06:00");
+    expect(formatUntil("2026-10-05T20:00:00Z", NOW, cs)).toBe("22:00");
+    expect(formatUntil("2026-10-06T04:00:00Z", NOW, cs)).toBe("zítra 06:00");
+    expect(formatUntil("2026-10-06T04:00:00Z", NOW, en)).toBe("tomorrow 06:00");
     expect(formatUntil("2026-10-07T04:00:00Z", NOW, cs)).toBe("středy 06:00");
     expect(formatUntil("2026-10-07T04:00:00Z", NOW, en)).toBe("Wed 06:00");
     expect(formatUntil("2026-10-12T10:00:00Z", NOW, cs)).toBe("12. 10. 12:00");
@@ -64,8 +66,8 @@ describe("reason and next", () => {
     next: { mode: "comfort", temperature: 21, source: "plan" },
   };
   it("describes the plan", () => {
-    expect(reasonText(plan, NOW, en, t)).toBe("Plan: Night until 06:00");
-    expect(nextText(plan, NOW, en, t)).toBe("until 06:00 → Warm 21.0 °C");
+    expect(reasonText(plan, NOW, en, t)).toBe("Plan: Night until tomorrow 06:00");
+    expect(nextText(plan, NOW, en, t)).toBe("until tomorrow 06:00 → Warm 21.0 °C");
   });
   it("shows a holiday end with its date", () => {
     const vacation: TargetData = { ...plan, mode: "frost", temperature: 7, source: "vacation" };

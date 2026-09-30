@@ -137,7 +137,10 @@ export class HsHouseDialog extends HsHaDialog<HouseDialogParams> {
     const select = event.currentTarget as HTMLElement & { value?: string };
     const mode = event.detail.value;
     const before = zone ? zone.house.effective : commonMode(snapshot);
-    if (mode !== before) {
+    // The selector shows what the house really does, also while a question is open.
+    select.value = before ?? undefined;
+    // Holiday again opens the holiday dialog, to change the dates.
+    if (mode !== before || mode === "vacation") {
       this.busy = true;
       try {
         await chooseHouseMode(this, this.hass, snapshot, zone, mode);
@@ -145,7 +148,6 @@ export class HsHouseDialog extends HsHaDialog<HouseDialogParams> {
         this.busy = false;
       }
     }
-    // The selector shows what the house really does until the new state arrives.
     const now = this.snapshot ?? snapshot;
     const current = this.zone(now);
     select.value = (current ? current.house.effective : commonMode(now)) ?? undefined;

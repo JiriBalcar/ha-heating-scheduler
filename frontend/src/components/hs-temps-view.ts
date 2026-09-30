@@ -7,7 +7,8 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import { TEMPERATURE_MODES, type HomeAssistant, type Mode, type RoomData, type Snapshot, type TempSetData } from "../types";
 import { define } from "./define";
-import { confirmDialog, keepMineDialog } from "./hs-dialog";
+import { reportUnsaved } from "../unsaved";
+import { confirmDialog, keepMineDialog, promptDialog } from "./hs-dialog";
 
 interface Draft {
   name: string;
@@ -114,6 +115,20 @@ export class HsTempsView extends LitElement {
       }
       ha-select {
         width: 220px;
+        max-width: 100%;
+      }
+      ha-card {
+        container-type: inline-size;
+      }
+      /* HA gives a row's label and its control half the width each. In a narrow card the control
+         goes under the label, as in HA's own narrow layout. */
+      @container (max-width: 480px) {
+        ha-settings-row {
+          flex-direction: column;
+          align-items: stretch;
+          padding-bottom: var(--ha-space-3, 12px);
+          --settings-row-content-padding-block: 0;
+        }
       }
     `,
   ];
@@ -153,6 +168,16 @@ export class HsTempsView extends LitElement {
     const draft = this.drafts[set.id];
     const base = this.base[set.id];
     return Boolean(draft && base && !sameDraft(draft, base));
+  }
+
+  private reportedUnsaved = false;
+
+  protected override updated(): void {
+    const unsaved = Boolean(this.snapshot?.temp_sets.some((set) => this.dirty(set)));
+    if (unsaved !== this.reportedUnsaved) {
+      this.reportedUnsaved = unsaved;
+      reportUnsaved(this, unsaved);
+    }
   }
 
   private patch(id: string, change: (draft: Draft) => Draft) {
@@ -209,10 +234,7 @@ export class HsTempsView extends LitElement {
 
   private async deleteSet(set: TempSetData) {
     const t = this.t;
-    const rooms = (set.used_by ?? [])
-      .map((id) => this.snapshot.rooms.find((room) => room.id === id)?.name)
-      .filter(Boolean)
-      .join(", ");
+    const rooms = this.roomNames(set.used_by);
     const ok = await confirmDialog(this, {
       heading: t("common.delete"),
       message: rooms
@@ -225,9 +247,17 @@ export class HsTempsView extends LitElement {
     if (ok) await this.run("temp_set/delete", { temp_set_id: set.id });
   }
 
-  private createSet() {
-    const name = uniqueName(this.t("temps.new"), this.snapshot.temp_sets.map((set) => set.name));
-    void this.run("temp_set/save", { temp_set: { name, temperatures: {} } });
+  private async createSet() {
+    const t = this.t;
+    const answer = await promptDialog(this, {
+      heading: t("temps.new"),
+      label: t("plans.name"),
+      value: uniqueName(t("temps.new"), this.snapshot.temp_sets.map((set) => set.name)),
+      confirm: t("plans.create"),
+      cancel: t("common.cancel"),
+    });
+    const name = answer?.trim();
+    if (name) await this.run("temp_set/save", { temp_set: { name, temperatures: {} } });
   }
 
   private number(id: string, mode: Mode, value: number) {

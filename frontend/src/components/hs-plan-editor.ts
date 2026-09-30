@@ -18,6 +18,7 @@ import {
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, PlanData, Snapshot } from "../types";
+import { reportUnsaved } from "../unsaved";
 import { define } from "./define";
 import type { BoundaryMoveDetail, SegmentTapDetail } from "./hs-day-bar";
 import "./hs-day-bar";
@@ -65,6 +66,9 @@ export class HsPlanEditor extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
+        /* A flex item with auto margins shrinks to its content without a width. */
+        width: 100%;
+        box-sizing: border-box;
         max-width: 760px;
         margin: 0 auto;
       }
@@ -143,6 +147,16 @@ export class HsPlanEditor extends LitElement {
       this.name.trim() !== this.baseName ||
       this.days.some((day, index) => !sameDay(normalize(day), this.original[index] ?? []))
     );
+  }
+
+  private reportedUnsaved = false;
+
+  protected override updated(): void {
+    const unsaved = this.dirty;
+    if (unsaved !== this.reportedUnsaved) {
+      this.reportedUnsaved = unsaved;
+      reportUnsaved(this, unsaved);
+    }
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -382,6 +396,10 @@ export class HsSavePlanDialog extends HsHaDialog<SavePlanParams> {
   static override styles = css`
     p {
       color: var(--secondary-text-color);
+      margin: 0 0 var(--ha-space-3, 12px);
+    }
+    hs-week-view + p {
+      margin: var(--ha-space-3, 12px) 0 0;
     }
   `;
 

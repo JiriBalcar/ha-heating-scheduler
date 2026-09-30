@@ -5,6 +5,7 @@ import { languageOf, translator } from "../i18n";
 import { houseTemperature } from "../modes";
 import { errorText, storeFor, toast } from "../store";
 import type { Snapshot, ZoneData } from "../types";
+import { wholeHouse } from "../zones";
 import { define } from "./define";
 import { HsHaDialog, confirmDialog } from "./hs-dialog";
 
@@ -33,6 +34,12 @@ function localDate(date: Date, timeZone: string): string {
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
 
+/** "HH:MM" of an instant in the house's time zone, as HA's time field uses. */
+function localTime(date: Date, timeZone: string): string {
+  const p = zonedParts(date, timeZone);
+  return `${pad(p.hour)}:${pad(p.minute)}`;
+}
+
 const DATE_SELECTOR = { date: {} };
 const TIME_SELECTOR = { time: { no_second: true } };
 
@@ -51,7 +58,7 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
   static override styles = css`
     ha-alert {
       display: block;
-      margin-top: var(--ha-space-4, 16px);
+      margin-bottom: var(--ha-space-4, 16px);
     }
     .when {
       display: flex;
@@ -78,7 +85,29 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
       end_time: "12:00",
       mode: params.snapshot.settings.vacation_mode,
     };
+    // A holiday that is on or planned opens with its own dates, to change them.
+    const house = params.zone ? params.zone.house : wholeHouse(params.snapshot);
+    const vacation = house?.vacation;
+    if (vacation) {
+      const start = new Date(vacation.start);
+      this.data = {
+        ...this.data,
+        leave: vacation.active ? "now" : "later",
+        ...(vacation.active ? {} : { start_date: localDate(start, tz), start_time: localTime(start, tz) }),
+        ...(vacation.end
+          ? { end_date: localDate(new Date(vacation.end), tz), end_time: localTime(new Date(vacation.end), tz) }
+          : {}),
+        mode: vacation.mode,
+      };
+    }
     this.error = "";
+  }
+
+  /** Show an error at the top of the dialog, where it is seen. */
+  private async fail(message: string) {
+    this.error = message;
+    await this.updateComplete;
+    this.shadowRoot?.querySelector("ha-alert")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   private get t() {
@@ -171,13 +200,13 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
     const ctx = formatContext(this.hass, languageOf(this.hass), snapshot);
     const end = this.instant(this.data.end_date, this.data.end_time);
     if (!end) {
-      this.error = t("vacation.error_end");
+      void this.fail(t("vacation.error_end"));
       return;
     }
     const start = this.data.leave === "later" ? this.instant(this.data.start_date, this.data.start_time) : null;
     const begin = start && start.getTime() > Date.now() ? start : null;
     if (end.getTime() <= (begin ?? new Date()).getTime()) {
-      this.error = t("vacation.error_order");
+      void this.fail(t("vacation.error_order"));
       return;
     }
     const temp = formatTemp(houseTemperature(snapshot, this.data.mode), ctx);
@@ -220,6 +249,7 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
         header-title=${this.args.zone ? t("vacation.title_zone", { zone: this.args.zone.name }) : t("vacation.title")}
         @closed=${this.onClosed}
       >
+        ${this.error ? html`<ha-alert alert-type="error">${this.error}</ha-alert>` : nothing}
         <ha-form
           .hass=${this.hass}
           .data=${this.data}
@@ -235,7 +265,6 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
           .computeLabel=${this.label}
           @value-changed=${(e: CustomEvent<{ value: Partial<HolidayData> }>) => this.changed(e.detail.value)}
         ></ha-form>
-        ${this.error ? html`<ha-alert alert-type="error">${this.error}</ha-alert>` : nothing}
         <ha-dialog-footer slot="footer">
           <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
             ${t("common.cancel")}

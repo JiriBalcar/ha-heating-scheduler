@@ -36,6 +36,7 @@ export interface HomeAssistant {
   panels?: Record<string, { config?: { _panel_custom?: { module_url?: string } } | null }>;
   user?: { name: string; is_admin: boolean };
   themes?: { darkMode?: boolean };
+  localize?: (key: string) => string;
   callWS<T>(message: MessageBase): Promise<T>;
 }
 

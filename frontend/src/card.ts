@@ -3,6 +3,7 @@ import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { define } from "./components/define";
 import "./components/hs-house-card";
+import "./components/hs-house-hints";
 import "./components/hs-room-card";
 import { languageOf, translator, type TextKey } from "./i18n";
 import { storeFor } from "./store";
@@ -38,7 +39,12 @@ export class HeatingSchedulerCard extends LitElement {
       }
       .stack {
         display: grid;
+        /* minmax(0, …): the compact tiles must not make the card wider than the dashboard column. */
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--ha-space-2, 8px);
+      }
+      hs-house-hints[hidden] {
+        display: none;
       }
       .status {
         padding: var(--ha-space-4, 16px);
@@ -101,7 +107,8 @@ export class HeatingSchedulerCard extends LitElement {
     return html`
       <div class="stack">
         ${this.showHouse
-          ? html`<hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>`
+          ? html`<hs-house-hints .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-hints>
+              <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>`
           : nothing}
         ${repeat(
           rooms,
