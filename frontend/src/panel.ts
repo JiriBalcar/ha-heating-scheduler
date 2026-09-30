@@ -14,6 +14,7 @@ import "./components/hs-plans-view";
 import "./components/hs-temps-view";
 import { HA_ELEMENTS, whenDefined } from "./ha";
 import { languageOf, translator } from "./i18n";
+import { acquireScrim, releaseScrim } from "./scrim";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
 import type { HomeAssistant, Snapshot } from "./types";
@@ -102,12 +103,14 @@ export class HeatingSchedulerPanel extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    acquireScrim();
     this.clock = setInterval(() => (this.tick += 1), 30000);
     if (this.hass) this.subscribe();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    releaseScrim();
     this.unsubscribe?.();
     this.unsubscribe = null;
     if (this.clock) clearInterval(this.clock);

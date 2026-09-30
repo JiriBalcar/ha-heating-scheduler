@@ -251,8 +251,12 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   dialogs remain only for content HA has no dialog for: forms, previews and the house dialog.
 - Our own dialogs dim the page with a black overlay of 32 % instead of HA's `backdrop-filter:
   brightness(68%)`. Both dim the same, but browsers can draw the filter with a seam: a thin line
-  across the whole page, darkened twice (seen in the user's browser, 2026-09-30). HA's dialog
-  box keeps HA's filter.
+  across the whole page, darkened twice (seen in the user's browser, 2026-09-30). It also showed
+  with HA's own entity dialog on a dashboard with our cards: the house tile's selector is its own
+  compositing layer. So while our card or panel is on the page, the page root carries the overlay
+  for HA's dialogs too (`scrim.ts`, counted per element; the last one to leave removes it). A
+  theme that sets its own dimming keeps it: themes set their variables on the page root itself,
+  HA's default comes from its style sheet.
 - Dialogs keep their arguments in `args`, never in `params`. HA's dialog manager takes an
   element with a `params` property for its newer dialog type: it drops the element after
   closing and creates the next one without `hass`. A test guards this.

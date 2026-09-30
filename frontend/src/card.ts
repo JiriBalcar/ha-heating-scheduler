@@ -7,6 +7,7 @@ import "./components/hs-house-card";
 import "./components/hs-house-hints";
 import "./components/hs-room-card";
 import { languageOf, translator, type TextKey } from "./i18n";
+import { acquireScrim, releaseScrim } from "./scrim";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
 import type { CardConfig, HomeAssistant, Snapshot } from "./types";
@@ -76,11 +77,13 @@ export class HeatingSchedulerCard extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    acquireScrim();
     if (this.hass && !this.unsubscribe) this.subscribe();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    releaseScrim();
     this.unsubscribe?.();
     this.unsubscribe = null;
   }
