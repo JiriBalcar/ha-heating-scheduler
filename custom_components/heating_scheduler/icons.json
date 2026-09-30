@@ -1,5 +1,20 @@
 {
   "entity": {
+    "climate": {
+      "thermostat": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "comfort": "mdi:white-balance-sunny",
+              "eco": "mdi:leaf",
+              "night": "mdi:weather-night",
+              "away": "mdi:home-export-outline",
+              "frost": "mdi:snowflake"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "mode": {
         "default": "mdi:radiator",
