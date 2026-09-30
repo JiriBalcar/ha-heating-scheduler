@@ -99,6 +99,9 @@
     "switch": {
       "boost": {
         "name": "Boost"
+      },
+      "zone_boost": {
+        "name": "Boost {zone}"
       }
     }
   },
@@ -225,11 +228,15 @@
     },
     "boost": {
       "name": "Boost",
-      "description": "Heats every room at its valves' maximum for a while. Ends Away, Holiday and Off first.",
+      "description": "Heats the rooms of every zone, or of one zone, at their valves' maximum for a while. Ends Away, Holiday and Off there first. A single room boosts with its thermostat's preset Boost.",
       "fields": {
         "duration": {
           "name": "Duration",
           "description": "How long. Empty: the length in the settings."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "Name of the zone. Empty: the whole house."
         }
       }
     }

@@ -85,3 +85,7 @@ boost:
       example: "01:00:00"
       selector:
         duration:
+    zone:
+      example: "1. patro"
+      selector:
+        text:

@@ -6,14 +6,14 @@ from collections.abc import Callable, Iterable
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN, SIGNAL_ROOMS_CHANGED, SIGNAL_UPDATE, VERSION
-from .core.model import Room, RoomTarget
+from .const import DOMAIN, SIGNAL_ROOMS_CHANGED, SIGNAL_UPDATE, SIGNAL_ZONES_CHANGED, VERSION
+from .core.model import Room, RoomTarget, Zone
 from .engine import HeatingEngine
 
 HOUSE_DEVICE = "house"
@@ -103,6 +103,44 @@ def async_add_room_entities(
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_ROOMS_CHANGED, add_new_rooms))
 
 
+def zone_unique_id(zone_id: str, key: str) -> str:
+    """Return the unique id of a zone's entity."""
+    return f"zone_{zone_id}_{key}"
+
+
+@callback
+def async_add_zone_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    engine: HeatingEngine,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+    domain: str,
+    key: str,
+    factory: Callable[[HeatingEngine, str], Entity],
+) -> None:
+    """Add an entity per zone while there are two or more zones, and remove those of removed
+    zones. With one zone, the entity of the whole house covers it."""
+    registry = er.async_get(hass)
+    known: set[str] = set()
+
+    @callback
+    def sync_zones() -> None:
+        zones = engine.config.zones
+        wanted = set(zones) if len(zones) > 1 else set()
+        for zone_id in known - wanted:
+            entity_id = registry.async_get_entity_id(domain, DOMAIN, zone_unique_id(zone_id, key))
+            if entity_id is not None:
+                registry.async_remove(entity_id)
+        known.intersection_update(wanted)
+        added = [zone_id for zone_id in zones if zone_id in wanted and zone_id not in known]
+        known.update(added)
+        if added:
+            async_add_entities([factory(engine, zone_id) for zone_id in added])
+
+    sync_zones()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_ZONES_CHANGED, sync_zones))
+
+
 class HeatingEntity(Entity):
     """An entity that updates whenever the engine notifies."""
 
@@ -153,3 +191,35 @@ class RoomEntity(HeatingEntity):
     def _handle_engine_update(self) -> None:
         if self.room is not None:
             self.async_write_ha_state()
+
+
+class ZoneEntity(HeatingEntity):
+    """An entity of one zone, on the house device; its name holds the zone's name."""
+
+    def __init__(self, engine: HeatingEngine, zone_id: str, key: str) -> None:
+        """Create the entity for `zone_id`."""
+        super().__init__(engine)
+        self.zone_id = zone_id
+        self._attr_unique_id = zone_unique_id(zone_id, key)
+        self._attr_device_info = house_device_info()
+        self._attr_translation_placeholders = {"zone": engine.config.zones[zone_id].name}
+
+    @property
+    def zone(self) -> Zone | None:
+        """Return the zone, or None once it is deleted."""
+        return self._engine.config.zones.get(self.zone_id)
+
+    @property
+    def available(self) -> bool:
+        """Return True while the zone exists."""
+        return self.zone is not None
+
+    @callback
+    def _handle_engine_update(self) -> None:
+        zone = self.zone
+        if zone is not None and self._attr_translation_placeholders != {"zone": zone.name}:
+            self._attr_translation_placeholders = {"zone": zone.name}
+            # HA caches the name, and new placeholders do not clear it (only a new _attr_name
+            # does, in the same way). Without this, a renamed zone keeps its old name.
+            self.__dict__.pop("name", None)
+        super()._handle_engine_update()

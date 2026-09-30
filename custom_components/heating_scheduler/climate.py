@@ -1,8 +1,8 @@
 """Virtual room thermostat for voice assistants and standard thermostat cards.
 
-HVAC modes: `auto` follows the plan, `heat` means a manual change is active,
+HVAC modes: `auto` follows the plan, `heat` means a manual change or a boost is active,
 `off` means the room is off. Setting a temperature or a preset makes a manual
-change until the next plan change.
+change until the next plan change; the preset "boost" starts the room's own boost.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ PARALLEL_UPDATES = 0
 PRESETS = [mode.value for mode in TEMPERATURE_MODES]
 # A manual change at a temperature that no mode has.
 MANUAL_PRESET = TargetMode.MANUAL.value
-# A boost of the whole house; offered only while one runs.
+# The room's own boost; also shown while the house or its zone boosts.
 BOOST_PRESET = TargetMode.BOOST.value
 
 
@@ -71,6 +71,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
+    _attr_preset_modes = [*PRESETS, MANUAL_PRESET, BOOST_PRESET]
     _attr_min_temp = MIN_TEMPERATURE
     _attr_max_temp = MAX_TEMPERATURE
 
@@ -161,12 +162,6 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         return HVACAction.IDLE
 
     @property
-    def preset_modes(self) -> list[str]:
-        """Return the modes, "manual", and "boost" while a boost runs."""
-        presets = [*PRESETS, MANUAL_PRESET]
-        return [*presets, BOOST_PRESET] if self._engine.boost_until is not None else presets
-
-    @property
     def preset_mode(self) -> str | None:
         """Return the current mode if it has a temperature.
 
@@ -228,6 +223,8 @@ class RoomThermostat(RoomEntity, ClimateEntity):
                 raise service_error(err) from err
         elif hvac_mode == HVACMode.OFF:
             await self._override(None)
+        elif (target := self.target) is not None and target.source is Source.BOOST:
+            return  # The room already heats, at full.
         else:
             current = self.target_temperature
             await self._override(current if current is not None else self._comfort())
@@ -238,13 +235,17 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Use the temperature of a mode by hand until the next plan change.
 
-        "manual" keeps the current temperature by hand.
+        "manual" keeps the current temperature by hand; "boost" starts the room's own boost.
         """
         if preset_mode == MANUAL_PRESET:
             await self.async_set_hvac_mode(HVACMode.HEAT)
             return
         if preset_mode == BOOST_PRESET:
-            return  # Only listed while the boost runs.
+            try:
+                await self._engine.async_start_room_boost(self._room_id)
+            except ValidationError as err:
+                raise service_error(err) from err
+            return
         await self._override(self._temperatures()[Mode(preset_mode)])
 
     async def async_turn_on(self) -> None:

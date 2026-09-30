@@ -5,30 +5,23 @@ from __future__ import annotations
 from typing import Any, Final
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import HeatingConfigEntry
-from .const import DOMAIN, SIGNAL_ZONES_CHANGED
-from .core.model import HouseMode, HouseState, Zone
+from .const import DOMAIN
+from .core.model import HouseMode, HouseState
 from .core.validation import ValidationError
 from .engine import HeatingEngine
-from .entity import HeatingEntity, house_device_info
+from .entity import HeatingEntity, ZoneEntity, async_add_zone_entities, house_device_info
 from .errors import service_error
 
 PARALLEL_UPDATES = 0
 
 # The state of the house select while the zones are in different modes. It cannot be selected.
 MIXED: Final = "mixed"
-
-
-def zone_unique_id(zone_id: str) -> str:
-    """Return the unique id of a zone's select."""
-    return f"zone_{zone_id}_mode"
 
 
 def house_attributes(house: HouseState) -> dict[str, Any]:
@@ -52,25 +45,9 @@ async def async_setup_entry(
     """Add the house select, and a select per zone while there are two or more zones."""
     engine = entry.runtime_data
     async_add_entities([HouseModeSelect(engine)])
-    registry = er.async_get(hass)
-    known: set[str] = set()
-
-    @callback
-    def sync_zones() -> None:
-        zones = engine.config.zones
-        wanted = set(zones) if len(zones) > 1 else set()
-        for zone_id in known - wanted:
-            entity_id = registry.async_get_entity_id("select", DOMAIN, zone_unique_id(zone_id))
-            if entity_id is not None:
-                registry.async_remove(entity_id)
-        known.intersection_update(wanted)
-        new = [ZoneModeSelect(engine, zone_id) for zone_id in zones if zone_id in wanted - known]
-        known.update(entity.zone_id for entity in new)
-        if new:
-            async_add_entities(new)
-
-    sync_zones()
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_ZONES_CHANGED, sync_zones))
+    async_add_zone_entities(
+        hass, entry, engine, async_add_entities, "select", "mode", ZoneModeSelect
+    )
 
 
 class HouseModeSelect(HeatingEntity, SelectEntity):
@@ -120,7 +97,7 @@ class HouseModeSelect(HeatingEntity, SelectEntity):
             raise service_error(err) from err
 
 
-class ZoneModeSelect(HeatingEntity, SelectEntity):
+class ZoneModeSelect(ZoneEntity, SelectEntity):
     """The house mode of one zone."""
 
     _attr_translation_key = "zone_mode"
@@ -128,31 +105,7 @@ class ZoneModeSelect(HeatingEntity, SelectEntity):
 
     def __init__(self, engine: HeatingEngine, zone_id: str) -> None:
         """Create the select of a zone."""
-        super().__init__(engine)
-        self.zone_id = zone_id
-        self._attr_unique_id = zone_unique_id(zone_id)
-        self._attr_device_info = house_device_info()
-        self._attr_translation_placeholders = {"zone": engine.config.zones[zone_id].name}
-
-    @property
-    def zone(self) -> Zone | None:
-        """Return the zone, or None once it is deleted."""
-        return self._engine.config.zones.get(self.zone_id)
-
-    @property
-    def available(self) -> bool:
-        """Return True while the zone exists."""
-        return self.zone is not None
-
-    @callback
-    def _handle_engine_update(self) -> None:
-        zone = self.zone
-        if zone is not None and self._attr_translation_placeholders != {"zone": zone.name}:
-            self._attr_translation_placeholders = {"zone": zone.name}
-            # HA caches the name, and new placeholders do not clear it (only a new _attr_name
-            # does, in the same way). Without this, a renamed zone keeps its old name.
-            self.__dict__.pop("name", None)
-        super()._handle_engine_update()
+        super().__init__(engine, zone_id, "mode")
 
     @property
     def current_option(self) -> str | None:

@@ -187,11 +187,14 @@ class Override:
 @dataclass(frozen=True, slots=True)
 class RuntimeState:
     """State that changes while running: overrides, the last effective mode of each zone, and
-    the end of a boost (every room at its valves' maximum) while one runs."""
+    the ends of running boosts (rooms at their valves' maximum). The whole house, each zone and
+    each room have boosts of their own; a room heats at full while any of them covers it."""
 
     overrides: Mapping[str, Override] = field(default_factory=dict)
     house_modes: Mapping[str, HouseMode] = field(default_factory=dict)
     boost_until: datetime | None = None
+    zone_boosts: Mapping[str, datetime] = field(default_factory=dict)
+    room_boosts: Mapping[str, datetime] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

@@ -81,6 +81,12 @@
         "state": {
           "off": "mdi:fire-off"
         }
+      },
+      "zone_boost": {
+        "default": "mdi:fire",
+        "state": {
+          "off": "mdi:fire-off"
+        }
       }
     }
   },

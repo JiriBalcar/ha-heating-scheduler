@@ -99,6 +99,9 @@
     "switch": {
       "boost": {
         "name": "Zatopit naplno"
+      },
+      "zone_boost": {
+        "name": "Zatopit naplno {zone}"
       }
     }
   },
@@ -225,11 +228,15 @@
     },
     "boost": {
       "name": "Zatopit naplno",
-      "description": "Zatopí ve všech místnostech naplno, hlavice na maximum. Nejdřív ukončí Pryč, dovolenou a vypnuté topení.",
+      "description": "Zatopí naplno (hlavice na maximum) ve všech místnostech, nebo v místnostech jedné zóny. Nejdřív tam ukončí Pryč, dovolenou a vypnuté topení. Jedna místnost se zatápí naplno předvolbou Naplno jejího termostatu.",
       "fields": {
         "duration": {
           "name": "Doba",
           "description": "Jak dlouho. Prázdné: délka z nastavení."
+        },
+        "zone": {
+          "name": "Zóna",
+          "description": "Název zóny. Bez zadání celý dům."
         }
       }
     }

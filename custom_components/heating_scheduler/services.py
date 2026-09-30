@@ -50,7 +50,9 @@ SET_VACATION_SCHEMA = vol.Schema(
 )
 CANCEL_VACATION_SCHEMA = vol.Schema({vol.Optional("zone"): cv.string})
 
-BOOST_SCHEMA = vol.Schema({vol.Optional("duration"): cv.positive_time_period})
+BOOST_SCHEMA = vol.Schema(
+    {vol.Optional("duration"): cv.positive_time_period, vol.Optional("zone"): cv.string}
+)
 
 
 def _engine(hass: HomeAssistant) -> HeatingEngine:
@@ -128,8 +130,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
         _engine(hass).reconcile_now()
 
     async def boost(call: ServiceCall) -> None:
+        engine = _engine(hass)
         try:
-            await _engine(hass).async_start_boost(call.data.get("duration"))
+            await engine.async_start_boost(call.data.get("duration"), _zones(engine, call))
         except ValidationError as err:
             raise service_error(err) from err
 

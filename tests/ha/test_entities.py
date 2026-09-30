@@ -144,7 +144,7 @@ async def test_thermostat_modes_presets_and_turn_on_off(
     assert state is not None and state.state == "heat"
     # The picked preset stays shown; a temperature of no mode shows "manual".
     assert state.attributes["preset_mode"] == "eco"
-    presets = ["comfort", "eco", "night", "away", "frost", "manual"]
+    presets = ["comfort", "eco", "night", "away", "frost", "manual", "boost"]
     assert state.attributes["preset_modes"] == presets
     await call(hass, "climate", "set_temperature", {"entity_id": THERMOSTAT, "temperature": 23.5})
     assert hass.states.get(THERMOSTAT).attributes["preset_mode"] == "manual"  # type: ignore[union-attr]

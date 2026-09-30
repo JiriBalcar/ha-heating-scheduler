@@ -322,7 +322,20 @@ def state_to_dict(state: RuntimeState) -> JsonDict:
         "overrides": {key: override_to_dict(item) for key, item in state.overrides.items()},
         "house_modes": {key: mode.value for key, mode in state.house_modes.items()},
         "boost_until": None if state.boost_until is None else datetime_to_str(state.boost_until),
+        "zone_boosts": {key: datetime_to_str(end) for key, end in state.zone_boosts.items()},
+        "room_boosts": {key: datetime_to_str(end) for key, end in state.room_boosts.items()},
     }
+
+
+def _boost_ends(data: Mapping[str, Any], key: str) -> dict[str, datetime]:
+    """Parse the boost ends of zones or rooms; invalid ones are dropped."""
+    ends: dict[str, datetime] = {}
+    for item, value in (_opt(data, key, dict) or {}).items():
+        try:
+            ends[item] = datetime_from_str(value)
+        except ValidationError:
+            continue
+    return ends
 
 
 def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
@@ -346,7 +359,13 @@ def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
         boost_until = None if raw_boost is None else datetime_from_str(raw_boost)
     except ValidationError:
         pass
-    return RuntimeState(overrides=overrides, house_modes=house_modes, boost_until=boost_until)
+    return RuntimeState(
+        overrides=overrides,
+        house_modes=house_modes,
+        boost_until=boost_until,
+        zone_boosts=_boost_ends(data, "zone_boosts"),
+        room_boosts=_boost_ends(data, "room_boosts"),
+    )
 
 
 def migrate_config(

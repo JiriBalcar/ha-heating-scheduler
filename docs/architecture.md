@@ -58,15 +58,21 @@ tests/core/  tests/ha/
   (`zone_id`). There is always at least one zone: a new installation has one zone for the
   whole house, and the last zone cannot be deleted. Deleting a zone moves its rooms to the
   first remaining zone. Zones have an order, which the UI and the selects follow.
-- **Boost (decision, 2026-09-30, user request)**: one end time for the whole house
-  (`boost_until` in the state store). While it runs, each room's target is the highest
-  `max_temp` of its valves (35 °C if no valve reports one); the usual clamping gives each
-  valve its own maximum. The length comes from the settings (default 1 h, 15 min to 4 h; the
-  panel offers 30 min to 4 h) or from the `boost` service. A boost means someone is home:
-  starting one switches every zone that is not Normal to Normal (this also ends a running
-  holiday). When any zone leaves Normal (Away, Off, a holiday, also a planned one that
-  starts), housekeeping ends the boost. A boost that ended while HA was stopped is dropped at
-  start.
+- **Boost (decision, 2026-09-30, user request; per zone and room on 2026-10-01)**: the whole
+  house, each zone and each room have boosts of their own, each an end time in the state store
+  (`boost_until`, `zone_boosts`, `room_boosts`). A room heats at full while any of them covers
+  it, until the latest end: its target is the highest `max_temp` of its valves (35 °C if no
+  valve reports one), and the usual clamping gives each valve its own maximum. Stopping one
+  boost leaves the others running. The length comes from the settings (default 1 h, 15 min to
+  4 h; the panel offers 30 min to 4 h) or from the `boost` service. A boost of the house or of
+  a zone means someone is home: it switches those zones to Normal first (this also ends a
+  running holiday). A room's boost (its thermostat's preset `boost`) starts only while its
+  zone is Normal, like a manual change; another preset or `auto` ends it. When a zone leaves
+  Normal (Away, Off, a holiday, also a planned one that starts), housekeeping ends its boost
+  and its rooms' boosts, and the house's boost once no zone is Normal. A room under the boost
+  of its zone or the house takes no manual changes (`boost_active`). Boosts that ended while
+  HA was stopped are dropped at start. The zone boost has no control in the panel (user's
+  decision): a tile of HA for its switch starts it.
 
 ## resolve()
 
@@ -161,7 +167,7 @@ service are refused (`boost_active` during a boost).
 | Store key | Content | Save |
 |---|---|---|
 | `heating_scheduler.config` | zones with their house state, rooms, plans, temperature sets, settings | immediately |
-| `heating_scheduler.state` | overrides, last effective mode of each zone, boost end | 2 s delay, flushed on stop |
+| `heating_scheduler.state` | overrides, last effective mode of each zone, boost ends (house, zones, rooms) | 2 s delay, flushed on stop |
 | `heating_scheduler.log` | last 100 events per room | 60 s delay |
 
 The configuration has a revision; websocket writes must send the revision they edited.
@@ -178,21 +184,21 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   and the mode sensor show a new room temperature at once.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
-- Room thermostat: `heat` during a manual change or a boost. The preset `boost` is listed
-  only while a boost runs; HA allows 100 capability changes per hour, and a boost makes two.
+- Room thermostat: `heat` during a manual change or a boost. The preset `boost` is always
+  listed: it starts the room's own boost.
 - House: `select` (house mode), `switch` (boost; attributes `until`, `duration_minutes`), five
   `number` entities (house temperatures). The house mode
   select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision
   2026-09-30) and the attribute `zones` holds the mode of each zone. `mixed` is one of the
   options only then, because a select's state must be an option; selecting it is an error.
-- Zones: with two or more zones, one `select` per zone (unique id `zone_<id>_mode`). The
-  selects are added and removed when zones are added and removed. A renamed zone renames its
-  select: HA caches an entity's name and new translation placeholders do not clear it, so the
-  select clears it itself.
+- Zones: with two or more zones, one `select` (unique id `zone_<id>_mode`) and one boost
+  `switch` (`zone_<id>_boost`) per zone. They are added and removed when zones are added and
+  removed (`async_add_zone_entities`). A renamed zone renames them: HA caches an entity's name
+  and new translation placeholders do not clear it, so `ZoneEntity` clears it itself.
 - Services: `set_override`, `clear_override` (target: room thermostat), `set_house_mode`,
   `set_vacation`, `cancel_vacation`, `boost` (optional `duration`), `reconcile_now`. The house
-  services take an optional `zone` (name in any case, or id); without it they apply to every
-  zone.
+  services and `boost` take an optional `zone` (name in any case, or id); without it they
+  apply to every zone (`boost`: the house's own boost).
 - Create zones from floors (`zones/from_floors`) uses HA's floor registry. A room's area is
   its own `area_id`, or else the area of its first valve that has one (the entity's area,
   else its device's area). A zone with the floor's name is reused. Zones that the import
