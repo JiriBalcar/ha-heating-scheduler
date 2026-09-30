@@ -1,4 +1,4 @@
-import{D as p,M as f,a as c,b as t,c as r,d as h,u as l,v as d,w as a,y as u}from"./chunks/chunk-C2YFDFWI.js";var m=class extends h{constructor(){super();this.unsubscribe=null;this.messageTimer=null;this.snapshot=null,this.message="",this.addEventListener("hs-toast",s=>{this.message=s.detail,this.messageTimer&&clearTimeout(this.messageTimer),this.messageTimer=setTimeout(()=>this.message="",6e3)})}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0},message:{state:!0}}}static{this.styles=[u,c`
+import{D as p,M as f,a as c,b as t,c as r,d as h,u as l,v as d,w as a,y as u}from"./chunks/chunk-XXNFPJVC.js";var m=class extends h{constructor(){super();this.unsubscribe=null;this.messageTimer=null;this.snapshot=null,this.message="",this.addEventListener("hs-toast",s=>{this.message=s.detail,this.messageTimer&&clearTimeout(this.messageTimer),this.messageTimer=setTimeout(()=>this.message="",6e3)})}static{this.properties={hass:{attribute:!1},config:{state:!0},snapshot:{state:!0},message:{state:!0}}}static{this.styles=[u,c`
       :host {
         display: block;
       }

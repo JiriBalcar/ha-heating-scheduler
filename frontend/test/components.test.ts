@@ -60,10 +60,17 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
   };
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   // happy-dom may lack modal dialogs; the tests do not need the top layer.
   const proto = HTMLDialogElement.prototype as Any;
   if (!proto.showModal) proto.showModal = function (this: Any) { this.open = true; };
+  // Our elements are defined once Home Assistant has defined its root element.
+  customElements.define("home-assistant", class extends HTMLElement {});
+  await Promise.all(
+    ["hs-adv-settings", "hs-block-sheet", "hs-plan-editor", "hs-room-dialog"].map((name) =>
+      customElements.whenDefined(name),
+    ),
+  );
 });
 
 describe("hs-block-sheet (F06)", () => {
