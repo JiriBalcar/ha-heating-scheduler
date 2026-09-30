@@ -31,7 +31,14 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.heating_scheduler.const import DOMAIN
 from custom_components.heating_scheduler.core.model import Config, Room, RuntimeState
 from custom_components.heating_scheduler.core.schedule_ops import default_config
-from custom_components.heating_scheduler.core.serde import config_to_dict, state_to_dict
+from custom_components.heating_scheduler.core.serde import (
+    CONFIG_MINOR_VERSION,
+    CONFIG_VERSION,
+    STATE_MINOR_VERSION,
+    STATE_VERSION,
+    config_to_dict,
+    state_to_dict,
+)
 from custom_components.heating_scheduler.engine import HeatingEngine
 
 # Monday 2026-10-05 12:00 Europe/Prague (CEST).
@@ -250,15 +257,15 @@ def two_rooms() -> Config:
 def store(hass_storage: dict[str, Any], config: Config, state: RuntimeState | None = None) -> None:
     """Put configuration (and state) into storage before setup."""
     hass_storage[f"{DOMAIN}.config"] = {
-        "version": 1,
-        "minor_version": 1,
+        "version": CONFIG_VERSION,
+        "minor_version": CONFIG_MINOR_VERSION,
         "key": f"{DOMAIN}.config",
         "data": config_to_dict(config),
     }
     if state is not None:
         hass_storage[f"{DOMAIN}.state"] = {
-            "version": 1,
-            "minor_version": 1,
+            "version": STATE_VERSION,
+            "minor_version": STATE_MINOR_VERSION,
             "key": f"{DOMAIN}.state",
             "data": state_to_dict(state),
         }

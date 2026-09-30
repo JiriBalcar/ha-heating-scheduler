@@ -9,6 +9,7 @@ import re
 from typing import Any, cast
 
 from .model import (
+    HOUSE_ID,
     Config,
     HouseMode,
     HouseState,
@@ -22,12 +23,14 @@ from .model import (
     Slot,
     TempSet,
     Vacation,
+    Zone,
 )
 from .validation import ValidationError
 
-CONFIG_VERSION = 1
+# 2.1: the house mode and holiday moved into zones (1.1 had one house state).
+CONFIG_VERSION = 2
 CONFIG_MINOR_VERSION = 1
-STATE_VERSION = 1
+STATE_VERSION = 2
 STATE_MINOR_VERSION = 1
 
 _TIME_PATTERN = re.compile(r"^(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d)$")
@@ -162,6 +165,7 @@ def room_to_dict(room: Room) -> JsonDict:
         "temp_set_id": room.temp_set_id,
         "temperature_entity": room.temperature_entity,
         "area_id": room.area_id,
+        "zone_id": room.zone_id,
     }
 
 
@@ -178,6 +182,7 @@ def room_from_dict(data: Mapping[str, Any]) -> Room:
         temp_set_id=_get(data, "temp_set_id", str),
         temperature_entity=_opt(data, "temperature_entity", str),
         area_id=_opt(data, "area_id", str),
+        zone_id=_get(data, "zone_id", str),
     )
 
 
@@ -217,6 +222,20 @@ def house_from_dict(data: Mapping[str, Any]) -> HouseState:
     )
 
 
+def zone_to_dict(zone: Zone) -> JsonDict:
+    """Serialize a zone."""
+    return {"id": zone.id, "name": zone.name, "house": house_to_dict(zone.house)}
+
+
+def zone_from_dict(data: Mapping[str, Any]) -> Zone:
+    """Parse a zone."""
+    return Zone(
+        id=_get(data, "id", str),
+        name=_get(data, "name", str),
+        house=house_from_dict(_get(data, "house", dict)),
+    )
+
+
 def _minutes(value: timedelta) -> int:
     return int(value.total_seconds() // 60)
 
@@ -250,7 +269,7 @@ def config_to_dict(config: Config) -> JsonDict:
         "rooms": [room_to_dict(room) for room in config.rooms.values()],
         "plans": [plan_to_dict(plan) for plan in config.plans.values()],
         "temp_sets": [temp_set_to_dict(item) for item in config.temp_sets.values()],
-        "house": house_to_dict(config.house),
+        "zones": [zone_to_dict(zone) for zone in config.zones.values()],
         "settings": settings_to_dict(config.settings),
     }
 
@@ -260,11 +279,12 @@ def config_from_dict(data: Mapping[str, Any]) -> Config:
     rooms = [room_from_dict(item) for item in _get(data, "rooms", list)]
     plans = [plan_from_dict(item) for item in _get(data, "plans", list)]
     temp_sets = [temp_set_from_dict(item) for item in _get(data, "temp_sets", list)]
+    zones = [zone_from_dict(item) for item in _get(data, "zones", list)]
     return Config(
         rooms={room.id: room for room in rooms},
         plans={plan.id: plan for plan in plans},
         temp_sets={item.id: item for item in temp_sets},
-        house=house_from_dict(_get(data, "house", dict)),
+        zones={zone.id: zone for zone in zones},
         settings=settings_from_dict(_get(data, "settings", dict)),
         revision=_get(data, "revision", int),
     )
@@ -297,7 +317,7 @@ def state_to_dict(state: RuntimeState) -> JsonDict:
     """Serialize runtime state."""
     return {
         "overrides": {key: override_to_dict(item) for key, item in state.overrides.items()},
-        "house_mode": None if state.house_mode is None else state.house_mode.value,
+        "house_modes": {key: mode.value for key, mode in state.house_modes.items()},
     }
 
 
@@ -310,28 +330,43 @@ def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
             overrides[key] = override_from_dict(item)
         except ValidationError:
             continue
-    house_mode = _opt(data, "house_mode", str)
-    return RuntimeState(
-        overrides=overrides,
-        house_mode=None if house_mode is None else _enum(HouseMode, house_mode, "house mode"),
-    )
+    house_modes: dict[str, HouseMode] = {}
+    for key, value in (_opt(data, "house_modes", dict) or {}).items():
+        try:
+            house_modes[key] = _enum(HouseMode, value, "house mode")
+        except ValidationError:
+            continue
+    return RuntimeState(overrides=overrides, house_modes=house_modes)
 
 
-def migrate_config(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:
-    """Migrate stored configuration data to the current version.
+def migrate_config(
+    old_major: int, old_minor: int, data: JsonDict, zone_name: str = "House"
+) -> JsonDict:
+    """Migrate stored configuration data to the current version, one step per version.
 
-    Version 1.1 is the first version, so there is nothing to convert yet. New versions add
-    one step per minor or major version here.
+    1.x -> 2.1: the house state becomes the first zone, named `zone_name`, with every room.
     """
     if old_major > CONFIG_VERSION:
         raise ValueError(f"configuration version {old_major} is newer than this integration")
     del old_minor
+    if old_major < 2:
+        house = data.get("house")
+        data = {key: value for key, value in data.items() if key != "house"}
+        data["zones"] = [{"id": HOUSE_ID, "name": zone_name, "house": house}]
+        data["rooms"] = [{**room, "zone_id": HOUSE_ID} for room in data.get("rooms", [])]
     return data
 
 
 def migrate_state(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:
-    """Migrate stored runtime state to the current version."""
+    """Migrate stored runtime state to the current version.
+
+    1.x -> 2.1: the last effective house mode becomes the mode of the first zone.
+    """
     if old_major > STATE_VERSION:
         raise ValueError(f"state version {old_major} is newer than this integration")
     del old_minor
+    if old_major < 2:
+        mode = data.get("house_mode")
+        data = {key: value for key, value in data.items() if key != "house_mode"}
+        data["house_modes"] = {} if mode is None else {HOUSE_ID: mode}
     return data

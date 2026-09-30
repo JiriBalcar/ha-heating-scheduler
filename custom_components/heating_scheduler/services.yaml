@@ -42,6 +42,10 @@ set_house_mode:
             - away
             - vacation
             - "off"
+    zone:
+      example: "1. patro"
+      selector:
+        text:
 
 set_vacation:
   fields:
@@ -61,7 +65,16 @@ set_vacation:
           options:
             - frost
             - away
+    zone:
+      example: "1. patro"
+      selector:
+        text:
 
 cancel_vacation:
+  fields:
+    zone:
+      example: "1. patro"
+      selector:
+        text:
 
 reconcile_now:

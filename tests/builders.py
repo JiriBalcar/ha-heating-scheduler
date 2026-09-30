@@ -5,9 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, time
 from zoneinfo import ZoneInfo
 
+from custom_components.heating_scheduler.core.config_ops import put_zone_house
 from custom_components.heating_scheduler.core.model import (
     DAYS_PER_WEEK,
     DEFAULT_TEMPERATURES,
+    Config,
+    HouseState,
     Mode,
     Plan,
     Slot,
@@ -55,3 +58,13 @@ def uniform(*items: tuple[str, Mode], plan_id: str = "house", name: str = "House
 
 # The default house plan: night, warm 06:00-22:00.
 STANDARD = uniform(("00:00", Mode.NIGHT), ("06:00", Mode.COMFORT), ("22:00", Mode.NIGHT))
+
+
+def house_of(config: Config) -> HouseState:
+    """Return the house state of the first zone (tests with one zone)."""
+    return next(iter(config.zones.values())).house
+
+
+def with_house(config: Config, house: HouseState) -> Config:
+    """Return `config` with the house state of its first zone replaced."""
+    return put_zone_house(config, next(iter(config.zones)), house)

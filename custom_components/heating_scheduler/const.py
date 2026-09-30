@@ -11,6 +11,7 @@ VERSION: Final = "1.0.0"
 # Dispatcher signals.
 SIGNAL_UPDATE: Final = f"{DOMAIN}_update"
 SIGNAL_ROOMS_CHANGED: Final = f"{DOMAIN}_rooms_changed"
+SIGNAL_ZONES_CHANGED: Final = f"{DOMAIN}_zones_changed"
 
 # Frontend.
 PANEL_URL_PATH: Final = "heating-scheduler"

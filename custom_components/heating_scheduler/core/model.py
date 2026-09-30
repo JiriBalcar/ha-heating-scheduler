@@ -1,4 +1,4 @@
-"""Domain model: modes, plans, temperature sets, rooms, house state, overrides."""
+"""Domain model: modes, plans, temperature sets, rooms, zones, house state, overrides."""
 
 from __future__ import annotations
 
@@ -127,6 +127,7 @@ class Room:
     temp_set_id: str = HOUSE_ID
     temperature_entity: str | None = None
     area_id: str | None = None
+    zone_id: str = HOUSE_ID
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +163,15 @@ class HouseState:
 
 
 @dataclass(frozen=True, slots=True)
+class Zone:
+    """A part of the house, e.g. a floor, with its own house mode and holiday."""
+
+    id: str
+    name: str
+    house: HouseState = field(default_factory=HouseState)
+
+
+@dataclass(frozen=True, slots=True)
 class Override:
     """A manual change for a whole room. `temperature` None means heating off."""
 
@@ -174,10 +184,10 @@ class Override:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeState:
-    """State that changes while running: overrides and the last effective house mode."""
+    """State that changes while running: overrides and the last effective mode of each zone."""
 
     overrides: Mapping[str, Override] = field(default_factory=dict)
-    house_mode: HouseMode | None = None
+    house_modes: Mapping[str, HouseMode] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,16 +201,24 @@ class Settings:
     dry_run: bool = False
 
 
+def _default_zones() -> dict[str, Zone]:
+    return {HOUSE_ID: Zone(HOUSE_ID, "House")}
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
-    """Everything the user configures. Dict order is display order."""
+    """Everything the user configures. Dict order is display order. There is always a zone."""
 
     rooms: Mapping[str, Room]
     plans: Mapping[str, Plan]
     temp_sets: Mapping[str, TempSet]
-    house: HouseState = field(default_factory=HouseState)
+    zones: Mapping[str, Zone] = field(default_factory=_default_zones)
     settings: Settings = field(default_factory=Settings)
     revision: int = 0
+
+    def zone_of(self, room: Room) -> Zone:
+        """Return the zone of `room`; the first zone if the room's zone is unknown."""
+        return self.zones.get(room.zone_id) or next(iter(self.zones.values()))
 
     @property
     def house_plan(self) -> Plan:

@@ -49,6 +49,15 @@
           "vacation": "Dovolená",
           "off": "Vypnuto"
         }
+      },
+      "zone_mode": {
+        "name": "Režim {zone}",
+        "state": {
+          "auto": "Normálně",
+          "away": "Pryč",
+          "vacation": "Dovolená",
+          "off": "Vypnuto"
+        }
       }
     },
     "number": {
@@ -86,7 +95,7 @@
   },
   "exceptions": {
     "house_mode_active": {
-      "message": "Dům je v režimu {house_mode}. Nejdřív přepněte dům na Normálně."
+      "message": "Tato část domu je v režimu {house_mode}. Nejdřív ji přepněte na Normálně."
     },
     "invalid_duration": {
       "message": "Zvolený konec není platný."
@@ -148,11 +157,15 @@
     },
     "set_house_mode": {
       "name": "Nastavit režim domu",
-      "description": "Přepne režim celého domu.",
+      "description": "Přepne režim celého domu nebo jedné zóny.",
       "fields": {
         "mode": {
           "name": "Režim",
           "description": "Nový režim domu."
+        },
+        "zone": {
+          "name": "Zóna",
+          "description": "Název zóny. Bez zadání všechny zóny."
         }
       }
     },
@@ -171,12 +184,22 @@
         "mode": {
           "name": "Teplota",
           "description": "Jaká teplota platí během dovolené."
+        },
+        "zone": {
+          "name": "Zóna",
+          "description": "Název zóny. Bez zadání všechny zóny."
         }
       }
     },
     "cancel_vacation": {
       "name": "Zrušit dovolenou",
-      "description": "Zruší aktivní nebo naplánovanou dovolenou."
+      "description": "Zruší aktivní nebo naplánovanou dovolenou.",
+      "fields": {
+        "zone": {
+          "name": "Zóna",
+          "description": "Název zóny. Bez zadání všechny zóny."
+        }
+      }
     },
     "reconcile_now": {
       "name": "Zkontrolovat hlavice",

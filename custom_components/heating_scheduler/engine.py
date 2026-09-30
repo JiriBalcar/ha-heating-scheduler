@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Collection, Coroutine
 from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
@@ -38,9 +38,10 @@ from .const import (
     KNOB_SETTLE,
     SIGNAL_ROOMS_CHANGED,
     SIGNAL_UPDATE,
+    SIGNAL_ZONES_CHANGED,
     WRITE_CONCURRENCY,
 )
-from .core.config_ops import put_house
+from .core.config_ops import put_zone_house
 from .core.echo import Change, classify_setpoint_change
 from .core.model import (
     Config,
@@ -53,6 +54,7 @@ from .core.model import (
     RoomTarget,
     RuntimeState,
     Vacation,
+    Zone,
 )
 from .core.overrides import ExpiryKind, override_until
 from .core.resolve import next_plan_change, resolve, room_inputs
@@ -103,8 +105,8 @@ class HeatingEngine:
         """Load stored data and start listening. Raises ValidationError on broken config."""
         config = await self.storage.async_load_config()
         if config is None:
-            plan_name, temps_name = DEFAULT_NAMES[language(self.hass.config.language)]
-            config = default_config(plan_name, temps_name)
+            plan_name, temps_name, zone_name = DEFAULT_NAMES[language(self.hass.config.language)]
+            config = default_config(plan_name, temps_name, zone_name)
             await self.storage.async_save_config(config)
         else:
             validate_config(config)
@@ -117,7 +119,8 @@ class HeatingEngine:
             for room_id, item in stored.overrides.items()
             if room_id in config.rooms and item.until > now
         }
-        self.state = RuntimeState(overrides, stored.house_mode)
+        house_modes = {key: mode for key, mode in stored.house_modes.items() if key in config.zones}
+        self.state = RuntimeState(overrides, house_modes)
         if overrides != dict(stored.overrides):
             # Overrides that expired while Home Assistant was down are dropped.
             await self.storage.async_save_state(self.state)
@@ -262,16 +265,18 @@ class HeatingEngine:
 
     def _resolve_room(self, room: Room, now: datetime, tz: Any) -> RoomTarget:
         plan, temperatures = room_inputs(room, self.config.plans, self.config.temp_sets)
-        return resolve(
-            now, self.config.house, plan, temperatures, self.state.overrides.get(room.id), tz
-        )
+        house = self.config.zone_of(room).house
+        return resolve(now, house, plan, temperatures, self.state.overrides.get(room.id), tz)
 
     def _housekeeping(self, now: datetime) -> None:
-        """Drop expired overrides, end a finished vacation, react to house mode changes."""
-        house = self.config.house
-        vacation = house.vacation
-        if vacation is not None and vacation.end is not None and vacation.end <= now:
-            self._commit_config_soon(put_house(self.config, HouseState(house.mode, None)))
+        """Drop expired overrides, end finished holidays, react to zone mode changes."""
+        config = self.config
+        for zone in config.zones.values():
+            vacation = zone.house.vacation
+            if vacation is not None and vacation.end is not None and vacation.end <= now:
+                config = put_zone_house(config, zone.id, HouseState(zone.house.mode, None))
+        if config is not self.config:
+            self._commit_config_soon(config)
 
         overrides = dict(self.state.overrides)
         for room_id, item in list(overrides.items()):
@@ -281,12 +286,20 @@ class HeatingEngine:
                     room_id, LogEntry(now, LogKind.OVERRIDE_EXPIRED, value=item.temperature)
                 )
 
-        effective = self.config.house.effective_mode(now)
-        previous = self.state.house_mode
-        if previous is not None and effective is not previous:
-            for room_id, item in overrides.items():
+        # A change of a zone's mode ends the manual changes in that zone's rooms.
+        house_modes: dict[str, HouseMode] = {}
+        for zone in self.config.zones.values():
+            effective = zone.house.effective_mode(now)
+            house_modes[zone.id] = effective
+            previous = self.state.house_modes.get(zone.id)
+            if previous is None or effective is previous:
+                continue
+            for room in self.config.rooms.values():
+                if self.config.zone_of(room).id != zone.id or room.id not in overrides:
+                    continue
+                item = overrides.pop(room.id)
                 self.log.add(
-                    room_id,
+                    room.id,
                     LogEntry(
                         now,
                         LogKind.OVERRIDE_CLEARED,
@@ -294,8 +307,7 @@ class HeatingEngine:
                         detail=f"house mode {effective.value}",
                     ),
                 )
-            overrides = {}
-        new_state = RuntimeState(overrides, effective)
+        new_state = RuntimeState(overrides, house_modes)
         if new_state != self.state:
             self.state = new_state
             self._save_state()
@@ -316,11 +328,12 @@ class HeatingEngine:
         """Arm one timer at the earliest instant where any target can change."""
         candidates = [t.valid_until for t in self.targets.values() if t.valid_until is not None]
         candidates += [item.until for item in self.state.overrides.values()]
-        vacation = self.config.house.vacation
-        if vacation is not None:
-            candidates.append(vacation.start)
-            if vacation.end is not None:
-                candidates.append(vacation.end)
+        for zone in self.config.zones.values():
+            vacation = zone.house.vacation
+            if vacation is not None:
+                candidates.append(vacation.start)
+                if vacation.end is not None:
+                    candidates.append(vacation.end)
         at = min((c for c in candidates if c > now), default=None)
         if at == self._timer_at and (at is None or self._timer_unsub is not None):
             return
@@ -436,9 +449,10 @@ class HeatingEngine:
         room = self.config.rooms.get(worker.room_id)
         if room is None:
             return
-        house_mode = self.config.house.effective_mode(now)
+        house = self.config.zone_of(room).house
+        house_mode = house.effective_mode(now)
         if house_mode is not HouseMode.AUTO:
-            # The house mode wins: undo the change.
+            # The zone's house mode wins: undo the change.
             self.log.add(
                 room.id,
                 LogEntry(
@@ -456,7 +470,7 @@ class HeatingEngine:
         until = override_until(
             now,
             ExpiryKind.NEXT_CHANGE,
-            next_change=next_plan_change(now, self.config.house, plan, temperatures, tz),
+            next_change=next_plan_change(now, house, plan, temperatures, tz),
             max_duration=self.config.settings.max_override,
         )
         self._set_override(
@@ -542,6 +556,9 @@ class HeatingEngine:
         self._apply_tick_interval()
         if old.rooms != self.config.rooms:
             async_dispatcher_send(self.hass, SIGNAL_ROOMS_CHANGED)
+        zone_names = {zone.id: zone.name for zone in self.config.zones.values()}
+        if {zone.id: zone.name for zone in old.zones.values()} != zone_names:
+            async_dispatcher_send(self.hass, SIGNAL_ZONES_CHANGED)
         self.request_reconcile(retry_failed=True)
 
     # ----- public API (services, websocket, entities) -----
@@ -565,11 +582,12 @@ class HeatingEngine:
         """Set a manual change for a room from the app, a service or voice."""
         room = self.room(room_id)
         now = dt_util.utcnow()
-        house_mode = self.config.house.effective_mode(now)
+        house = self.config.zone_of(room).house
+        house_mode = house.effective_mode(now)
         if house_mode is not HouseMode.AUTO:
             raise ValidationError(
                 "house_mode_active",
-                f"the house is in mode {house_mode.value}",
+                f"the zone is in mode {house_mode.value}",
                 house_mode=house_mode.value,
             )
         if temperature is not None:
@@ -580,7 +598,7 @@ class HeatingEngine:
             end = override_until(
                 now,
                 kind,
-                next_change=next_plan_change(now, self.config.house, plan, temperatures, tz),
+                next_change=next_plan_change(now, house, plan, temperatures, tz),
                 max_duration=self.config.settings.max_override,
                 duration=duration,
                 until=until,
@@ -605,46 +623,85 @@ class HeatingEngine:
             self._release_hold(room.id)
         self.request_reconcile()
 
-    async def async_set_house_mode(self, mode: HouseMode) -> None:
-        """Select a house mode.
+    def find_zone(self, key: str) -> Zone:
+        """Return the zone whose id or name (any case) is `key`."""
+        wanted = key.strip().casefold()
+        for zone in self.config.zones.values():
+            if zone.id == key or zone.name.strip().casefold() == wanted:
+                return zone
+        raise ValidationError("not_found", f"unknown zone {key!r}", id=key)
+
+    def zones_for(self, zone_ids: Collection[str] | None) -> list[Zone]:
+        """Return the zones with `zone_ids`, or every zone for None."""
+        if zone_ids is None:
+            return list(self.config.zones.values())
+        for zone_id in zone_ids:
+            if zone_id not in self.config.zones:
+                raise ValidationError("not_found", f"unknown zone {zone_id!r}", id=zone_id)
+        return [zone for zone in self.config.zones.values() if zone.id in zone_ids]
+
+    def house_mode(self, now: datetime | None = None) -> HouseMode | None:
+        """Return the effective mode shared by all zones, or None if the zones differ."""
+        at = now or dt_util.utcnow()
+        modes = {zone.house.effective_mode(at) for zone in self.config.zones.values()}
+        return modes.pop() if len(modes) == 1 else None
+
+    async def async_set_house_mode(
+        self, mode: HouseMode, zone_ids: Collection[str] | None = None
+    ) -> None:
+        """Select a house mode in some zones (None: all zones).
 
         Selecting vacation starts a planned vacation now (keeping its end), or an
         open-ended vacation if none is planned. An active vacation stays as it is.
         """
-        if mode is HouseMode.VACATION:
-            vacation = self.config.house.vacation
-            if vacation is not None and self.config.house.vacation_active(dt_util.utcnow()):
-                return
-            if vacation is not None:
-                await self.async_set_vacation(None, vacation.end, vacation.mode)
+        now = dt_util.utcnow()
+        config = self.config
+        for zone in self.zones_for(zone_ids):
+            house = zone.house
+            vacation = house.vacation
+            if mode is HouseMode.VACATION:
+                if vacation is not None and house.vacation_active(now):
+                    continue
+                end = vacation.end if vacation is not None else None
+                if end is not None and end <= now:
+                    end = None
+                kind = vacation.mode if vacation is not None else config.settings.vacation_mode
+                house = HouseState(house.mode, Vacation(now, end, kind))
             else:
-                await self.async_set_vacation(None, None, None)
-            return
-        house = self.config.house
-        vacation = house.vacation
-        if vacation is not None and house.vacation_active(dt_util.utcnow()):
-            # Choosing another mode ends an active vacation. A planned one stays.
-            vacation = None
-        await self._async_commit(put_house(self.config, HouseState(mode, vacation)))
+                if vacation is not None and house.vacation_active(now):
+                    # Choosing another mode ends an active vacation. A planned one stays.
+                    vacation = None
+                house = HouseState(mode, vacation)
+            config = put_zone_house(config, zone.id, house)
+        if config is not self.config:
+            await self._async_commit(config)
 
     async def async_set_vacation(
-        self, start: datetime | None, end: datetime | None, mode: Mode | None
+        self,
+        start: datetime | None,
+        end: datetime | None,
+        mode: Mode | None,
+        zone_ids: Collection[str] | None = None,
     ) -> None:
-        """Set an active or planned vacation."""
+        """Set an active or planned vacation in some zones (None: all zones)."""
         now = dt_util.utcnow()
         begin = now if start is None or start < now else start
         if end is not None and end <= begin:
             raise ValidationError("vacation_order", "the vacation must end after it starts")
         vacation = Vacation(begin, end, mode or self.config.settings.vacation_mode)
-        house = HouseState(self.config.house.mode, vacation)
-        await self._async_commit(put_house(self.config, house))
+        config = self.config
+        for zone in self.zones_for(zone_ids):
+            config = put_zone_house(config, zone.id, HouseState(zone.house.mode, vacation))
+        await self._async_commit(config)
 
-    async def async_cancel_vacation(self) -> None:
-        """Cancel an active or planned vacation."""
-        if self.config.house.vacation is None:
-            return
-        house = HouseState(self.config.house.mode, None)
-        await self._async_commit(put_house(self.config, house))
+    async def async_cancel_vacation(self, zone_ids: Collection[str] | None = None) -> None:
+        """Cancel an active or planned vacation in some zones (None: all zones)."""
+        config = self.config
+        for zone in self.zones_for(zone_ids):
+            if zone.house.vacation is not None:
+                config = put_zone_house(config, zone.id, HouseState(zone.house.mode, None))
+        if config is not self.config:
+            await self._async_commit(config)
 
     async def async_apply_config(self, config: Config, expected_revision: int | None) -> None:
         """Replace the configuration, if nobody changed it since `expected_revision`."""

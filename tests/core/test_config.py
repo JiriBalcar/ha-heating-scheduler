@@ -23,6 +23,7 @@ from custom_components.heating_scheduler.core.model import (
     Slot,
     TempSet,
     Vacation,
+    Zone,
 )
 from custom_components.heating_scheduler.core.schedule_ops import (
     copy_day,
@@ -34,6 +35,7 @@ from custom_components.heating_scheduler.core.schedule_ops import (
 )
 from custom_components.heating_scheduler.core.serde import (
     CONFIG_VERSION,
+    STATE_VERSION,
     config_from_dict,
     config_to_dict,
     migrate_config,
@@ -68,9 +70,15 @@ def full_config() -> Config:
         rooms=rooms,
         plans={**base.plans, "bedrooms": bedrooms},
         temp_sets={**base.temp_sets, "kids": kids},
-        house=HouseState(
-            HouseMode.AWAY, Vacation(utc(2026, 10, 10), utc(2026, 10, 20), Mode.FROST)
-        ),
+        zones={
+            "house": Zone(
+                "house",
+                "House",
+                HouseState(
+                    HouseMode.AWAY, Vacation(utc(2026, 10, 10), utc(2026, 10, 20), Mode.FROST)
+                ),
+            )
+        },
         settings=Settings(max_override=timedelta(hours=3), dry_run=True),
         revision=7,
     )
@@ -217,13 +225,13 @@ def test_parse_errors() -> None:
     expect_error("invalid", plan_from_dict, {"id": "x", "name": "x"})
     expect_error("invalid", plan_from_dict, {"id": "x", "name": "x", "days": [["06:00"]]})
     data = config_to_dict(full_config())
-    data["house"]["mode"] = "party"
+    data["zones"][0]["house"]["mode"] = "party"
     expect_error("invalid", config_from_dict, data)
     data = config_to_dict(full_config())
     data["revision"] = True
     expect_error("invalid", config_from_dict, data)
     data = config_to_dict(full_config())
-    data["house"]["vacation"]["start"] = "2026-10-10T00:00:00"
+    data["zones"][0]["house"]["vacation"]["start"] = "2026-10-10T00:00:00"
     expect_error("naive_datetime", config_from_dict, data)
     data = config_to_dict(full_config())
     data["temp_sets"][1]["temperatures"]["comfort"] = float("inf")
@@ -237,7 +245,7 @@ def test_state_round_trip() -> None:
             None, utc(2026, 10, 5, 18), utc(2026, 10, 5, 14), OverrideOrigin.DEVICE, "climate.bed"
         ),
     }
-    state = RuntimeState(overrides, HouseMode.AWAY)
+    state = RuntimeState(overrides, {"house": HouseMode.AWAY})
     assert state_from_dict(state_to_dict(state)) == state
     assert state_from_dict(state_to_dict(RuntimeState())) == RuntimeState()
 
@@ -252,9 +260,35 @@ def test_state_drops_invalid_overrides() -> None:
 
 def test_migrations() -> None:
     data = config_to_dict(full_config())
-    assert migrate_config(1, 1, data) == data
-    assert migrate_state(1, 1, {"overrides": {}}) == {"overrides": {}}
+    assert migrate_config(CONFIG_VERSION, 1, data) == data
+    state: dict[str, Any] = {"overrides": {}, "house_modes": {}}
+    assert migrate_state(STATE_VERSION, 1, state) == state
     with pytest.raises(ValueError, match="newer"):
         migrate_config(CONFIG_VERSION + 1, 1, data)
     with pytest.raises(ValueError, match="newer"):
-        migrate_state(2, 1, {})
+        migrate_state(STATE_VERSION + 1, 1, {})
+
+
+def test_migration_to_zones() -> None:
+    """Version 1.1 had one house state; it becomes the first zone with every room."""
+    new = config_to_dict(full_config())
+    house = new["zones"][0]["house"]
+    old = {key: value for key, value in new.items() if key != "zones"}
+    old["house"] = house
+    old["rooms"] = [
+        {key: value for key, value in room.items() if key != "zone_id"} for room in new["rooms"]
+    ]
+    migrated = migrate_config(1, 1, old, "Dům")
+    assert migrated["zones"] == [{"id": "house", "name": "Dům", "house": house}]
+    assert "house" not in migrated
+    assert all(room["zone_id"] == "house" for room in migrated["rooms"])
+    assert config_from_dict(migrated).zones["house"].house == full_config().zones["house"].house
+
+    assert migrate_state(1, 1, {"overrides": {}, "house_mode": "away"}) == {
+        "overrides": {},
+        "house_modes": {"house": "away"},
+    }
+    assert migrate_state(1, 1, {"overrides": {}, "house_mode": None}) == {
+        "overrides": {},
+        "house_modes": {},
+    }

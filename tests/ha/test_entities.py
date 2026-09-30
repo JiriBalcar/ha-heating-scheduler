@@ -12,7 +12,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
 from custom_components.heating_scheduler.core.model import HouseMode, Room
-from tests.builders import prague
+from tests.builders import house_of, prague, with_house
 
 from .conftest import (
     FakeClimate,
@@ -115,7 +115,7 @@ async def test_house_mode_select(
     assert state.attributes["vacation_end"] is None
     assert standard_trvs["climate.bedroom_trv"].setpoint == 7.0
     await call(hass, "select", "select_option", {"entity_id": select, "option": "auto"})
-    assert engine_of(entry).config.house.vacation is None
+    assert house_of(engine_of(entry).config).vacation is None
     assert standard_trvs["climate.bedroom_trv"].setpoint == 21.0
 
 
@@ -158,7 +158,7 @@ async def test_thermostat_refuses_changes_in_away_mode(
     hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
 ) -> None:
     config = two_rooms()
-    store(hass_storage, replace(config, house=replace(config.house, mode=HouseMode.AWAY)))
+    store(hass_storage, with_house(config, replace(house_of(config), mode=HouseMode.AWAY)))
     await setup_entry(hass)
     with pytest.raises(ServiceValidationError) as info:
         await hass.services.async_call(

@@ -17,6 +17,7 @@ from homeassistant.helpers import (
     area_registry as ar,
     device_registry as dr,
     entity_registry as er,
+    floor_registry as fr,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
@@ -27,15 +28,19 @@ from .core.config_ops import (
     delete_plan,
     delete_room,
     delete_temp_set,
+    delete_zone,
     put_plan,
     put_room,
     put_settings,
     put_temp_set,
+    put_zone,
     reorder_rooms,
+    reorder_zones,
+    rooms_in_zone,
     rooms_using_plan,
     rooms_using_temp_set,
 )
-from .core.model import HOUSE_ID, HouseMode, Mode, Room
+from .core.model import HOUSE_ID, Config, HouseMode, HouseState, Mode, Room, Zone
 from .core.overrides import ExpiryKind
 from .core.schedule_ops import new_id, normalize_day
 from .core.serde import (
@@ -89,12 +94,27 @@ def _guarded(
     return wrapper
 
 
+def _house(house: HouseState, now: Any) -> dict[str, Any]:
+    """The mode and holiday of a zone."""
+    vacation = house.vacation
+    return {
+        "mode": house.mode.value,
+        "effective": house.effective_mode(now).value,
+        "vacation": None
+        if vacation is None
+        else {
+            "start": datetime_to_str(vacation.start),
+            "end": None if vacation.end is None else datetime_to_str(vacation.end),
+            "mode": vacation.mode.value,
+            "active": house.vacation_active(now),
+        },
+    }
+
+
 def snapshot(engine: HeatingEngine) -> dict[str, Any]:
     """Return everything the UI shows, as JSON-compatible data."""
     config = engine.config
     now = dt_util.utcnow()
-    house = config.house
-    vacation = house.vacation
     rooms = []
     for room in config.rooms.values():
         target = engine.targets.get(room.id)
@@ -132,18 +152,15 @@ def snapshot(engine: HeatingEngine) -> dict[str, Any]:
     return {
         "revision": config.revision,
         "time_zone": str(dt_util.get_default_time_zone()),
-        "house": {
-            "mode": house.mode.value,
-            "effective": house.effective_mode(now).value,
-            "vacation": None
-            if vacation is None
-            else {
-                "start": datetime_to_str(vacation.start),
-                "end": None if vacation.end is None else datetime_to_str(vacation.end),
-                "mode": vacation.mode.value,
-                "active": house.vacation_active(now),
-            },
-        },
+        "zones": [
+            {
+                "id": zone.id,
+                "name": zone.name,
+                "house": _house(zone.house, now),
+                "rooms": rooms_in_zone(config, zone.id),
+            }
+            for zone in config.zones.values()
+        ],
         "settings": settings_to_dict(config.settings),
         "plans": [
             {**plan_to_dict(plan), "used_by": rooms_using_plan(config, plan.id)}
@@ -178,6 +195,12 @@ def ws_subscribe(hass: HomeAssistant, connection: ActiveConnection, msg: dict[st
     push()
 
 
+def _zone_ids(msg: dict[str, Any]) -> list[str] | None:
+    """The zone of a house command as a list, or None for every zone."""
+    zone_id = msg.get("zone_id")
+    return None if not zone_id else [zone_id]
+
+
 def _check_trvs(hass: HomeAssistant, engine: HeatingEngine, trvs: list[str]) -> None:
     registry = er.async_get(hass)
     for entity_id in trvs:
@@ -197,6 +220,7 @@ ROOM_SCHEMA = vol.Schema(
         vol.Optional("temp_set_id", default=HOUSE_ID): str,
         vol.Optional("temperature_entity"): vol.Any(None, str),
         vol.Optional("area_id"): vol.Any(None, str),
+        vol.Optional("zone_id"): vol.Any(None, str),
     }
 )
 
@@ -219,6 +243,10 @@ async def ws_room_save(
     if data.get("id") and room_id not in engine.config.rooms:
         raise ValidationError("not_found", f"unknown room {room_id!r}", id=room_id)
     _check_trvs(hass, engine, data["trvs"])
+    existing = engine.config.rooms.get(room_id)
+    zone_id = data.get("zone_id") or (
+        existing.zone_id if existing is not None else next(iter(engine.config.zones))
+    )
     room = Room(
         id=room_id,
         name=data["name"].strip(),
@@ -227,6 +255,7 @@ async def ws_room_save(
         temp_set_id=data["temp_set_id"],
         temperature_entity=data.get("temperature_entity") or None,
         area_id=data.get("area_id") or None,
+        zone_id=zone_id,
     )
     await engine.async_apply_config(put_room(engine.config, room), msg["revision"])
     connection.send_result(msg["id"], {"room_id": room_id, "revision": engine.config.revision})
@@ -414,6 +443,7 @@ async def ws_override_clear(
     {
         vol.Required("type"): f"{PREFIX}house_mode/set",
         vol.Required("mode"): vol.In([mode.value for mode in HouseMode]),
+        vol.Optional("zone_id"): vol.Any(None, str),
     }
 )
 @async_response
@@ -421,8 +451,8 @@ async def ws_override_clear(
 async def ws_house_mode_set(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
 ) -> None:
-    """Select a house mode."""
-    await engine.async_set_house_mode(HouseMode(msg["mode"]))
+    """Select a house mode for one zone, or for every zone."""
+    await engine.async_set_house_mode(HouseMode(msg["mode"]), _zone_ids(msg))
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
@@ -432,6 +462,7 @@ async def ws_house_mode_set(
         vol.Optional("start"): vol.Any(None, str),
         vol.Optional("end"): vol.Any(None, str),
         vol.Optional("mode"): vol.Any(None, vol.In([Mode.FROST.value, Mode.AWAY.value])),
+        vol.Optional("zone_id"): vol.Any(None, str),
     }
 )
 @async_response
@@ -447,18 +478,131 @@ async def ws_vacation_set(
         None if start is None else datetime_from_str(start),
         None if end is None else datetime_from_str(end),
         None if mode is None else Mode(mode),
+        _zone_ids(msg),
     )
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}vacation/cancel"})
+@websocket_command(
+    {vol.Required("type"): f"{PREFIX}vacation/cancel", vol.Optional("zone_id"): vol.Any(None, str)}
+)
 @async_response
 @_guarded
 async def ws_vacation_cancel(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
 ) -> None:
-    """Cancel the vacation."""
-    await engine.async_cancel_vacation()
+    """Cancel the vacation of one zone, or of every zone."""
+    await engine.async_cancel_vacation(_zone_ids(msg))
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
+
+
+@websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}zone/save",
+        vol.Required("revision"): int,
+        vol.Required("zone"): vol.Schema(
+            {vol.Optional("id"): vol.Any(None, str), vol.Required("name"): str}
+        ),
+    }
+)
+@async_response
+@_guarded
+async def ws_zone_save(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """Create or rename a zone."""
+    data = msg["zone"]
+    zone_id = data.get("id") or new_id("zone", engine.config.zones)
+    existing = engine.config.zones.get(zone_id)
+    if data.get("id") and existing is None:
+        raise ValidationError("not_found", f"unknown zone {zone_id!r}", id=zone_id)
+    house = existing.house if existing is not None else HouseState()
+    zone = Zone(zone_id, data["name"].strip(), house)
+    await engine.async_apply_config(put_zone(engine.config, zone), msg["revision"])
+    connection.send_result(msg["id"], {"zone_id": zone_id, "revision": engine.config.revision})
+
+
+@websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}zone/delete",
+        vol.Required("revision"): int,
+        vol.Required("zone_id"): str,
+    }
+)
+@async_response
+@_guarded
+async def ws_zone_delete(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """Delete a zone; its rooms move to the first zone that remains."""
+    await engine.async_apply_config(delete_zone(engine.config, msg["zone_id"]), msg["revision"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
+
+
+@websocket_command(
+    {
+        vol.Required("type"): f"{PREFIX}zones/reorder",
+        vol.Required("revision"): int,
+        vol.Required("order"): [str],
+    }
+)
+@async_response
+@_guarded
+async def ws_zones_reorder(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """Change the order of zones."""
+    await engine.async_apply_config(reorder_zones(engine.config, msg["order"]), msg["revision"])
+    connection.send_result(msg["id"], {"revision": engine.config.revision})
+
+
+def zones_from_floors(config: Config, room_floors: dict[str, tuple[str, str]]) -> Config:
+    """Put rooms into zones named after their Home Assistant floors.
+
+    `room_floors` maps a room id to (floor id, floor name), in floor order. A zone with the
+    floor's name is reused. Zones that this leaves empty are removed, but one zone stays.
+    """
+    by_name = {zone.name.strip().casefold(): zone.id for zone in config.zones.values()}
+    before = {zone_id: set(rooms_in_zone(config, zone_id)) for zone_id in config.zones}
+    for room_id, (_floor_id, floor_name) in room_floors.items():
+        zone_id = by_name.get(floor_name.strip().casefold())
+        if zone_id is None:
+            zone_id = new_id("zone", config.zones)
+            config = put_zone(config, Zone(zone_id, floor_name.strip()))
+            by_name[floor_name.strip().casefold()] = zone_id
+        config = put_room(config, replace(config.rooms[room_id], zone_id=zone_id))
+    for zone_id, rooms in before.items():
+        if rooms and not rooms_in_zone(config, zone_id) and len(config.zones) > 1:
+            config = delete_zone(config, zone_id)
+    return config
+
+
+def _room_floors(hass: HomeAssistant, engine: HeatingEngine) -> dict[str, tuple[str, str]]:
+    """Map rooms whose area is on a floor to (floor id, floor name), in floor order."""
+    areas = ar.async_get(hass)
+    floors = fr.async_get(hass)
+    order = {floor.floor_id: index for index, floor in enumerate(floors.async_list_floors())}
+    found: list[tuple[int, str, str, str]] = []
+    for room in engine.config.rooms.values():
+        area = areas.async_get_area(room.area_id) if room.area_id else None
+        floor = floors.async_get_floor(area.floor_id) if area and area.floor_id else None
+        if floor is not None:
+            found.append((order.get(floor.floor_id, 0), room.id, floor.floor_id, floor.name))
+    found.sort(key=lambda item: item[0])
+    return {room_id: (floor_id, name) for _, room_id, floor_id, name in found}
+
+
+@websocket_command(
+    {vol.Required("type"): f"{PREFIX}zones/from_floors", vol.Required("revision"): int}
+)
+@async_response
+@_guarded
+async def ws_zones_from_floors(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
+) -> None:
+    """Put every room whose area is on a floor into a zone named after the floor."""
+    config = zones_from_floors(engine.config, _room_floors(hass, engine))
+    await engine.async_apply_config(config, msg["revision"])
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
@@ -549,9 +693,18 @@ async def ws_candidates(
                 "temperature_entity": area_temps[0] if area_temps else None,
             }
         )
+    floors: dict[str, dict[str, Any]] = {}
+    for room_id, (floor_id, name) in _room_floors(hass, engine).items():
+        floors.setdefault(floor_id, {"floor_id": floor_id, "name": name, "rooms": []})
+        floors[floor_id]["rooms"].append(room_id)
     connection.send_result(
         msg["id"],
-        {"climates": climates, "temperature_entities": temperatures, "areas": area_list},
+        {
+            "climates": climates,
+            "temperature_entities": temperatures,
+            "areas": area_list,
+            "floors": list(floors.values()),
+        },
     )
 
 
@@ -573,6 +726,10 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_house_mode_set,
         ws_vacation_set,
         ws_vacation_cancel,
+        ws_zone_save,
+        ws_zone_delete,
+        ws_zones_reorder,
+        ws_zones_from_floors,
         ws_log,
         ws_reconcile,
         ws_candidates,

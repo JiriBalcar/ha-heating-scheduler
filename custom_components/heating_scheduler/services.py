@@ -32,14 +32,22 @@ SET_OVERRIDE_SCHEMA: VolDictType = {
     vol.Exclusive("duration", "end"): cv.positive_time_period,
     vol.Exclusive("until", "end"): cv.datetime,
 }
-SET_HOUSE_MODE_SCHEMA = vol.Schema({vol.Required("mode"): vol.In([m.value for m in HouseMode])})
+# `zone` is a zone's name or id; without it, a house action applies to every zone.
+SET_HOUSE_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Required("mode"): vol.In([m.value for m in HouseMode]),
+        vol.Optional("zone"): cv.string,
+    }
+)
 SET_VACATION_SCHEMA = vol.Schema(
     {
         vol.Optional("start"): cv.datetime,
         vol.Optional("end"): cv.datetime,
         vol.Optional("mode"): vol.In([Mode.FROST.value, Mode.AWAY.value]),
+        vol.Optional("zone"): cv.string,
     }
 )
+CANCEL_VACATION_SCHEMA = vol.Schema({vol.Optional("zone"): cv.string})
 
 
 def _engine(hass: HomeAssistant) -> HeatingEngine:
@@ -52,6 +60,12 @@ def _engine(hass: HomeAssistant) -> HeatingEngine:
         )
     engine: HeatingEngine = entries[0].runtime_data
     return engine
+
+
+def _zones(engine: HeatingEngine, call: ServiceCall) -> list[str] | None:
+    """Return the zone of the call as a list, or None for every zone."""
+    key = call.data.get("zone")
+    return None if not key else [engine.find_zone(key).id]
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -81,24 +95,31 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
 
     async def set_house_mode(call: ServiceCall) -> None:
+        engine = _engine(hass)
         try:
-            await _engine(hass).async_set_house_mode(HouseMode(call.data["mode"]))
+            await engine.async_set_house_mode(HouseMode(call.data["mode"]), _zones(engine, call))
         except ValidationError as err:
             raise service_error(err) from err
 
     async def set_vacation(call: ServiceCall) -> None:
+        engine = _engine(hass)
         mode = call.data.get("mode")
         try:
-            await _engine(hass).async_set_vacation(
+            await engine.async_set_vacation(
                 _aware(call.data.get("start")),
                 _aware(call.data.get("end")),
                 None if mode is None else Mode(mode),
+                _zones(engine, call),
             )
         except ValidationError as err:
             raise service_error(err) from err
 
-    async def cancel_vacation(_call: ServiceCall) -> None:
-        await _engine(hass).async_cancel_vacation()
+    async def cancel_vacation(call: ServiceCall) -> None:
+        engine = _engine(hass)
+        try:
+            await engine.async_cancel_vacation(_zones(engine, call))
+        except ValidationError as err:
+            raise service_error(err) from err
 
     async def reconcile_now(_call: ServiceCall) -> None:
         _engine(hass).reconcile_now()
@@ -109,5 +130,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_SET_VACATION, set_vacation, schema=SET_VACATION_SCHEMA
     )
-    hass.services.async_register(DOMAIN, SERVICE_CANCEL_VACATION, cancel_vacation)
+    hass.services.async_register(
+        DOMAIN, SERVICE_CANCEL_VACATION, cancel_vacation, schema=CANCEL_VACATION_SCHEMA
+    )
     hass.services.async_register(DOMAIN, SERVICE_RECONCILE_NOW, reconcile_now)

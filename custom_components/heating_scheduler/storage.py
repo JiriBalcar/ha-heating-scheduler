@@ -22,6 +22,7 @@ from .core.serde import (
     state_from_dict,
     state_to_dict,
 )
+from .core.text import DEFAULT_NAMES, language
 
 type JsonDict = dict[str, Any]
 type Migration = Callable[[int, int, JsonDict], JsonDict]
@@ -47,8 +48,13 @@ class HeatingStorage:
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Create the stores."""
+        zone_name = DEFAULT_NAMES[language(hass.config.language)][2]
         self._config = _MigratingStore(
-            hass, CONFIG_VERSION, CONFIG_MINOR_VERSION, f"{DOMAIN}.config", migrate_config
+            hass,
+            CONFIG_VERSION,
+            CONFIG_MINOR_VERSION,
+            f"{DOMAIN}.config",
+            lambda major, minor, data: migrate_config(major, minor, data, zone_name),
         )
         self._state = _MigratingStore(
             hass, STATE_VERSION, STATE_MINOR_VERSION, f"{DOMAIN}.state", migrate_state

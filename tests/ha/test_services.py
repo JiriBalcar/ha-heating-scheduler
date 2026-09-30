@@ -13,7 +13,7 @@ from homeassistant.util import dt as dt_util
 import pytest
 
 from custom_components.heating_scheduler.const import DOMAIN, PANEL_URL_PATH
-from tests.builders import prague
+from tests.builders import house_of, prague
 
 from .conftest import FakeClimate, FakeTrv, engine_of, settle, setup_entry, store, two_rooms
 
@@ -97,13 +97,13 @@ async def test_house_mode_and_vacation_services(
         "set_vacation",
         {"start": "2026-10-10 08:00:00", "end": "2026-10-20 12:00:00", "mode": "away"},
     )
-    vacation = engine.config.house.vacation
+    vacation = house_of(engine.config).vacation
     assert vacation is not None
     assert vacation.start == prague(2026, 10, 10, 8)
     assert vacation.end == prague(2026, 10, 20, 12)
     assert trv.setpoint == 21.0  # planned, not active yet
     await call(hass, "cancel_vacation", {})
-    assert engine.config.house.vacation is None
+    assert house_of(engine.config).vacation is None
     with pytest.raises(ServiceValidationError) as info:
         await call(hass, "set_vacation", {"end": "2026-10-01 12:00:00"})
     assert info.value.translation_key == "vacation_order"

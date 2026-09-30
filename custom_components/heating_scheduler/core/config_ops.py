@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import replace
 
-from .model import HOUSE_ID, Config, HouseState, Plan, Room, Settings, TempSet
+from .model import HOUSE_ID, Config, HouseState, Plan, Room, Settings, TempSet, Zone
 from .validation import ValidationError
 
 
@@ -81,6 +81,41 @@ def put_settings(config: Config, settings: Settings) -> Config:
     return replace(config, settings=settings)
 
 
-def put_house(config: Config, house: HouseState) -> Config:
-    """Replace the house state."""
-    return replace(config, house=house)
+def rooms_in_zone(config: Config, zone_id: str) -> list[str]:
+    """Return the ids of rooms in `zone_id`."""
+    return [room.id for room in config.rooms.values() if room.zone_id == zone_id]
+
+
+def put_zone(config: Config, zone: Zone) -> Config:
+    """Add `zone`, or replace the zone with the same id (keeping its position)."""
+    return replace(config, zones={**config.zones, zone.id: zone})
+
+
+def delete_zone(config: Config, zone_id: str) -> Config:
+    """Remove a zone. Its rooms move to the first zone that remains."""
+    if zone_id not in config.zones:
+        raise ValidationError("not_found", f"unknown zone {zone_id!r}", id=zone_id)
+    zones = {key: zone for key, zone in config.zones.items() if key != zone_id}
+    if not zones:
+        raise ValidationError("last_zone", "the last zone cannot be deleted")
+    first = next(iter(zones))
+    rooms = {
+        key: replace(room, zone_id=first) if room.zone_id == zone_id else room
+        for key, room in config.rooms.items()
+    }
+    return replace(config, rooms=rooms, zones=zones)
+
+
+def reorder_zones(config: Config, order: Sequence[str]) -> Config:
+    """Return `config` with zones in `order`, which must list every zone once."""
+    if sorted(order) != sorted(config.zones) or len(set(order)) != len(order):
+        raise ValidationError("invalid_order", "the order must list every zone once")
+    return replace(config, zones={zone_id: config.zones[zone_id] for zone_id in order})
+
+
+def put_zone_house(config: Config, zone_id: str, house: HouseState) -> Config:
+    """Replace the house state of one zone."""
+    zone = config.zones.get(zone_id)
+    if zone is None:
+        raise ValidationError("not_found", f"unknown zone {zone_id!r}", id=zone_id)
+    return put_zone(config, replace(zone, house=house))

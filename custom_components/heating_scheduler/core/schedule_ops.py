@@ -18,6 +18,7 @@ from .model import (
     Plan,
     Slot,
     TempSet,
+    Zone,
 )
 
 
@@ -79,12 +80,15 @@ def default_house_temps(name: str = "House") -> TempSet:
     return TempSet(id=HOUSE_ID, name=name, temperatures=dict(DEFAULT_TEMPERATURES))
 
 
-def default_config(plan_name: str = "House plan", temps_name: str = "House") -> Config:
-    """Return the configuration of a new installation."""
+def default_config(
+    plan_name: str = "House plan", temps_name: str = "House", zone_name: str = "House"
+) -> Config:
+    """Return the configuration of a new installation: one zone for the whole house."""
     return Config(
         rooms={},
         plans={HOUSE_ID: default_house_plan(plan_name)},
         temp_sets={HOUSE_ID: default_house_temps(temps_name)},
+        zones={HOUSE_ID: Zone(HOUSE_ID, zone_name)},
     )
 
 

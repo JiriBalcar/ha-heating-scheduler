@@ -22,6 +22,7 @@ from .model import (
     Room,
     Settings,
     TempSet,
+    Zone,
 )
 
 MAX_NAME_LENGTH = 60
@@ -158,6 +159,13 @@ def validate_house(house: HouseState) -> None:
         raise ValidationError("vacation_mode", "vacation uses frost or away")
 
 
+def validate_zone(zone: Zone) -> None:
+    """Raise ValidationError if `zone` is not usable on its own."""
+    _check_id(zone.id, "zone")
+    _check_name(zone.name, "zone")
+    validate_house(zone.house)
+
+
 def _check_unique_names(names: list[str], what: str) -> None:
     seen: set[str] = set()
     for name in names:
@@ -181,6 +189,12 @@ def validate_config(config: Config) -> None:
         if key != temp_set.id:
             raise ValidationError("id_mismatch", "set key and id differ", id=temp_set.id)
         validate_temp_set(temp_set, complete=key == HOUSE_ID)
+    if not config.zones:
+        raise ValidationError("zones_missing", "there must be at least one zone")
+    for key, zone in config.zones.items():
+        if key != zone.id:
+            raise ValidationError("id_mismatch", "zone key and id differ", id=zone.id)
+        validate_zone(zone)
     owners: dict[str, str] = {}
     for key, room in config.rooms.items():
         if key != room.id:
@@ -192,6 +206,8 @@ def validate_config(config: Config) -> None:
             raise ValidationError(
                 "unknown_temp_set", "the room uses an unknown set", id=room.temp_set_id
             )
+        if room.zone_id not in config.zones:
+            raise ValidationError("unknown_zone", "the room is in an unknown zone", id=room.zone_id)
         for entity_id in room.trvs:
             if entity_id in owners:
                 raise ValidationError(
@@ -204,5 +220,5 @@ def validate_config(config: Config) -> None:
     _check_unique_names([room.name for room in config.rooms.values()], "rooms")
     _check_unique_names([plan.name for plan in config.plans.values()], "plans")
     _check_unique_names([item.name for item in config.temp_sets.values()], "temperature sets")
-    validate_house(config.house)
+    _check_unique_names([zone.name for zone in config.zones.values()], "zones")
     validate_settings(config.settings)

@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.heating_scheduler.core.schedule_ops import default_house_plan
 from custom_components.heating_scheduler.core.serde import plan_to_dict
+from tests.builders import house_of
 
 from .conftest import FakeTrv, engine_of, settle, setup_entry, store, two_rooms
 
@@ -75,7 +76,15 @@ async def test_subscribe_pushes_snapshots(hass: HomeAssistant, ws: Ws) -> None:
     data = await ws.event()
     assert data["revision"] == 0
     assert data["time_zone"] == "Europe/Prague"
-    assert data["house"] == {"mode": "auto", "effective": "auto", "vacation": None}
+    assert data["zones"] == [
+        {
+            "id": "house",
+            "name": "House",
+            "house": {"mode": "auto", "effective": "auto", "vacation": None},
+            "rooms": ["living", "bedroom"],
+        }
+    ]
+    assert data["rooms"][0]["zone_id"] == "house"
     assert [room["id"] for room in data["rooms"]] == ["living", "bedroom"]
     living = data["rooms"][0]
     assert living["target"]["mode"] == "comfort"
@@ -226,11 +235,11 @@ async def test_override_house_mode_and_vacation(hass: HomeAssistant, ws: Ws) -> 
         end="2026-10-20T12:00:00+02:00",
         mode="frost",
     )
-    assert engine.config.house.vacation is not None
+    assert house_of(engine.config).vacation is not None
     assert await ws.error("vacation/set", end="2026-10-01T12:00:00+02:00") == "vacation_order"
     assert await ws.error("vacation/set", end="2026-10-21T12:00:00") == "naive_datetime"
     await ws.ok("vacation/cancel")
-    assert engine.config.house.vacation is None
+    assert house_of(engine.config).vacation is None
     await ws.ok("reconcile")
 
 

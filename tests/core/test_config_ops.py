@@ -12,11 +12,11 @@ from custom_components.heating_scheduler.core.config_ops import (
     delete_plan,
     delete_room,
     delete_temp_set,
-    put_house,
     put_plan,
     put_room,
     put_settings,
     put_temp_set,
+    put_zone_house,
     reorder_rooms,
     rooms_using_plan,
     rooms_using_temp_set,
@@ -109,4 +109,4 @@ def test_put_settings_and_house() -> None:
     settings = Settings(max_override=timedelta(hours=2))
     assert put_settings(config, settings).settings == settings
     house = HouseState(HouseMode.OFF)
-    assert put_house(config, house).house == house
+    assert put_zone_house(config, "house", house).zones["house"].house == house

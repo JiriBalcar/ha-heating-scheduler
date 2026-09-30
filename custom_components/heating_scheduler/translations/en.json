@@ -49,6 +49,15 @@
           "vacation": "Holiday",
           "off": "Off"
         }
+      },
+      "zone_mode": {
+        "name": "Mode {zone}",
+        "state": {
+          "auto": "Normal",
+          "away": "Away",
+          "vacation": "Holiday",
+          "off": "Off"
+        }
       }
     },
     "number": {
@@ -86,7 +95,7 @@
   },
   "exceptions": {
     "house_mode_active": {
-      "message": "The house is in mode {house_mode}. Switch the house back to Normal first."
+      "message": "This part of the house is in mode {house_mode}. Switch it back to Normal first."
     },
     "invalid_duration": {
       "message": "The chosen end is not valid."
@@ -148,11 +157,15 @@
     },
     "set_house_mode": {
       "name": "Set house mode",
-      "description": "Changes the mode of the whole house.",
+      "description": "Changes the mode of the whole house or of one zone.",
       "fields": {
         "mode": {
           "name": "Mode",
           "description": "The new house mode."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "Name of the zone. Empty: every zone."
         }
       }
     },
@@ -171,12 +184,22 @@
         "mode": {
           "name": "Temperature",
           "description": "The temperature during the holiday."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "Name of the zone. Empty: every zone."
         }
       }
     },
     "cancel_vacation": {
       "name": "Cancel holiday",
-      "description": "Cancels an active or planned holiday."
+      "description": "Cancels an active or planned holiday.",
+      "fields": {
+        "zone": {
+          "name": "Zone",
+          "description": "Name of the zone. Empty: every zone."
+        }
+      }
     },
     "reconcile_now": {
       "name": "Check valves now",

@@ -14,9 +14,10 @@ DEFAULT_LANGUAGE = "cs"
 LANGUAGES = ("cs", "en")
 
 # Names of the house plan and the house temperatures in a new installation.
-DEFAULT_NAMES: dict[str, tuple[str, str]] = {
-    "cs": ("Plán domu", "Teploty domu"),
-    "en": ("House plan", "House temperatures"),
+# Names of the house plan, the house temperatures and the first zone.
+DEFAULT_NAMES: dict[str, tuple[str, str, str]] = {
+    "cs": ("Plán domu", "Teploty domu", "Dům"),
+    "en": ("House plan", "House temperatures", "House"),
 }
 
 MODE_NAMES: dict[str, dict[TargetMode, str]] = {

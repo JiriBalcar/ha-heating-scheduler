@@ -26,7 +26,7 @@ from custom_components.heating_scheduler.core.model import (
 from custom_components.heating_scheduler.core.validation import ValidationError
 from custom_components.heating_scheduler.log import LogKind
 from custom_components.heating_scheduler.trv import Phase
-from tests.builders import prague, uniform, utc
+from tests.builders import house_of, prague, uniform, utc, with_house
 
 from .conftest import (
     FakeClimate,
@@ -128,7 +128,7 @@ async def test_restart_with_persisted_override(
     hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
 ) -> None:
     override = Override(23.0, prague(2026, 10, 5, 14), prague(2026, 10, 5, 11), OverrideOrigin.USER)
-    store(hass_storage, two_rooms(), RuntimeState({"living": override}, HouseMode.AUTO))
+    store(hass_storage, two_rooms(), RuntimeState({"living": override}, {"house": HouseMode.AUTO}))
     entry = await setup_entry(hass)
     engine = engine_of(entry)
     assert standard_trvs["climate.living_trv_1"].temperature_calls == [23.0]
@@ -142,7 +142,7 @@ async def test_override_expired_during_downtime_is_dropped(
     hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
 ) -> None:
     override = Override(23.0, prague(2026, 10, 5, 11), prague(2026, 10, 5, 9), OverrideOrigin.USER)
-    store(hass_storage, two_rooms(), RuntimeState({"living": override}, HouseMode.AUTO))
+    store(hass_storage, two_rooms(), RuntimeState({"living": override}, {"house": HouseMode.AUTO}))
     entry = await setup_entry(hass)
     assert engine_of(entry).state.overrides == {}
     assert hass_storage["heating_scheduler.state"]["data"]["overrides"] == {}
@@ -515,7 +515,7 @@ async def test_manual_change_in_away_mode_is_undone(
     hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
 ) -> None:
     config = two_rooms()
-    store(hass_storage, replace(config, house=replace(config.house, mode=HouseMode.AWAY)))
+    store(hass_storage, with_house(config, replace(house_of(config), mode=HouseMode.AWAY)))
     entry = await setup_entry(hass)
     engine = engine_of(entry)
     trv = standard_trvs["climate.bedroom_trv"]
@@ -597,7 +597,7 @@ async def test_planned_vacation_returns_to_previous_mode(
     freezer: FrozenDateTimeFactory,
 ) -> None:
     config = two_rooms()
-    store(hass_storage, replace(config, house=replace(config.house, mode=HouseMode.AWAY)))
+    store(hass_storage, with_house(config, replace(house_of(config), mode=HouseMode.AWAY)))
     entry = await setup_entry(hass)
     engine = engine_of(entry)
     trv = standard_trvs["climate.bedroom_trv"]
@@ -613,8 +613,8 @@ async def test_planned_vacation_returns_to_previous_mode(
     await advance(hass, freezer, 0)
     # The house returns to the mode selected before: away.
     assert trv.setpoint == 16.0
-    assert engine.config.house.vacation is None
-    assert engine.config.house.mode is HouseMode.AWAY
+    assert house_of(engine.config).vacation is None
+    assert house_of(engine.config).mode is HouseMode.AWAY
 
 
 async def test_vacation_survives_restart(
@@ -645,14 +645,14 @@ async def test_selecting_vacation_starts_the_planned_one_with_its_end(
     engine = engine_of(entry)
     await engine.async_set_vacation(prague(2026, 10, 10), prague(2026, 10, 20), Mode.AWAY)
     await engine.async_set_house_mode(HouseMode.VACATION)
-    vacation = engine.config.house.vacation
+    vacation = house_of(engine.config).vacation
     assert vacation is not None
     assert vacation.start == dt_util.utcnow()
     assert vacation.end == prague(2026, 10, 20)
     assert vacation.mode is Mode.AWAY
     # Selecting it again while active changes nothing.
     await engine.async_set_house_mode(HouseMode.VACATION)
-    assert engine.config.house.vacation == vacation
+    assert house_of(engine.config).vacation == vacation
 
 
 async def test_selecting_a_mode_ends_active_vacation_but_keeps_planned_one(
@@ -662,15 +662,16 @@ async def test_selecting_a_mode_ends_active_vacation_but_keeps_planned_one(
     entry = await setup_entry(hass)
     engine = engine_of(entry)
     await engine.async_set_house_mode(HouseMode.VACATION)
-    assert engine.config.house.vacation is not None
-    assert engine.config.house.vacation.end is None
+    vacation = house_of(engine.config).vacation
+    assert vacation is not None
+    assert vacation.end is None
     await engine.async_set_house_mode(HouseMode.AUTO)
-    assert engine.config.house.vacation is None
+    assert house_of(engine.config).vacation is None
     await engine.async_set_vacation(prague(2026, 10, 10), prague(2026, 10, 12), None)
     await engine.async_set_house_mode(HouseMode.AWAY)
-    assert engine.config.house.vacation is not None
+    assert house_of(engine.config).vacation is not None
     await engine.async_cancel_vacation()
-    assert engine.config.house.vacation is None
+    assert house_of(engine.config).vacation is None
     with pytest.raises(ValidationError) as info:
         await engine.async_set_vacation(prague(2026, 10, 10), prague(2026, 10, 9), None)
     assert info.value.code == "vacation_order"
@@ -680,7 +681,7 @@ async def test_off_uses_hvac_off_or_minimum(
     hass: HomeAssistant, hass_storage: dict[str, Any], climate: FakeClimate
 ) -> None:
     config = two_rooms()
-    store(hass_storage, replace(config, house=replace(config.house, mode=HouseMode.OFF)))
+    store(hass_storage, with_house(config, replace(house_of(config), mode=HouseMode.OFF)))
     with_off = await climate.add("climate.living_trv_1", setpoint=20.0)
     without_off = await climate.add(
         "climate.living_trv_2", setpoint=20.0, hvac_modes=("heat",), min_temp=5.0
