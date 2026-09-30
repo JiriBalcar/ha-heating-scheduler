@@ -1,11 +1,14 @@
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyDeclarations } from "lit";
 import { mdiClose } from "@mdi/js";
+import { fire, showDialog } from "../ha";
 import type { Translate } from "../i18n";
 import { baseStyles } from "../styles";
+import type { HomeAssistant } from "../types";
 import { define } from "./define";
 import "./hs-icon";
 
 /**
+ * Legacy: a modal dialog on the native <dialog> element, until every dialog uses HsHaDialog.
  * A modal dialog on the native <dialog> element: a bottom sheet on phones,
  * a centred box on larger screens. Fires "hs-closed" when it closes.
  */
@@ -137,6 +140,48 @@ export class HsDialog extends LitElement {
 
 define("hs-dialog", HsDialog);
 
+/**
+ * A dialog that Home Assistant's dialog manager shows (see `showDialog` in ../ha). HA creates the
+ * element once, sets `hass`, calls `showDialog(params)`, and calls `closeDialog()` on Back.
+ * Subclasses render `<ha-dialog .open=${this.open} @closed=${this.onClosed}>`.
+ */
+export class HsHaDialog<P> extends LitElement {
+  static override properties: PropertyDeclarations = {
+    hass: { attribute: false },
+    params: { state: true },
+    open: { state: true },
+  };
+  declare hass: HomeAssistant;
+  declare params: P | undefined;
+  declare open: boolean;
+
+  constructor() {
+    super();
+    this.open = false;
+  }
+
+  showDialog(params: P): void {
+    this.params = params;
+    this.open = true;
+  }
+
+  closeDialog(): boolean {
+    this.open = false;
+    return true;
+  }
+
+  /** Runs when the dialog has closed, before `params` is cleared. */
+  protected dialogClosed(): void {}
+
+  protected onClosed(event: Event): void {
+    // Only the dialog itself, not a "closed" event of a field inside it.
+    if (event.target !== event.currentTarget) return;
+    this.dialogClosed();
+    this.params = undefined;
+    fire(this, "dialog-closed", { dialog: this.localName });
+  }
+}
+
 export interface ConfirmOptions {
   heading: string;
   message: string;
@@ -145,72 +190,67 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
+interface ConfirmParams extends ConfirmOptions {
+  resolve: (confirmed: boolean) => void;
+}
+
 /** A yes/no question. Use `confirmDialog()`. */
-export class HsConfirm extends LitElement {
-  static override properties = { options: { attribute: false } };
-  declare options: ConfirmOptions;
-  result = false;
+export class HsConfirmDialog extends HsHaDialog<ConfirmParams> {
+  private confirmed = false;
 
-  static override styles = [
-    baseStyles,
-    css`
-      p {
-        margin: 0;
-      }
-    `,
-  ];
+  static override styles = css`
+    p {
+      margin: 0;
+    }
+  `;
 
-  get dialog(): HsDialog | null {
-    return this.renderRoot.querySelector("hs-dialog");
+  override showDialog(params: ConfirmParams): void {
+    // A new question replaces one that is still open.
+    this.params?.resolve(false);
+    this.confirmed = false;
+    super.showDialog(params);
   }
 
-  private answer(value: boolean) {
-    this.result = value;
-    this.dialog?.close();
+  protected override dialogClosed(): void {
+    this.params?.resolve(this.confirmed);
+  }
+
+  private answer(confirmed: boolean) {
+    this.confirmed = confirmed;
+    this.closeDialog();
   }
 
   override render() {
-    const o = this.options;
+    const p = this.params;
+    if (!p) return nothing;
     return html`
-      <hs-dialog .heading=${o.heading} .closeLabel=${o.cancel}>
-        <p>${o.message}</p>
-        <button slot="actions" class="btn" @click=${() => this.answer(false)}>${o.cancel}</button>
-        <button
-          slot="actions"
-          class="btn primary ${o.danger ? "danger" : ""}"
-          @click=${() => this.answer(true)}
-        >
-          ${o.confirm}
-        </button>
-      </hs-dialog>
+      <ha-dialog .open=${this.open} type="alert" prevent-scrim-close @closed=${this.onClosed}>
+        <ha-dialog-header slot="header">
+          <span slot="title">${p.heading}</span>
+        </ha-dialog-header>
+        <p>${p.message}</p>
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.answer(false)}>
+            ${p.cancel}
+          </ha-button>
+          <ha-button
+            slot="primaryAction"
+            variant=${p.danger ? "danger" : "brand"}
+            @click=${() => this.answer(true)}
+          >
+            ${p.confirm}
+          </ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
     `;
   }
 }
 
-define("hs-confirm", HsConfirm);
+define("hs-confirm-dialog", HsConfirmDialog);
 
-/** Ask a yes/no question in a dialog. Resolves true if confirmed. */
-export async function confirmDialog(host: HTMLElement, options: ConfirmOptions): Promise<boolean> {
-  const element = document.createElement("hs-confirm") as HsConfirm;
-  element.options = options;
-  (host.shadowRoot ?? host).appendChild(element);
-  await element.updateComplete;
-  const dialog = element.dialog;
-  if (!dialog) {
-    element.remove();
-    return false;
-  }
-  return new Promise((resolve) => {
-    dialog.addEventListener(
-      "hs-closed",
-      () => {
-        element.remove();
-        resolve(element.result);
-      },
-      { once: true },
-    );
-    void dialog.show();
-  });
+/** Ask a yes/no question in HA's dialog. Resolves true if confirmed. */
+export function confirmDialog(host: HTMLElement, options: ConfirmOptions): Promise<boolean> {
+  return new Promise((resolve) => showDialog(host, "hs-confirm-dialog", { ...options, resolve }));
 }
 
 /** Ask what to do when the edited item was changed elsewhere. Resolves true to keep mine. */

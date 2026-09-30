@@ -1,5 +1,7 @@
-// Build the panel and the card into custom_components/heating_scheduler/dist.
-// Both entries share one chunk, so every custom element is defined once.
+// Build the frontend into custom_components/heating_scheduler/dist:
+// - heating-scheduler-panel.js: the main bundle (panel, card, components);
+// - heating-scheduler-card.js: the small card loader that HA loads on start.
+// The two share no chunk: the loader always imports the main bundle by its current URL.
 import { build, context } from "esbuild";
 import { rm, mkdir } from "node:fs/promises";
 
@@ -9,25 +11,22 @@ const watch = process.argv.includes("--watch");
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });
 
-const options = {
-  entryPoints: {
-    "heating-scheduler-panel": "src/panel.ts",
-    "heating-scheduler-card": "src/card.ts",
-  },
+const common = {
   outdir,
   bundle: true,
-  splitting: true,
   format: "esm",
   target: "es2022",
   minify: !watch,
   legalComments: "none",
-  chunkNames: "chunks/[name]-[hash]",
   logLevel: "info",
 };
+const builds = [
+  { ...common, entryPoints: { "heating-scheduler-panel": "src/panel.ts" } },
+  { ...common, entryPoints: { "heating-scheduler-card": "src/card-loader.ts" } },
+];
 
 if (watch) {
-  const ctx = await context(options);
-  await ctx.watch();
+  for (const options of builds) await (await context(options)).watch();
 } else {
-  await build(options);
+  await Promise.all(builds.map((options) => build(options)));
 }

@@ -33,9 +33,18 @@ export interface HomeAssistant {
   language: string;
   locale?: HassLocale;
   config: { time_zone: string; unit_system?: { temperature?: string } };
+  panels?: Record<string, { config?: { _panel_custom?: { module_url?: string } } | null }>;
   user?: { name: string; is_admin: boolean };
   themes?: { darkMode?: boolean };
   callWS<T>(message: MessageBase): Promise<T>;
+}
+
+/** Options of the Lovelace card. */
+export interface CardConfig {
+  type: string;
+  room?: string;
+  compact?: boolean;
+  show_house?: boolean;
 }
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";

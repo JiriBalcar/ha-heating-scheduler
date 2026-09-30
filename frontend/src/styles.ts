@@ -5,11 +5,11 @@ export const baseStyles = css`
   :host {
     /* Filled buttons: white text on this colour passes WCAG AA in light and dark themes. */
     --hs-accent: #1565c0;
-    font-family: var(
-      --ha-font-family-body,
-      var(--paper-font-body1_-_font-family, Roboto, "Noto Sans", system-ui, sans-serif)
-    );
+    font-family: var(--ha-font-family-body, Roboto, Noto, sans-serif);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
     color: var(--primary-text-color, #212121);
+    -webkit-font-smoothing: var(--ha-font-smoothing, antialiased);
     -webkit-tap-highlight-color: transparent;
   }
   *,

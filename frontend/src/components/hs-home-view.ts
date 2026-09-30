@@ -1,15 +1,13 @@
 import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing } from "lit";
-import { mdiPlusCircle } from "@mdi/js";
 import { languageOf, translator } from "../i18n";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, Snapshot } from "../types";
 import { define } from "./define";
-import "./hs-house-strip";
-import "./hs-icon";
-import "./hs-room-tile";
+import "./hs-house-card";
+import "./hs-room-card";
 
-/** The simple view: house mode and one tile per room. */
+/** The simple view: house mode and one tile per room, laid out like a dashboard. */
 export class HsHomeView extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -22,30 +20,23 @@ export class HsHomeView extends LitElement {
     baseStyles,
     css`
       :host {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
+        display: block;
       }
-      .rooms {
+      .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+        align-items: start;
+        gap: var(--ha-space-2, 8px);
       }
-      .dry {
-        padding: 12px 16px;
-        border-radius: 12px;
-        background: var(--warning-color, #e65100);
-        color: #fff;
-        font-weight: 600;
-        font-size: 17px;
+      ha-alert {
+        display: block;
+        margin-bottom: var(--ha-space-4, 16px);
       }
       .empty {
-        padding: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        align-items: flex-start;
-        font-size: 18px;
+        padding: var(--ha-space-4, 16px);
+      }
+      .empty p {
+        margin: 0 0 var(--ha-space-4, 16px);
       }
     `,
   ];
@@ -61,28 +52,22 @@ export class HsHomeView extends LitElement {
     const t = translator(languageOf(this.hass));
     return html`
       ${this.snapshot.settings.dry_run
-        ? html`<div class="dry" role="status">${t("adv.dry_run_banner")}</div>`
+        ? html`<ha-alert alert-type="warning">${t("adv.dry_run_banner")}</ha-alert>`
         : nothing}
-      <hs-house-strip .hass=${this.hass} .snapshot=${this.snapshot}></hs-house-strip>
-      ${this.snapshot.rooms.length === 0
-        ? html`<div class="card empty">
-            <span>${t("adv.rooms.empty")}</span>
-            <button class="btn primary" @click=${this.addRooms}>
-              <hs-icon .path=${mdiPlusCircle}></hs-icon>${t("adv.rooms.add")}
-            </button>
-          </div>`
-        : html`<div class="rooms">
-            ${repeat(
+      <div class="grid">
+        <hs-house-card .hass=${this.hass} .snapshot=${this.snapshot}></hs-house-card>
+        ${this.snapshot.rooms.length === 0
+          ? html`<ha-card class="empty">
+              <p>${t("adv.rooms.empty")}</p>
+              <ha-button @click=${this.addRooms}>${t("adv.rooms.add")}</ha-button>
+            </ha-card>`
+          : repeat(
               this.snapshot.rooms,
               (room) => room.id,
               (room) =>
-                html`<hs-room-tile
-                  .hass=${this.hass}
-                  .room=${room}
-                  .snapshot=${this.snapshot}
-                ></hs-room-tile>`,
+                html`<hs-room-card .hass=${this.hass} .room=${room} .snapshot=${this.snapshot}></hs-room-card>`,
             )}
-          </div>`}
+      </div>
     `;
   }
 }

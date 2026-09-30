@@ -1,45 +1,31 @@
-// Lovelace card: one room, or all rooms, optionally with the house mode.
+// The real Lovelace card and its editor, in the main bundle. card-loader.ts shows them.
 import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { define } from "./components/define";
-import "./components/hs-house-strip";
-import "./components/hs-room-tile";
-import { languageOf, translator } from "./i18n";
+import "./components/hs-house-card";
+import "./components/hs-room-card";
+import { languageOf, translator, type TextKey } from "./i18n";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
-import type { HomeAssistant, Snapshot } from "./types";
+import type { CardConfig, HomeAssistant, Snapshot } from "./types";
 
-export interface CardConfig {
-  type: string;
-  room?: string;
-  compact?: boolean;
-  show_house?: boolean;
-}
+const ALL_ROOMS = "all";
 
 export class HeatingSchedulerCard extends LitElement {
   static override properties = {
     hass: { attribute: false },
     config: { state: true },
     snapshot: { state: true },
-    message: { state: true },
   };
   declare hass: HomeAssistant;
   declare config: CardConfig;
   declare snapshot: Snapshot | null;
-  declare message: string;
 
   private unsubscribe: (() => void) | null = null;
-  private messageTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
     this.snapshot = null;
-    this.message = "";
-    this.addEventListener("hs-toast", (event) => {
-      this.message = (event as CustomEvent<string>).detail;
-      if (this.messageTimer) clearTimeout(this.messageTimer);
-      this.messageTimer = setTimeout(() => (this.message = ""), 6000);
-    });
   }
 
   static override styles = [
@@ -49,20 +35,12 @@ export class HeatingSchedulerCard extends LitElement {
         display: block;
       }
       .stack {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+        display: grid;
+        gap: var(--ha-space-2, 8px);
       }
       .status {
-        padding: 16px;
-        font-size: 17px;
-      }
-      .message {
-        padding: 12px 16px;
-        border-radius: 12px;
-        background: #323232;
-        color: #fff;
-        font-size: 16px;
+        padding: var(--ha-space-4, 16px);
+        color: var(--secondary-text-color);
       }
     `,
   ];
@@ -78,18 +56,6 @@ export class HeatingSchedulerCard extends LitElement {
   getCardSize(): number {
     const rooms = this.config?.room ? 1 : (this.snapshot?.rooms.length ?? 2);
     return (this.config?.show_house ? 3 : 0) + rooms * (this.config?.compact ? 3 : 5);
-  }
-
-  getGridOptions() {
-    return { columns: 12, min_columns: 6, rows: "auto" };
-  }
-
-  static getConfigElement(): HTMLElement {
-    return document.createElement("heating-scheduler-card-editor");
-  }
-
-  static getStubConfig(): Partial<CardConfig> {
-    return { show_house: true };
   }
 
   override connectedCallback(): void {
@@ -115,33 +81,32 @@ export class HeatingSchedulerCard extends LitElement {
     if (!this.hass || !this.config) return nothing;
     const t = translator(languageOf(this.hass));
     const snapshot = this.snapshot;
-    if (!snapshot) return html`<div class="card status">${t("common.loading")}</div>`;
+    if (!snapshot) return html`<ha-card class="status">${t("common.loading")}</ha-card>`;
     const rooms = this.config.room
       ? snapshot.rooms.filter((room) => room.id === this.config.room)
       : snapshot.rooms;
     return html`
       <div class="stack">
         ${this.config.show_house
-          ? html`<hs-house-strip .hass=${this.hass} .snapshot=${snapshot}></hs-house-strip>`
+          ? html`<hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>`
           : nothing}
         ${repeat(
           rooms,
           (room) => room.id,
           (room) =>
-            html`<hs-room-tile
+            html`<hs-room-card
               .hass=${this.hass}
               .room=${room}
               .snapshot=${snapshot}
               ?compact=${this.config.compact ?? false}
-            ></hs-room-tile>`,
+            ></hs-room-card>`,
         )}
-        ${this.message ? html`<div class="message" role="alert">${this.message}</div>` : nothing}
       </div>
     `;
   }
 }
 
-/** Visual editor of the card: room, compact list, house mode. */
+/** Visual editor of the card: room, compact tiles, house mode. */
 export class HeatingSchedulerCardEditor extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -159,28 +124,6 @@ export class HeatingSchedulerCardEditor extends LitElement {
     this.snapshot = null;
   }
 
-  static override styles = [
-    baseStyles,
-    css`
-      .form {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-      .check {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        min-height: 48px;
-        font-size: 16px;
-      }
-      .check input {
-        width: 24px;
-        height: 24px;
-      }
-    `,
-  ];
-
   setConfig(config: CardConfig): void {
     this.config = { ...config };
   }
@@ -197,8 +140,40 @@ export class HeatingSchedulerCardEditor extends LitElement {
     }
   }
 
-  private update_(patch: Partial<CardConfig>) {
-    const config: CardConfig = { ...this.config, ...patch };
+  private get t() {
+    return translator(languageOf(this.hass));
+  }
+
+  private schema() {
+    const rooms = this.snapshot?.rooms ?? [];
+    return [
+      {
+        name: "room",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: ALL_ROOMS, label: this.t("card.all_rooms") },
+              ...rooms.map((room) => ({ value: room.id, label: room.name })),
+            ],
+          },
+        },
+      },
+      { name: "show_house", selector: { boolean: {} } },
+      { name: "compact", selector: { boolean: {} } },
+    ];
+  }
+
+  private label = (field: { name: string }): string => this.t(`card.${field.name}` as TextKey);
+
+  private changed(event: CustomEvent<{ value: Record<string, unknown> }>) {
+    const value = event.detail.value;
+    const config: CardConfig = {
+      ...this.config,
+      room: value.room === ALL_ROOMS ? undefined : (value.room as string | undefined),
+      show_house: Boolean(value.show_house),
+      compact: Boolean(value.compact),
+    };
     for (const key of Object.keys(config) as (keyof CardConfig)[]) {
       if (config[key] === undefined || config[key] === "" || config[key] === false) delete config[key];
     }
@@ -208,60 +183,20 @@ export class HeatingSchedulerCardEditor extends LitElement {
 
   override render() {
     if (!this.hass || !this.config) return nothing;
-    const t = translator(languageOf(this.hass));
-    return html`
-      <div class="form">
-        <label class="field">
-          <span>${t("card.room")}</span>
-          <select
-            class="input"
-            @change=${(e: Event) => this.update_({ room: (e.target as HTMLSelectElement).value || undefined })}
-          >
-            <option value="" ?selected=${!this.config.room}>${t("card.all_rooms")}</option>
-            ${(this.snapshot?.rooms ?? []).map(
-              (room) =>
-                html`<option value=${room.id} ?selected=${room.id === this.config.room}>${room.name}</option>`,
-            )}
-          </select>
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            .checked=${this.config.show_house ?? false}
-            @change=${(e: Event) => this.update_({ show_house: (e.target as HTMLInputElement).checked })}
-          />
-          ${t("card.show_house")}
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            .checked=${this.config.compact ?? false}
-            @change=${(e: Event) => this.update_({ compact: (e.target as HTMLInputElement).checked })}
-          />
-          ${t("card.compact")}
-        </label>
-      </div>
-    `;
+    const data = {
+      room: this.config.room ?? ALL_ROOMS,
+      show_house: this.config.show_house ?? false,
+      compact: this.config.compact ?? false,
+    };
+    return html`<ha-form
+      .hass=${this.hass}
+      .data=${data}
+      .schema=${this.schema()}
+      .computeLabel=${this.label}
+      @value-changed=${this.changed}
+    ></ha-form>`;
   }
 }
 
-define("heating-scheduler-card", HeatingSchedulerCard);
-define("heating-scheduler-card-editor", HeatingSchedulerCardEditor);
-
-declare global {
-  interface Window {
-    customCards?: { type: string; name: string; description: string; preview?: boolean }[];
-  }
-}
-
-const lang = (document.documentElement.lang || navigator.language || "cs").startsWith("en") ? "en" : "cs";
-const t = translator(lang);
-window.customCards = window.customCards ?? [];
-if (!window.customCards.some((card) => card.type === "heating-scheduler-card")) {
-  window.customCards.push({
-    type: "heating-scheduler-card",
-    name: t("card.name"),
-    description: t("card.description"),
-    preview: true,
-  });
-}
+define("hs-card", HeatingSchedulerCard);
+define("hs-card-editor", HeatingSchedulerCardEditor);

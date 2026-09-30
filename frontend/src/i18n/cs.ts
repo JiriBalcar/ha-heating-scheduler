@@ -42,6 +42,7 @@ export const cs: Record<TextKey, string> = {
   "house.banner.vacation_open": "Dovolená je zapnutá.",
   "house.banner.off": "Topení je v celém domě vypnuté.",
   "house.home_again": "Jsem doma — Normálně",
+  "house.back_hint": "Až se vrátíte, přepněte na Normálně.",
   "house.heating_on": "Zapnout topení — Normálně",
   "house.planned": "Naplánovaná dovolená: {from} – {to}",
   "house.planned_open": "Naplánovaná dovolená od {from}",
@@ -80,6 +81,7 @@ export const cs: Record<TextKey, string> = {
   "health.mismatch": "Hlavice {name} má jinou teplotu, než má mít. Zkusím to opravit.",
   "health.since": "Od {time}.",
   "health.retry": "Zkusit hned",
+  "health.valve": "Zobrazit hlavici",
   "health.details": "Podrobnosti jsou v části Rozšířené → Hlavice.",
 
   "vacation.title": "Dovolená",
@@ -87,6 +89,7 @@ export const cs: Record<TextKey, string> = {
   "vacation.to": "Návrat",
   "vacation.date": "Datum",
   "vacation.time": "Čas",
+  "vacation.leave_at": "Odjezd",
   "vacation.now": "Hned",
   "vacation.later": "Později",
   "vacation.temperature": "Teplota během dovolené",

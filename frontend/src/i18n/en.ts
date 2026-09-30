@@ -40,6 +40,7 @@ export const en = {
   "house.banner.vacation_open": "Holiday is on.",
   "house.banner.off": "Heating is off in the whole house.",
   "house.home_again": "I'm home — Normal",
+  "house.back_hint": "When you are back, switch to Normal.",
   "house.heating_on": "Turn heating on — Normal",
   "house.planned": "Holiday planned: {from} – {to}",
   "house.planned_open": "Holiday planned from {from}",
@@ -78,6 +79,7 @@ export const en = {
   "health.mismatch": "The valve {name} has a different temperature than it should. It will be corrected.",
   "health.since": "Since {time}.",
   "health.retry": "Try again now",
+  "health.valve": "Show valve",
   "health.details": "Details are in Advanced → Valves.",
 
   "vacation.title": "Holiday",
@@ -85,6 +87,7 @@ export const en = {
   "vacation.to": "Coming back",
   "vacation.date": "Date",
   "vacation.time": "Time",
+  "vacation.leave_at": "Leaving on",
   "vacation.now": "Now",
   "vacation.later": "Later",
   "vacation.temperature": "Temperature while away",

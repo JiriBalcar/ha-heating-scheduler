@@ -1,4 +1,5 @@
 // One websocket subscription per connection, shared by the panel and every card.
+import { showToast } from "./ha";
 import type { Translate, TextKey } from "./i18n";
 import { ALL_KEYS } from "./i18n";
 import type { Connection, HomeAssistant, Snapshot } from "./types";
@@ -83,7 +84,7 @@ export function errorText(error: unknown, t: Translate): string {
   return t("error.unknown", { message });
 }
 
-/** Tell the page to show a short message. */
+/** Show a short message in HA's toast. */
 export function toast(from: HTMLElement, message: string): void {
-  from.dispatchEvent(new CustomEvent("hs-toast", { detail: message, bubbles: true, composed: true }));
+  showToast(from, message);
 }

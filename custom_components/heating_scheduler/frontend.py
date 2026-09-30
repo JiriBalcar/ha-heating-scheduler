@@ -56,6 +56,8 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         module_url=f"{STATIC_URL}/{PANEL_FILE}?v={key}",
         require_admin=False,
         config={},
+        # The panel uses HA's page layout, which keeps clear of the safe areas itself.
+        handle_safe_area=True,
     )
 
 

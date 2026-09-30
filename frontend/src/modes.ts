@@ -1,5 +1,4 @@
-// Colours and icons of modes. Colours carry white text with WCAG AA contrast
-// in light and dark themes; they are never used without an icon and a word.
+// Colours and icons of modes. Colours are HA theme colours; they always come with an icon and a word.
 import {
   mdiBagSuitcase,
   mdiHandBackRight,
@@ -15,13 +14,13 @@ import {
 import type { HouseMode, Mode, Snapshot, TargetMode, RoomData } from "./types";
 
 export const MODE_COLORS: Record<TargetMode, string> = {
-  comfort: "#bf360c",
-  eco: "#2e7d32",
-  night: "#3949ab",
-  away: "#546e7a",
-  frost: "#006978",
-  off: "#616161",
-  manual: "#8e24aa",
+  comfort: "var(--deep-orange-color, #ff6f22)",
+  eco: "var(--green-color, #4caf50)",
+  night: "var(--indigo-color, #3f51b5)",
+  away: "var(--blue-grey-color, #607d8b)",
+  frost: "var(--cyan-color, #00bcd4)",
+  off: "var(--grey-color, #9e9e9e)",
+  manual: "var(--purple-color, #9c27b0)",
 };
 
 export const MODE_ICONS: Record<TargetMode, string> = {
@@ -35,9 +34,9 @@ export const MODE_ICONS: Record<TargetMode, string> = {
 };
 
 export const HOUSE_COLORS: Record<HouseMode, string> = {
-  auto: "#1565c0",
+  auto: "var(--primary-color, #009ac7)",
   away: MODE_COLORS.away,
-  vacation: "#00695c",
+  vacation: "var(--teal-color, #009688)",
   off: MODE_COLORS.off,
 };
 
