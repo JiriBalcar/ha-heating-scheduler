@@ -1,8 +1,7 @@
-import { LitElement, css, html, nothing, type PropertyDeclarations } from "lit";
-import { fire, showDialog } from "../ha";
+import { LitElement, type PropertyDeclarations } from "lit";
+import { fire, haDialogs } from "../ha";
 import type { Translate } from "../i18n";
 import type { HomeAssistant } from "../types";
-import { define } from "./define";
 
 /**
  * A dialog that Home Assistant's dialog manager shows (see `showDialog` in ../ha). HA creates the
@@ -85,64 +84,20 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
-interface ConfirmParams extends ConfirmOptions {
-  resolve: (confirmed: boolean) => void;
-}
-
-/** A yes/no question. Use `confirmDialog()`. */
-export class HsConfirmDialog extends HsHaDialog<ConfirmParams> {
-  private confirmed = false;
-
-  static override styles = css`
-    p {
-      margin: 0;
-    }
-  `;
-
-  protected override dialogOpened(): void {
-    this.confirmed = false;
-  }
-
-  protected override dialogClosed(): void {
-    this.args?.resolve(this.confirmed);
-  }
-
-  private answer(confirmed: boolean) {
-    this.confirmed = confirmed;
-    this.closeDialog();
-  }
-
-  override render() {
-    const p = this.args;
-    if (!p) return nothing;
-    return html`
-      <ha-dialog .open=${this.open} type="alert" prevent-scrim-close @closed=${this.onClosed}>
-        <ha-dialog-header slot="header">
-          <span slot="title">${p.heading}</span>
-        </ha-dialog-header>
-        <p>${p.message}</p>
-        <ha-dialog-footer slot="footer">
-          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.answer(false)}>
-            ${p.cancel}
-          </ha-button>
-          <ha-button
-            slot="primaryAction"
-            variant=${p.danger ? "danger" : "brand"}
-            @click=${() => this.answer(true)}
-          >
-            ${p.confirm}
-          </ha-button>
-        </ha-dialog-footer>
-      </ha-dialog>
-    `;
-  }
-}
-
-define("hs-confirm-dialog", HsConfirmDialog);
-
-/** Ask a yes/no question in HA's dialog. Resolves true if confirmed. */
-export function confirmDialog(host: HTMLElement, options: ConfirmOptions): Promise<boolean> {
-  return new Promise((resolve) => showDialog(host, "hs-confirm-dialog", { ...options, resolve }));
+/**
+ * Ask a yes/no question in HA's own confirmation dialog. Resolves true if confirmed. Without HA's
+ * dialogs, the browser asks.
+ */
+export async function confirmDialog(host: HTMLElement, options: ConfirmOptions): Promise<boolean> {
+  const dialogs = await haDialogs();
+  if (!dialogs) return window.confirm(`${options.heading}\n\n${options.message}`);
+  return dialogs.showConfirmationDialog(host, {
+    title: options.heading,
+    text: options.message,
+    confirmText: options.confirm,
+    dismissText: options.cancel,
+    destructive: options.danger,
+  });
 }
 
 /** Ask what to do when the edited item was changed elsewhere. Resolves true to keep mine. */
@@ -153,4 +108,32 @@ export function keepMineDialog(host: HTMLElement, t: Translate): Promise<boolean
     confirm: t("common.overwrite"),
     cancel: t("common.discard_mine"),
   });
+}
+
+export interface PromptOptions {
+  heading: string;
+  label: string;
+  value: string;
+  confirm: string;
+  cancel: string;
+}
+
+/** Ask for a text in HA's own prompt dialog. Resolves the text, or null if cancelled. */
+export async function promptDialog(host: HTMLElement, options: PromptOptions): Promise<string | null> {
+  const dialogs = await haDialogs();
+  if (!dialogs) return window.prompt(options.heading, options.value);
+  return dialogs.showPromptDialog(host, {
+    title: options.heading,
+    inputLabel: options.label,
+    defaultValue: options.value,
+    confirmText: options.confirm,
+    dismissText: options.cancel,
+  });
+}
+
+/** Tell something in HA's own alert dialog. */
+export async function alertDialog(host: HTMLElement, heading: string, message: string): Promise<void> {
+  const dialogs = await haDialogs();
+  if (dialogs) await dialogs.showAlertDialog(host, { title: heading, text: message });
+  else window.alert(`${heading}\n\n${message}`);
 }

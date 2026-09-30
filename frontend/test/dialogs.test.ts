@@ -3,9 +3,9 @@
 // drops the element after closing and creates the next one without `hass`. Ours must not have one.
 import { beforeAll, describe, expect, it } from "vitest";
 import "../src/panel";
+import { alertDialog, confirmDialog, promptDialog } from "../src/components/hs-dialog";
 
 const DIALOGS = [
-  "hs-confirm-dialog",
   "hs-problem-dialog",
   "hs-holiday-dialog",
   "hs-house-dialog",
@@ -15,8 +15,6 @@ const DIALOGS = [
   "hs-new-plan-dialog",
   "hs-room-dialog",
   "hs-import-rooms-dialog",
-  "hs-zone-dialog",
-  "hs-floors-dialog",
 ];
 
 beforeAll(async () => {
@@ -44,34 +42,64 @@ describe("dialogs", () => {
 describe("a dialog opened again while it closes", () => {
   it("answers the first caller and ignores the late close of the old ha-dialog", async () => {
     type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    const dialog = document.createElement("hs-confirm-dialog") as Any;
+    const dialog = document.createElement("hs-save-plan-dialog") as Any;
     dialog.hass = { language: "en", locale: { language: "en" } };
     document.body.appendChild(dialog);
     const closed: string[] = [];
     dialog.addEventListener("dialog-closed", () => closed.push("dialog-closed"));
     const answers: boolean[] = [];
-    const ask = (message: string) =>
-      dialog.showDialog({ heading: "Heading", message, confirm: "Yes", cancel: "No", resolve: (ok: boolean) => answers.push(ok) });
+    const days = Array.from({ length: 7 }, () => [{ start: 0, mode: "night" }]);
+    const ask = (used: string) =>
+      dialog.showDialog({ days, changed: new Set(), used, resolve: (save: boolean) => answers.push(save) });
 
     ask("first");
     await dialog.updateComplete;
     const first = dialog.shadowRoot.querySelector("ha-dialog");
-    dialog.answer(true); // Yes: the ha-dialog starts closing.
+    dialog.answer(true); // Save: the ha-dialog starts closing.
     ask("second"); // Opened again before the first "closed".
     await dialog.updateComplete;
     await dialog.updateComplete;
     expect(answers).toEqual([true]);
     const second = dialog.shadowRoot.querySelector("ha-dialog");
     expect(second).not.toBe(first);
-    expect(dialog.args.message).toBe("second");
+    expect(dialog.args.used).toBe("second");
 
     first.dispatchEvent(new Event("closed")); // The late close of the first ha-dialog.
     await dialog.updateComplete;
-    expect(dialog.args.message).toBe("second");
+    expect(dialog.args.used).toBe("second");
     expect(closed).toEqual([]);
 
     second.dispatchEvent(new Event("closed"));
     expect(answers).toEqual([true, false]);
     expect(closed).toEqual(["dialog-closed"]);
+  });
+});
+
+describe("HA's own dialogs", () => {
+  it("ask the questions for confirmations, names and notices", async () => {
+    const calls: [string, unknown][] = [];
+    window.loadCardHelpers = async () => ({
+      showAlertDialog: async (_element, params) => calls.push(["alert", params]),
+      showConfirmationDialog: async (_element, params) => (calls.push(["confirm", params]), true),
+      showPromptDialog: async (_element, params) => (calls.push(["prompt", params]), "Attic"),
+    });
+    const host = document.body;
+    const confirmed = await confirmDialog(host, {
+      heading: "Off",
+      message: "Turn off the heating?",
+      confirm: "Yes, turn off",
+      cancel: "Cancel",
+      danger: true,
+    });
+    const name = await promptDialog(host, { heading: "New zone", label: "Name", value: "", confirm: "Save", cancel: "Cancel" });
+    await alertDialog(host, "Floors", "No room is on a floor.");
+    expect(confirmed).toBe(true);
+    expect(name).toBe("Attic");
+    expect(calls).toEqual([
+      ["confirm", { title: "Off", text: "Turn off the heating?", confirmText: "Yes, turn off", dismissText: "Cancel", destructive: true }],
+      ["prompt", { title: "New zone", inputLabel: "Name", defaultValue: "", confirmText: "Save", dismissText: "Cancel" }],
+      ["alert", { title: "Floors", text: "No room is on a floor." }],
+    ]);
+    delete window.loadCardHelpers;
   });
 });

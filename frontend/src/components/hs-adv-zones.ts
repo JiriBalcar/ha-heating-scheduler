@@ -1,12 +1,11 @@
 import { LitElement, css, html, nothing } from "lit";
 import { mdiChevronDown, mdiChevronUp, mdiDelete, mdiDotsVertical, mdiHomeFloor1, mdiPencil, mdiPlus } from "@mdi/js";
-import { showDialog } from "../ha";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { Candidates, HomeAssistant, Snapshot, ZoneData } from "../types";
 import { define } from "./define";
-import { HsHaDialog, confirmDialog } from "./hs-dialog";
+import { alertDialog, confirmDialog, promptDialog } from "./hs-dialog";
 
 /** Zones: add, rename, reorder, delete, and create them from Home Assistant floors. */
 export class HsAdvZones extends LitElement {
@@ -70,10 +69,16 @@ export class HsAdvZones extends LitElement {
   }
 
   private async edit(zone: ZoneData | null) {
-    const name = await new Promise<string | null>((resolve) =>
-      showDialog(this, "hs-zone-dialog", { name: zone?.name ?? "", isNew: zone === null, resolve }),
-    );
-    if (name === null) return;
+    const t = this.t;
+    const answer = await promptDialog(this, {
+      heading: zone ? t("adv.zones.edit_title") : t("adv.zones.new_title"),
+      label: t("adv.zones.name"),
+      value: zone?.name ?? "",
+      confirm: t("common.save"),
+      cancel: t("common.cancel"),
+    });
+    const name = answer?.trim();
+    if (!name || name === zone?.name) return;
     await this.call("zone/save", { zone: zone ? { id: zone.id, name } : { name } });
   }
 
@@ -115,9 +120,20 @@ export class HsAdvZones extends LitElement {
       toast(this, errorText(error, this.t));
       return;
     }
+    const t = this.t;
+    if (!candidates.floors.length) {
+      await alertDialog(this, t("adv.zones.from_floors"), t("adv.zones.from_floors_none"));
+      return;
+    }
+    // "Přízemí: Obývák, Kuchyň · 1. patro: Ložnice, Koupelna"
     const roomName = (id: string) => this.snapshot.rooms.find((room) => room.id === id)?.name ?? id;
-    const floors = candidates.floors.map((floor) => ({ name: floor.name, rooms: floor.rooms.map(roomName) }));
-    const ok = await new Promise<boolean>((resolve) => showDialog(this, "hs-floors-dialog", { floors, resolve }));
+    const floors = candidates.floors.map((floor) => `${floor.name}: ${floor.rooms.map(roomName).join(", ")}`);
+    const ok = await confirmDialog(this, {
+      heading: t("adv.zones.from_floors"),
+      message: `${t("adv.zones.from_floors_hint")} ${floors.join(" · ")}`,
+      confirm: t("adv.zones.from_floors_button"),
+      cancel: t("common.cancel"),
+    });
     if (ok) await this.call("zones/from_floors", {});
   }
 
@@ -167,124 +183,3 @@ export class HsAdvZones extends LitElement {
 }
 
 define("hs-adv-zones", HsAdvZones);
-
-interface ZoneParams {
-  name: string;
-  isNew: boolean;
-  resolve: (name: string | null) => void;
-}
-
-/** Name a new zone, or rename one. */
-export class HsZoneDialog extends HsHaDialog<ZoneParams> {
-  static override properties = {
-    name: { state: true },
-  };
-  declare name: string;
-  private result: string | null = null;
-
-  protected override dialogOpened(params: ZoneParams): void {
-    this.name = params.name;
-    this.result = null;
-  }
-
-  protected override dialogClosed(): void {
-    this.args?.resolve(this.result);
-  }
-
-  private save() {
-    if (!this.name.trim()) return;
-    this.result = this.name.trim();
-    this.closeDialog();
-  }
-
-  override render() {
-    if (!this.args) return nothing;
-    const t = translator(languageOf(this.hass));
-    return html`
-      <ha-dialog
-        .open=${this.open}
-        header-title=${this.args.isNew ? t("adv.zones.new_title") : t("adv.zones.edit_title")}
-        @closed=${this.onClosed}
-      >
-        <ha-form
-          .hass=${this.hass}
-          .data=${{ name: this.name }}
-          .schema=${[{ name: "name", required: true, selector: { text: {} } }]}
-          .computeLabel=${() => t("adv.zones.name")}
-          @value-changed=${(e: CustomEvent<{ value: { name?: string } }>) => (this.name = e.detail.value.name ?? "")}
-        ></ha-form>
-        <ha-dialog-footer slot="footer">
-          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
-            ${t("common.cancel")}
-          </ha-button>
-          <ha-button slot="primaryAction" .disabled=${!this.name.trim()} @click=${this.save}>
-            ${t("common.save")}
-          </ha-button>
-        </ha-dialog-footer>
-      </ha-dialog>
-    `;
-  }
-}
-
-define("hs-zone-dialog", HsZoneDialog);
-
-interface FloorsParams {
-  floors: { name: string; rooms: string[] }[];
-  resolve: (ok: boolean) => void;
-}
-
-/** What "Create zones from floors" will do, before it does it. */
-export class HsFloorsDialog extends HsHaDialog<FloorsParams> {
-  private confirmed = false;
-
-  static override styles = css`
-    p {
-      margin-top: 0;
-    }
-    ha-md-list-item {
-      --md-list-item-leading-space: 0;
-    }
-  `;
-
-  protected override dialogOpened(): void {
-    this.confirmed = false;
-  }
-
-  protected override dialogClosed(): void {
-    this.args?.resolve(this.confirmed);
-  }
-
-  private create() {
-    this.confirmed = true;
-    this.closeDialog();
-  }
-
-  override render() {
-    const p = this.args;
-    if (!p) return nothing;
-    const t = translator(languageOf(this.hass));
-    return html`
-      <ha-dialog .open=${this.open} header-title=${t("adv.zones.from_floors")} @closed=${this.onClosed}>
-        ${p.floors.length
-          ? html`<p>${t("adv.zones.from_floors_hint")}</p>
-              ${p.floors.map(
-                (floor) => html`<ha-md-list-item>
-                  <span slot="headline">${floor.name}</span>
-                  <span slot="supporting-text">${floor.rooms.join(", ")}</span>
-                </ha-md-list-item>`,
-              )}`
-          : html`<p>${t("adv.zones.from_floors_none")}</p>`}
-        <ha-dialog-footer slot="footer">
-          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
-            ${t("common.cancel")}
-          </ha-button>
-          <ha-button slot="primaryAction" .disabled=${p.floors.length === 0} @click=${this.create}>
-            ${t("adv.zones.from_floors_button")}
-          </ha-button>
-        </ha-dialog-footer>
-      </ha-dialog>
-    `;
-  }
-}
-
-define("hs-floors-dialog", HsFloorsDialog);

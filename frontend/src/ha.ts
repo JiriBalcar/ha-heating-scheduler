@@ -59,3 +59,40 @@ export function showDialog<P>(node: HTMLElement, dialogTag: string, dialogParams
     dialogParams,
   });
 }
+
+/** The parameters of HA's own dialog box that we use. */
+export interface DialogBoxParams {
+  title?: string;
+  text?: string;
+  confirmText?: string;
+  dismissText?: string;
+  /** A red confirm button. */
+  destructive?: boolean;
+}
+
+export interface PromptParams extends DialogBoxParams {
+  inputLabel?: string;
+  defaultValue?: string;
+}
+
+/** HA's generic dialogs, from the helpers that HA gives custom cards. */
+export interface HaDialogs {
+  showAlertDialog(element: HTMLElement, params: DialogBoxParams): Promise<unknown>;
+  showConfirmationDialog(element: HTMLElement, params: DialogBoxParams): Promise<boolean>;
+  showPromptDialog(element: HTMLElement, params: PromptParams): Promise<string | null>;
+}
+
+declare global {
+  interface Window {
+    loadCardHelpers?: () => Promise<HaDialogs>;
+  }
+}
+
+/**
+ * HA's generic dialogs. HA's dashboard code defines `window.loadCardHelpers`; HA loads that code in
+ * the background also when a custom panel opens first. Null if HA does not have it.
+ */
+export async function haDialogs(): Promise<HaDialogs | null> {
+  if (!window.loadCardHelpers) await whenDefined(["ha-panel-lovelace"]);
+  return window.loadCardHelpers ? window.loadCardHelpers() : null;
+}
