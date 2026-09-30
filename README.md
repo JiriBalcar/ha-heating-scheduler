@@ -99,7 +99,9 @@ v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí sa
 - **Vypnuto**: topení je vypnuté (léto).
 - **Normálně**: topí se podle plánu.
 
-Klepnutím na dlaždici se otevře okno s velkými tlačítky a s tím, co se teď děje.
+Klepnutím na dlaždici se otevře okno s velkými tlačítky a s tím, co se teď děje. Nad
+dlaždicemi se ukáže připomínka s tlačítkem **Jsem doma — Normálně**. Když dovolená běží
+a chcete změnit den návratu, klepněte znovu na **Dovolená**.
 
 **Každé patro zvlášť.** Když je dům rozdělený na zóny (například patra), má každá zóna svou
 dlaždici nad svými místnostmi. Režim zóny platí jen pro její místnosti: **1. patro** může
@@ -109,12 +111,14 @@ najednou. Když mají zóny různé režimy, ukazuje **Různě** a vypíše rež
 Během režimů Pryč, Dovolená a Vypnuto nejde teplota v místnosti měnit. Nejdřív přepněte dům
 (nebo jeho zónu) na **Normálně**.
 
-**Oranžový vykřičník** na ikoně místnosti: některá hlavice neodpovídá nebo nepřijala
-teplotu. Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
+**Problém s hlavicí**: na ikoně místnosti je oranžový vykřičník, pod názvem místnosti je
+napsané, co se děje (například „Hlavice neodpovídá“), a nahoře se ukáže upozornění.
+Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
 
 **Změna plánu.** Otevřete **Plány**, u plánu klepněte na **Změnit plán** a pak na den.
 Časy změníte posunutím bílých úchytů nebo klepnutím na úsek. **Kopírovat den do…**
-zkopíruje den na jiné dny. Nakonec klepněte na **Uložit**.
+zkopíruje den na jiné dny. Nakonec klepněte na **Uložit**. Když odejdete bez uložení,
+aplikace se zeptá, jestli změny zahodit.
 
 **Větší písmo.** V nastavení aplikace Home Assistant nastavte **Page zoom** (přiblížení
 stránky), například na 125 %. Zvětší se celá aplikace.
@@ -129,14 +133,16 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 - **Whole house**: **Away** for short absences (press **I'm home — Normal** when back),
   **Holiday** with a return date (heating comes back by itself), **Off** for summer,
   **Normal** to follow the plans. In Away, Holiday and Off, room temperatures are fixed.
-  Tap the tile for a dialog with big buttons.
+  Tap the tile for a dialog with big buttons. A reminder with **I'm home — Normal** shows
+  above the tiles. To change the return date of a running holiday, tap **Holiday** again.
 - **Zones** (for example floors): each zone has its own tile above its rooms, and its mode
   applies only to its rooms. **Whole house** switches every zone; while the zones differ,
   it shows **Mixed** and lists the mode of each.
-- An **orange exclamation mark** on a room's icon means a valve has a problem; tap the icon
+- A **valve problem** shows as an orange exclamation mark on the room's icon, in words under
+  the room's name ("A valve does not respond"), and in an alert above the tiles; tap the icon
   for an explanation.
 - **Plans**: tap **Change plan** and a day, drag the white handles or tap a part, then
-  **Save**.
+  **Save**. Leaving with unsaved changes asks first.
 - **Larger text**: set **Page zoom** in the Companion app settings, for example to 125 %.
 
 ## How it works

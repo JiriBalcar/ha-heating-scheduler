@@ -169,7 +169,9 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   2026-09-30) and the attribute `zones` holds the mode of each zone. `mixed` is one of the
   options only then, because a select's state must be an option; selecting it is an error.
 - Zones: with two or more zones, one `select` per zone (unique id `zone_<id>_mode`). The
-  selects are added and removed when zones are added and removed.
+  selects are added and removed when zones are added and removed. A renamed zone renames its
+  select: HA caches an entity's name and new translation placeholders do not clear it, so the
+  select clears it itself.
 - Services: `set_override`, `clear_override` (target: room thermostat), `set_house_mode`,
   `set_vacation`, `cancel_vacation`, `reconcile_now`. The house services take an optional
   `zone` (name in any case, or id); without it they apply to every zone.
@@ -243,6 +245,21 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   tile followed by its rooms. The Whole house tile sets every zone; while the zones differ,
   it lists the mode of each zone and selects nothing. Advanced → Rooms groups the rooms by
   zone, with headings like HA's floor headings; moving a room up or down stays in its zone.
+- **Hints and problems above the tiles (decision, 2026-09-30, after a UI review).** Back to
+  Normal after Away, Holiday or Off, and a planned holiday, are shown once above the tiles
+  (`hs-house-hints`; per zone while the zones differ), not in every tile, so all tiles have
+  HA's one height (the house selector is 42 px, like the room tiles). A valve problem shows in
+  the room tile's status line in the warning colour, and in one alert above the tiles. Holiday
+  tapped during a holiday opens the Holiday dialog with its dates, to change them.
+- **Rows in narrow cards.** `ha-settings-row` gives the label and the control half the width
+  each. A container query on the card stacks the control under the label when the card is
+  narrow (the threshold depends on the control), as HA's own narrow layout does; HA's `narrow`
+  follows the window, not the card.
+- **Unsaved edits.** The plan editor, Temperatures and Settings tell the panel when they have
+  unsaved edits (`unsaved.ts`). On a tab switch the panel keeps the view, puts its URL back
+  and asks before discarding. HA's dialog box answers before it closes and then goes back in
+  the browser history; `confirmDialog()` and its siblings return only after that, so a
+  navigation that follows (for example "Discard" and leave) is not undone.
 - **Tabs (decision, 2026-09-30).** Overview · Plans · Temperatures · Advanced. Temperatures
   has its own tab like Plans, with the same layout: cards, a New button, and a card with the
   choice of each room. Advanced keeps the setup: rooms, zones, settings, health, log.
