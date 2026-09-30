@@ -54,7 +54,7 @@ Home Assistant.
    has valves. You can also add rooms by hand and pick their valves.
 4. Optional: choose a **Temperature shown** sensor per room. It is used only for display.
 5. **Plans**: change the house plan, or give some rooms their own plan.
-6. **Advanced → Temperatures**: the house temperatures, and own sets for rooms that need
+6. **Temperatures**: the house temperatures, and own sets for rooms that need
    other values (for example a warmer bathroom).
 7. Optional: **Advanced → Zones** divides the house into zones with their own mode and
    holiday, for example floors. **Create zones from floors** puts each room in a zone named
@@ -99,10 +99,12 @@ v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí sa
 - **Vypnuto**: topení je vypnuté (léto).
 - **Normálně**: topí se podle plánu.
 
+Klepnutím na dlaždici se otevře okno s velkými tlačítky a s tím, co se teď děje.
+
 **Každé patro zvlášť.** Když je dům rozdělený na zóny (například patra), má každá zóna svou
 dlaždici nad svými místnostmi. Režim zóny platí jen pro její místnosti: **1. patro** může
 být **Pryč** a přízemí topí dál podle plánu. Dlaždice **Celý dům** přepne všechny zóny
-najednou. Když mají zóny různé režimy, vypíše režim každé zóny.
+najednou. Když mají zóny různé režimy, ukazuje **Různě** a vypíše režim každé zóny.
 
 Během režimů Pryč, Dovolená a Vypnuto nejde teplota v místnosti měnit. Nejdřív přepněte dům
 (nebo jeho zónu) na **Normálně**.
@@ -127,9 +129,10 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 - **Whole house**: **Away** for short absences (press **I'm home — Normal** when back),
   **Holiday** with a return date (heating comes back by itself), **Off** for summer,
   **Normal** to follow the plans. In Away, Holiday and Off, room temperatures are fixed.
+  Tap the tile for a dialog with big buttons.
 - **Zones** (for example floors): each zone has its own tile above its rooms, and its mode
   applies only to its rooms. **Whole house** switches every zone; while the zones differ,
-  it lists the mode of each.
+  it shows **Mixed** and lists the mode of each.
 - An **orange exclamation mark** on a room's icon means a valve has a problem; tap the icon
   for an explanation.
 - **Plans**: tap **Change plan** and a day, drag the white handles or tap a part, then
@@ -166,7 +169,7 @@ Entity ids depend on the Home Assistant language; English names are shown.
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |
-| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off for every zone. Unknown while the zones have different modes; the attribute `zones` shows the mode of each. |
+| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off for every zone. Mixed (`mixed`) while the zones have different modes; it cannot be selected, and the attribute `zones` shows the mode of each. |
 | `select.heating_mode_<zone>` | zone | The mode of one zone. Only when there are two or more zones. |
 | `number.heating_temperature_*` | house | House temperatures of Warm, Saving, Night, Away, Frost guard. |
 
@@ -215,10 +218,13 @@ type: custom:heating-scheduler-card
 room: room_1a2b3c4d   # optional; without it the card shows all rooms
 zone: zone_1a2b3c4d   # optional: the zone's tile and its rooms
 show_house: true       # optional: the house mode tile
+show_rooms: false      # optional: only the house tile (or the zone's tile), no rooms
 compact: false         # optional: − / + next to the room name
 ```
 
-The card editor lists the rooms and zones by name.
+The card editor lists the rooms and zones by name. Home Assistant shows a `select` entity only
+as a dropdown; for big buttons on a dashboard, use this card with `show_rooms: false` instead of
+the house mode entity. A tap on the house tile opens a dialog like the one of an alarm panel.
 
 ## Development
 

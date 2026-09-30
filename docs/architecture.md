@@ -165,8 +165,9 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
 - House: `select` (house mode), five `number` entities (house temperatures). The house mode
-  select sets every zone. While the zones differ, its state is unknown and the attribute
-  `zones` holds the mode of each zone.
+  select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision
+  2026-09-30) and the attribute `zones` holds the mode of each zone. `mixed` is one of the
+  options only then, because a select's state must be an option; selecting it is an error.
 - Zones: with two or more zones, one `select` per zone (unique id `zone_<id>_mode`). The
   selects are added and removed when zones are added and removed.
 - Services: `set_override`, `clear_override` (target: room thermostat), `set_house_mode`,
@@ -212,10 +213,26 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
 - Dialogs keep their arguments in `args`, never in `params`. HA's dialog manager takes an
   element with a `params` property for its newer dialog type: it drops the element after
   closing and creates the next one without `hass`. A test guards this.
+- A dialog opened again before its last opening has finished closing ends that opening first
+  (its caller gets the choice made) and shows the new one in a new `ha-dialog`. The old
+  `ha-dialog` fires `closed` late; HA's dialog manager keeps one entry per dialog, so a late
+  `dialog-closed` would close the new opening. Dialogs set themselves up in `dialogOpened`.
+- **House dialog (decision, 2026-09-30).** A tap on the house tile or a zone tile opens a
+  dialog laid out like HA's alarm panel dialog: the state in big letters and HA's
+  `ha-control-select` upright, with HA's sizes. HA itself has no such view for a `select`
+  entity: its entity dialog shows a dropdown, and its tile feature for selects turns the
+  button style off. HA uses the upright selector only for alarm modes and fan speeds. An
+  `alarm_control_panel` entity was rejected: HA fixes its labels (Disarmed, Vacation, Custom
+  bypass), and voice assistants and HomeKit would treat it as a security alarm. For big
+  buttons on a dashboard, the card has `show_rooms: false`.
 - **Zones in the UI (decision, 2026-09-30).** With one zone, the overview has one house
   tile and the rooms. With two or more zones, it has a Whole house tile, then each zone's
   tile followed by its rooms. The Whole house tile sets every zone; while the zones differ,
-  it lists the mode of each zone and selects nothing.
+  it lists the mode of each zone and selects nothing. Advanced → Rooms groups the rooms by
+  zone, with headings like HA's floor headings; moving a room up or down stays in its zone.
+- **Tabs (decision, 2026-09-30).** Overview · Plans · Temperatures · Advanced. Temperatures
+  has its own tab like Plans, with the same layout: cards, a New button, and a card with the
+  choice of each room. Advanced keeps the setup: rooms, zones, settings, health, log.
 - **Sizes (decision, 2026-09-30, deviates from the spec).** Exact HA sizes: 42 px controls
   and 14 px text, as in HA's tile card. The spec asks for 48 px touch targets; the user
   accepted HA sizes because the Companion app's page zoom enlarges everything (115 % gives
