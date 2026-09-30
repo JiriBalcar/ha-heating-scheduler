@@ -12,7 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from . import HeatingConfigEntry
 from .const import DOMAIN
-from .core.model import HouseMode, HouseState
+from .core.model import HOUSE_MODES, HouseMode, HouseState
 from .core.validation import ValidationError
 from .engine import HeatingEngine
 from .entity import HeatingEntity, ZoneEntity, async_add_zone_entities, house_device_info
@@ -98,14 +98,20 @@ class HouseModeSelect(HeatingEntity, SelectEntity):
 
 
 class ZoneModeSelect(ZoneEntity, SelectEntity):
-    """The house mode of one zone."""
+    """The house mode of one zone; it offers the zone's modes."""
 
     _attr_translation_key = "zone_mode"
-    _attr_options = [mode.value for mode in HouseMode]
 
     def __init__(self, engine: HeatingEngine, zone_id: str) -> None:
         """Create the select of a zone."""
         super().__init__(engine, zone_id, "mode")
+
+    @property
+    def options(self) -> list[str]:
+        """Return the modes the zone offers."""
+        zone = self.zone
+        modes = HOUSE_MODES if zone is None else [m for m in HOUSE_MODES if m in zone.modes]
+        return [mode.value for mode in modes]
 
     @property
     def current_option(self) -> str | None:

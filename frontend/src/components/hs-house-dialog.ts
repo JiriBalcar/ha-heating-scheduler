@@ -3,8 +3,8 @@ import { formatContext, formatDateTime, formatTemp, plannedText } from "../forma
 import { languageOf, translator, type Translate } from "../i18n";
 import { HOUSE_COLORS, HOUSE_ICONS, houseTemperature } from "../modes";
 import { storeFor } from "../store";
-import { HOUSE_MODES, type HouseData, type HouseMode, type Snapshot, type ZoneData } from "../types";
-import { commonMode, wholeHouse } from "../zones";
+import type { HouseData, HouseMode, Snapshot, ZoneData } from "../types";
+import { commonMode, offeredModes, wholeHouse } from "../zones";
 import { define } from "./define";
 import { hint, hintStyles } from "./hint";
 import { cancelPlannedHoliday, chooseHouseMode } from "./house-actions";
@@ -126,6 +126,8 @@ export class HsHouseDialog extends HsHaDialog<HouseDialogParams> {
       }
       case "away":
         return t("house.detail.away", { temp: formatTemp(houseTemperature(snapshot, "away"), ctx) });
+      case "frost":
+        return t("house.detail.frost", { temp: formatTemp(houseTemperature(snapshot, "frost"), ctx) });
       case "off":
         return t("house.detail.off");
       default:
@@ -182,7 +184,7 @@ export class HsHouseDialog extends HsHaDialog<HouseDialogParams> {
     const effective = zone ? zone.house.effective : commonMode(snapshot);
     const house = zone ? zone.house : wholeHouse(snapshot);
     const name = zone ? zone.name : t("house.title");
-    const options = HOUSE_MODES.map((mode) => ({ value: mode, label: t(`house.${mode}`), path: HOUSE_ICONS[mode] }));
+    const options = offeredModes(snapshot, zone).map((mode) => ({ value: mode, label: t(`house.${mode}`), path: HOUSE_ICONS[mode] }));
     const color = effective ? HOUSE_COLORS[effective] : "var(--state-inactive-color, #9e9e9e)";
     return html`
       <ha-dialog

@@ -48,6 +48,16 @@ export async function chooseHouseMode(
     });
     if (!ok) return;
   }
+  if (mode === "frost") {
+    const temp = formatTemp(houseTemperature(snapshot, "frost"), formatContext(hass, languageOf(hass), snapshot));
+    const ok = await confirmDialog(host, {
+      heading: t("house.frost"),
+      message: zone ? t("house.confirm.frost_zone", { zone: zone.name, temp }) : t("house.confirm.frost", { temp }),
+      confirm: t("house.confirm.frost_button"),
+      cancel: t("common.cancel"),
+    });
+    if (!ok) return;
+  }
   if (mode === "off") {
     const ok = await confirmDialog(host, {
       heading: t("house.off"),

@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../src/card";
 import "../src/components/hs-adv-rooms";
 import "../src/components/hs-adv-settings";
+import "../src/components/hs-adv-zones";
 import "../src/components/hs-block-sheet";
 import "../src/components/hs-boost-card";
 import "../src/components/hs-copy-dialog";
@@ -14,11 +15,15 @@ import "../src/components/hs-house-hints";
 import "../src/components/hs-plan-editor";
 import "../src/components/hs-room-card";
 import "../src/components/hs-temps-view";
+import "../src/components/hs-zone-modes-dialog";
 import { gridOptions } from "../src/card-config";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
-import type { Candidates, HomeAssistant, HouseData, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
+import { fitReplacements, type ZoneModes } from "../src/components/hs-zone-modes-dialog";
+import type { Candidates, HomeAssistant, HouseData, HouseMode, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+const ALL_MODES: HouseMode[] = ["auto", "away", "vacation", "frost", "off"];
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -55,7 +60,7 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
   return {
     revision,
     time_zone: "Europe/Prague",
-    zones: [{ id: "house", name: "House", house: { mode: "auto", effective: "auto", vacation: null }, rooms: [] }],
+    zones: [{ id: "house", name: "House", house: { mode: "auto", effective: "auto", vacation: null }, modes: ALL_MODES, replacements: {}, rooms: [] }],
     settings: {
       max_override_minutes: 240,
       safety_interval_minutes: 5,
@@ -94,6 +99,7 @@ beforeAll(async () => {
       "hs-room-card",
       "hs-room-dialog",
       "hs-temps-view",
+      "hs-zone-modes-dialog",
     ].map((name) => customElements.whenDefined(name)),
   );
 });
@@ -236,8 +242,8 @@ describe("room dialog (F07)", () => {
 const AUTO: HouseData = { mode: "auto", effective: "auto", vacation: null };
 const AWAY: HouseData = { mode: "away", effective: "away", vacation: null };
 const ZONES: ZoneData[] = [
-  { id: "down", name: "Ground floor", house: AUTO, rooms: ["kitchen"] },
-  { id: "up", name: "1st floor", house: AWAY, rooms: ["bed"] },
+  { id: "down", name: "Ground floor", house: AUTO, modes: ALL_MODES, replacements: {}, rooms: ["kitchen"] },
+  { id: "up", name: "1st floor", house: AWAY, modes: ALL_MODES, replacements: {}, rooms: ["bed"] },
 ];
 const BEDROOM: RoomData = {
   id: "bed",
@@ -284,6 +290,17 @@ describe("zones on the overview", () => {
       "This part of the house is set to Away",
     );
     expect(await secondary("hs-room-card", { snapshot: data, room: BEDROOM })).toBe("19.0 °C · 1st floor: Away");
+  });
+
+  it("a zone without Holiday shows its replacement until the holiday ends", async () => {
+    const replaced: HouseData = {
+      mode: "auto",
+      effective: "frost",
+      vacation: { start: "2026-10-01T06:00:00Z", end: null, mode: "frost", replacement: "frost", active: true },
+    };
+    const upstairs: ZoneData = { ...ZONES[1]!, house: replaced, modes: ["auto", "away", "frost", "off"], replacements: { vacation: "frost" } };
+    const data = snapshot(1, { zones: [ZONES[0]!, upstairs], rooms: [BEDROOM] });
+    expect(await secondary("hs-house-card", { snapshot: data, zone: upstairs })).toBe("Frost guard for the holiday");
   });
 });
 
@@ -509,7 +526,7 @@ describe("house hints", () => {
     const planned: HouseData = {
       mode: "auto",
       effective: "auto",
-      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "frost", active: false },
+      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "frost", replacement: null, active: false },
     };
     const zones = [ZONES[0]!, { ...ZONES[1]!, house: planned }];
     const result = await hints({ snapshot: snapshot(1, { zones }), zone: zones[1] });
@@ -553,7 +570,7 @@ describe("holiday dialog", () => {
     const planned: HouseData = {
       mode: "auto",
       effective: "auto",
-      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "away", active: false },
+      vacation: { start: "2026-10-10T06:00:00Z", end: "2026-10-12T10:00:00Z", mode: "away", replacement: null, active: false },
     };
     const zone = { ...ZONES[1]!, house: planned };
     const dialog = await mount("hs-holiday-dialog", {});
@@ -586,5 +603,77 @@ describe("copy dialog", () => {
     dialog.copy();
     dialog.shadowRoot.querySelector("ha-dialog").dispatchEvent(new Event("closed"));
     expect(chosen).toEqual([[0, 4]]);
+  });
+});
+
+describe("zone modes dialog", () => {
+  // 1st floor without Holiday: Frost guard instead.
+  const upstairs: ZoneData = { ...ZONES[1]!, modes: ["auto", "away", "frost", "off"], replacements: { vacation: "frost" } };
+
+  async function open(zone: ZoneData) {
+    const chosen: (ZoneModes | null)[] = [];
+    const dialog = await mount("hs-zone-modes-dialog", {});
+    dialog.showDialog({ zone, resolve: (choice: ZoneModes | null) => chosen.push(choice) });
+    await dialog.updateComplete;
+    const close = () => dialog.shadowRoot.querySelector("ha-dialog").dispatchEvent(new Event("closed"));
+    return { dialog, chosen, close };
+  }
+
+  it("shows a switch for each mode but Normal, and a choice instead of each mode left out", async () => {
+    const { dialog } = await open(upstairs);
+    const switches = [...dialog.shadowRoot.querySelectorAll("ha-switch")] as Any[];
+    expect(switches.map((item) => item.checked)).toEqual([true, false, true, true]);
+    const selects = [...dialog.shadowRoot.querySelectorAll("ha-select")] as Any[];
+    expect(selects).toHaveLength(1);
+    expect(selects[0].value).toBe("frost");
+    expect(selects[0].options.map((option: Any) => option.value)).toEqual(["auto", "away", "frost", "off"]);
+  });
+
+  it("leaving out the replacement makes Normal the replacement; Save gives the choice", async () => {
+    const { dialog, chosen, close } = await open(upstairs);
+    dialog.offer("frost", false);
+    await dialog.updateComplete;
+    expect(dialog.replacements).toEqual({ vacation: "auto", frost: "auto" });
+    dialog.save();
+    close();
+    expect(chosen).toEqual([{ modes: ["auto", "away", "off"], replacements: { vacation: "auto", frost: "auto" } }]);
+  });
+
+  it("gives nothing when cancelled", async () => {
+    const { dialog, chosen, close } = await open(upstairs);
+    dialog.offer("vacation", true);
+    dialog.closeDialog();
+    close();
+    expect(chosen).toEqual([null]);
+  });
+
+  it("never replaces with Holiday or with a mode left out", () => {
+    expect(fitReplacements(["auto", "vacation"], { away: "vacation", frost: "off", off: "auto" })).toEqual({
+      away: "auto",
+      frost: "auto",
+      off: "auto",
+    });
+  });
+
+  it("the zones page saves the choice with the zone's current name and revision", async () => {
+    const calls: Any[] = [];
+    const hass = fakeHass(async (message) => {
+      calls.push(message);
+      return {};
+    });
+    const data = snapshot(7, { zones: [ZONES[0]!, upstairs] });
+    const page = await mount("hs-adv-zones", { hass, snapshot: data });
+    const choice: ZoneModes = { modes: ["auto", "off"], replacements: { away: "off", vacation: "off", frost: "auto" } };
+    let params: Any;
+    page.addEventListener("show-dialog", (e: Any) => (params = e.detail.dialogParams));
+    const saving = page.modes(upstairs);
+    // Renamed elsewhere while the dialog is open.
+    page.snapshot = snapshot(8, { zones: [ZONES[0]!, { ...upstairs, name: "Attic" }] });
+    params.resolve(choice);
+    await saving;
+    expect(calls.find((call) => call.type.endsWith("zone/save"))).toMatchObject({
+      revision: 8,
+      zone: { id: "up", name: "Attic", ...choice },
+    });
   });
 });

@@ -54,12 +54,12 @@ export interface CardConfig {
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";
 export type TargetMode = Mode | "manual" | "boost";
-export type HouseMode = "auto" | "away" | "vacation" | "off";
-export type Source = "plan" | "manual" | "house_away" | "vacation" | "house_off" | "boost";
+export type HouseMode = "auto" | "away" | "vacation" | "frost" | "off";
+export type Source = "plan" | "manual" | "house_away" | "vacation" | "house_frost" | "house_off" | "boost";
 
 export const MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost", "off"];
 export const TEMPERATURE_MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost"];
-export const HOUSE_MODES: readonly HouseMode[] = ["auto", "away", "vacation", "off"];
+export const HOUSE_MODES: readonly HouseMode[] = ["auto", "away", "vacation", "frost", "off"];
 
 export interface SlotData {
   start: string; // "HH:MM"
@@ -138,6 +138,8 @@ export interface VacationData {
   start: string;
   end: string | null;
   mode: "frost" | "away";
+  /** In a zone without Holiday: the mode it runs instead for the holiday's dates. */
+  replacement: HouseMode | null;
   active: boolean;
 }
 
@@ -162,6 +164,10 @@ export interface ZoneData {
   id: string;
   name: string;
   house: HouseData;
+  /** The modes the zone offers (always Normal). */
+  modes: HouseMode[];
+  /** For each mode it does not offer: the mode it runs instead when the whole house gets it. */
+  replacements: Partial<Record<HouseMode, HouseMode>>;
   rooms: string[];
 }
 

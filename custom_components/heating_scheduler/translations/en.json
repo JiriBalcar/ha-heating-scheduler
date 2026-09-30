@@ -48,6 +48,7 @@
           "auto": "Normal",
           "away": "Away",
           "vacation": "Holiday",
+          "frost": "Frost guard",
           "off": "Off",
           "mixed": "Mixed"
         }
@@ -58,6 +59,7 @@
           "auto": "Normal",
           "away": "Away",
           "vacation": "Holiday",
+          "frost": "Frost guard",
           "off": "Off"
         }
       }
@@ -138,6 +140,9 @@
     },
     "boost_duration": {
       "message": "A boost lasts from 15 minutes to 4 hours."
+    },
+    "zone_modes": {
+      "message": "A zone offers Normal, and every mode it does not offer needs a replacement among its modes."
     }
   },
   "selector": {
@@ -146,6 +151,7 @@
         "auto": "Normal",
         "away": "Away",
         "vacation": "Holiday",
+        "frost": "Frost guard",
         "off": "Off"
       }
     },

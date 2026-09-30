@@ -5,14 +5,13 @@ import { languageOf, translator } from "../i18n";
 import { HOUSE_COLORS, HOUSE_ICONS, MIXED_ICON } from "../modes";
 import { baseStyles } from "../styles";
 import {
-  HOUSE_MODES,
   type HomeAssistant,
   type HouseData,
   type HouseMode,
   type Snapshot,
   type ZoneData,
 } from "../types";
-import { commonMode, wholeHouse } from "../zones";
+import { commonMode, offeredModes, wholeHouse } from "../zones";
 import { define } from "./define";
 import { chooseHouseMode } from "./house-actions";
 import "./hs-house-dialog";
@@ -127,11 +126,20 @@ export class HsHouseCard extends LitElement {
       // The zones differ: "1. patro: Pryč · 2. patro: Normálně"
       return this.snapshot.zones.map((zone) => `${zone.name}: ${t(`house.${zone.house.effective}`)}`).join(" · ");
     }
+    const vacation = house.vacation;
+    if (vacation?.active && vacation.replacement) {
+      // A zone without Holiday runs its replacement for the holiday's dates.
+      const mode = t(`house.${vacation.replacement}`);
+      return vacation.end
+        ? t("house.banner.replaced", { mode, until: formatDateTime(vacation.end, ctx) })
+        : t("house.banner.replaced_open", { mode });
+    }
     if (house.effective === "vacation") {
       const end = house.vacation?.end;
       return end ? t("house.banner.vacation", { until: formatDateTime(end, ctx) }) : t("house.banner.vacation_open");
     }
     if (house.effective === "away") return t(this.zone ? "house.banner.away_zone" : "house.banner.away");
+    if (house.effective === "frost") return t(this.zone ? "house.banner.frost_zone" : "house.banner.frost");
     if (house.effective === "off") return t(this.zone ? "house.banner.off_zone" : "house.banner.off");
     return t("house.auto");
   }
@@ -140,7 +148,7 @@ export class HsHouseCard extends LitElement {
     if (!this.snapshot || !this.hass) return nothing;
     const t = this.t;
     const effective = this.effective;
-    const options = HOUSE_MODES.map((mode) => ({
+    const options = offeredModes(this.snapshot, this.zone).map((mode) => ({
       value: mode,
       label: t(`house.${mode}`),
       path: HOUSE_ICONS[mode],

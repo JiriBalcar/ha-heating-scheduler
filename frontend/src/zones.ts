@@ -1,23 +1,43 @@
 // Zones: parts of the house with their own mode and holiday.
-import type { HouseData, HouseMode, RoomData, Snapshot, ZoneData } from "./types";
+import { HOUSE_MODES, type HouseData, type HouseMode, type RoomData, type Snapshot, type ZoneData } from "./types";
 
 /** The zone of a room; the first zone if the room's zone is unknown. */
 export function zoneOf(snapshot: Snapshot, room: RoomData): ZoneData {
   return snapshot.zones.find((zone) => zone.id === room.zone_id) ?? snapshot.zones[0]!;
 }
 
-/** The effective mode shared by every zone, or null while the zones differ. */
-export function commonMode(snapshot: Snapshot): HouseMode | null {
-  const modes = new Set(snapshot.zones.map((zone) => zone.house.effective));
-  return modes.size === 1 ? [...modes][0]! : null;
+/** `mode` if the zone offers it, else the mode the zone runs instead, as the integration decides. */
+export function instead(zone: ZoneData, mode: HouseMode): HouseMode {
+  return zone.modes.includes(mode) ? mode : (zone.replacements[mode] ?? "auto");
 }
 
-/** The house state of the whole house: the zones' state when they all agree, else null. */
+/** The modes a tile offers: its zone's; for the whole house every mode, or its one zone's. */
+export function offeredModes(snapshot: Snapshot, zone: ZoneData | null): HouseMode[] {
+  const own = zone ?? (snapshot.zones.length === 1 ? snapshot.zones[0]! : null);
+  return own ? HOUSE_MODES.filter((mode) => own.modes.includes(mode)) : [...HOUSE_MODES];
+}
+
+/**
+ * The mode of the whole house, or null while the zones differ. A zone that runs its replacement
+ * for a mode it does not offer counts as in that mode.
+ */
+export function commonMode(snapshot: Snapshot): HouseMode | null {
+  return HOUSE_MODES.find((mode) => snapshot.zones.every((zone) => zone.house.effective === instead(zone, mode))) ?? null;
+}
+
+/**
+ * The house state of the whole house: the state of the zones that run its mode themselves, when
+ * they agree, else null. Whether a holiday is replaced in a zone does not count.
+ */
 export function wholeHouse(snapshot: Snapshot): HouseData | null {
-  const [first, ...others] = snapshot.zones;
+  const mode = commonMode(snapshot);
+  if (mode === null) return null;
+  const own = snapshot.zones.filter((zone) => zone.modes.includes(mode));
+  const [first, ...others] = own.length > 0 ? own : snapshot.zones;
   if (!first) return null;
-  const same = others.every((zone) => JSON.stringify(zone.house) === JSON.stringify(first.house));
-  return same ? first.house : null;
+  const key = (house: HouseData) =>
+    JSON.stringify({ ...house, vacation: house.vacation && { ...house.vacation, replacement: null } });
+  return others.every((zone) => key(zone.house) === key(first.house)) ? first.house : null;
 }
 
 /** Rooms of a zone, in room order. Rooms of an unknown zone count as the first zone's. */

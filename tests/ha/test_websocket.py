@@ -81,6 +81,8 @@ async def test_subscribe_pushes_snapshots(hass: HomeAssistant, ws: Ws) -> None:
             "id": "house",
             "name": "House",
             "house": {"mode": "auto", "effective": "auto", "vacation": None},
+            "modes": ["auto", "away", "vacation", "frost", "off"],
+            "replacements": {},
             "rooms": ["living", "bedroom"],
         }
     ]

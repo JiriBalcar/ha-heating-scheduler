@@ -10,6 +10,7 @@ from typing import Any, cast
 
 from .model import (
     HOUSE_ID,
+    HOUSE_MODES,
     Config,
     HouseMode,
     HouseState,
@@ -29,7 +30,7 @@ from .validation import ValidationError
 
 # 2.1: the house mode and holiday moved into zones (1.1 had one house state).
 CONFIG_VERSION = 2
-CONFIG_MINOR_VERSION = 1
+CONFIG_MINOR_VERSION = 2
 STATE_VERSION = 2
 STATE_MINOR_VERSION = 1
 
@@ -192,16 +193,19 @@ def vacation_to_dict(vacation: Vacation) -> JsonDict:
         "start": datetime_to_str(vacation.start),
         "end": None if vacation.end is None else datetime_to_str(vacation.end),
         "mode": vacation.mode.value,
+        "replacement": None if vacation.replacement is None else vacation.replacement.value,
     }
 
 
 def vacation_from_dict(data: Mapping[str, Any]) -> Vacation:
     """Parse a vacation."""
     end = data.get("end")
+    replacement = _opt(data, "replacement", str)
     return Vacation(
         start=datetime_from_str(_get(data, "start", str)),
         end=None if end is None else datetime_from_str(end),
         mode=_enum(Mode, _get(data, "mode", str), "vacation mode"),
+        replacement=None if replacement is None else _enum(HouseMode, replacement, "house mode"),
     )
 
 
@@ -223,16 +227,31 @@ def house_from_dict(data: Mapping[str, Any]) -> HouseState:
 
 
 def zone_to_dict(zone: Zone) -> JsonDict:
-    """Serialize a zone."""
-    return {"id": zone.id, "name": zone.name, "house": house_to_dict(zone.house)}
+    """Serialize a zone. Its modes keep the order of HOUSE_MODES."""
+    return {
+        "id": zone.id,
+        "name": zone.name,
+        "house": house_to_dict(zone.house),
+        "modes": [mode.value for mode in HOUSE_MODES if mode in zone.modes],
+        "replacements": {key.value: value.value for key, value in zone.replacements.items()},
+    }
 
 
 def zone_from_dict(data: Mapping[str, Any]) -> Zone:
-    """Parse a zone."""
+    """Parse a zone. Without `modes` (before 2.2), it offers every mode."""
+    modes = _opt(data, "modes", list)
+    replacements = _opt(data, "replacements", dict) or {}
     return Zone(
         id=_get(data, "id", str),
         name=_get(data, "name", str),
         house=house_from_dict(_get(data, "house", dict)),
+        modes=frozenset(HOUSE_MODES)
+        if modes is None
+        else frozenset(_enum(HouseMode, mode, "house mode") for mode in modes),
+        replacements={
+            _enum(HouseMode, key, "house mode"): _enum(HouseMode, value, "house mode")
+            for key, value in replacements.items()
+        },
     )
 
 
@@ -374,6 +393,7 @@ def migrate_config(
     """Migrate stored configuration data to the current version, one step per version.
 
     1.x -> 2.1: the house state becomes the first zone, named `zone_name`, with every room.
+    2.1 -> 2.2: nothing changes; a zone stored without `modes` offers every mode.
     """
     if old_major > CONFIG_VERSION:
         raise ValueError(f"configuration version {old_major} is newer than this integration")

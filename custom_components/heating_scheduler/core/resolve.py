@@ -73,6 +73,8 @@ def _target_at(
         return Target(TargetMode(mode), temperatures[mode], Source.VACATION)
     if house_mode is HouseMode.AWAY:
         return Target(TargetMode.AWAY, temperatures[Mode.AWAY], Source.HOUSE_AWAY)
+    if house_mode is HouseMode.FROST:
+        return Target(TargetMode.FROST, temperatures[Mode.FROST], Source.HOUSE_FROST)
     if boost is not None and at < boost.until:
         return Target(TargetMode.BOOST, boost.temperature, Source.BOOST)
     if override is not None and at < override.until:

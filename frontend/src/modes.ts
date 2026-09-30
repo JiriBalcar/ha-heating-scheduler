@@ -41,6 +41,7 @@ export const HOUSE_COLORS: Record<HouseMode, string> = {
   auto: "var(--primary-color, #009ac7)",
   away: MODE_COLORS.away,
   vacation: "var(--teal-color, #009688)",
+  frost: MODE_COLORS.frost,
   off: MODE_COLORS.off,
 };
 
@@ -48,6 +49,7 @@ export const HOUSE_ICONS: Record<HouseMode, string> = {
   auto: mdiHomeThermometerOutline,
   away: mdiHomeExportOutline,
   vacation: mdiBagSuitcase,
+  frost: mdiSnowflake,
   off: mdiPower,
 };
 

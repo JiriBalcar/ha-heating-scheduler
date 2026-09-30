@@ -48,7 +48,7 @@ tests/core/  tests/ha/
 - A plan day is a list of `(start, mode)` slots. The time before the first slot of a day
   belongs to the last slot of an earlier day. The editor always saves a 00:00 slot, so
   each day bar is self-contained.
-- **House state**: a selected mode (`auto`, `away`, `off`) plus an optional vacation
+- **House state**: a selected mode (`auto`, `away`, `frost`, `off`) plus an optional vacation
   (start, optional end, frost or away). The effective house mode is `vacation` while the
   vacation covers the instant. When a vacation ends, the zone returns to the selected
   mode, which is the mode that was active when the vacation started **(decision)**.
@@ -58,6 +58,18 @@ tests/core/  tests/ha/
   (`zone_id`). There is always at least one zone: a new installation has one zone for the
   whole house, and the last zone cannot be deleted. Deleting a zone moves its rooms to the
   first remaining zone. Zones have an order, which the UI and the selects follow.
+- **Frost guard and zone modes (decision, 2026-10-01, user request)**: Frost guard (`frost`) is
+  a house mode like Away: every room at the Frost guard temperature, with no end. Each zone
+  offers a set of modes (`modes`, always with `auto`) and, for each mode it leaves out, a
+  replacement (`replacements`): a mode it offers, never `vacation`. The house select and the
+  house services give each zone the mode or its replacement (`Zone.instead`). A holiday for a
+  zone without `vacation` is a vacation window with a `replacement`: the effective mode is the
+  replacement during the window, and the zone returns to its selected mode after it. The house
+  shows mode M while every zone's effective mode is `instead(M)`, so the whole house is Away
+  while a zone without Away stays Normal. Saving a zone's modes (`zone/save`) moves a zone in
+  a mode it no longer offers to the replacement, and a vacation to the new form (`fit_zone`).
+  Validation (`zone_modes`): the replacements cover exactly the missing modes, and the zone's
+  mode and vacation fit its modes.
 - **Boost (decision, 2026-09-30, user request; per zone and room on 2026-10-01)**: the whole
   house, each zone and each room have boosts of their own, each an end time in the state store
   (`boost_until`, `zone_boosts`, `room_boosts`). A room heats at full while any of them covers
@@ -66,13 +78,13 @@ tests/core/  tests/ha/
   boost leaves the others running. The length comes from the settings (default 1 h, 15 min to
   4 h; the panel offers 30 min to 4 h) or from the `boost` service. A boost of the house or of
   a zone means someone is home: it switches those zones to Normal first (this also ends a
-  running holiday). A room's boost (its thermostat's preset `boost`) starts only while its
-  zone is Normal, like a manual change; another preset or `auto` ends it. When a zone leaves
-  Normal (Away, Off, a holiday, also a planned one that starts), housekeeping ends its boost
-  and its rooms' boosts, and the house's boost once no zone is Normal. A room under the boost
-  of its zone or the house takes no manual changes (`boost_active`). Boosts that ended while
-  HA was stopped are dropped at start. The zone boost has no control in the panel (user's
-  decision): a tile of HA for its switch starts it.
+  running holiday and Frost guard). A room's boost (its thermostat's preset `boost`) starts
+  only while its zone is Normal, like a manual change; another preset or `auto` ends it. When a
+  zone leaves Normal (Away, Frost guard, Off, a holiday, also a planned one that starts),
+  housekeeping ends its boost and its rooms' boosts, and the house's boost once no zone is
+  Normal. A room under the boost of its zone or the house takes no manual changes
+  (`boost_active`). Boosts that ended while HA was stopped are dropped at start. The zone boost
+  has no control in the panel (user's decision): a tile of HA for its switch starts it.
 
 ## resolve()
 
@@ -83,8 +95,8 @@ resolve(now, house, plan, temperatures, override, tz, boost=None) -> RoomTarget(
 
 `house` is the house state of the room's zone.
 
-Precedence **(decision)**: house mode `off` / `vacation` / `away` → boost → manual change
-(override) → the room's plan. A boost starts only when every zone is Normal, so a house mode
+Precedence **(decision)**: house mode `off` / `frost` / `vacation` / `away` → boost → manual
+change (override) → the room's plan. A boost starts only when every zone is Normal, so a house mode
 wins over it only when a planned holiday starts during the boost; the holiday start is a
 change instant, so the timer runs then and housekeeping ends the boost. A manual change never
 beats a house mode or a boost; knob changes then are undone, and changes from the app or a
@@ -155,8 +167,8 @@ service are refused (`boost_active` during a boost).
 - Anything else is a manual change and becomes an override for the room: until the next
   plan change, capped by the max duration (default 4 h). After 3 s without further knob
   changes, the value goes to the other TRVs of the room.
-- In house modes away / vacation / off, and during a boost, a manual change is logged and
-  undone.
+- In house modes away / vacation / frost / off, and during a boost, a manual change is logged
+  and undone.
 - After an echo that moved the setpoint or HVAC mode (for example a cancelled write that
   landed late), an idle worker checks the TRV again and corrects it at once.
 - Config commands return the new revision. Editors detect whether the edited item itself
@@ -172,8 +184,10 @@ service are refused (`boost_active` during a boost).
 
 The configuration has a revision; websocket writes must send the revision they edited.
 
-Both stores are version 2.1. The migration from 1.x turns the house state into one zone,
-named „Dům“ or "House" by the HA language, and puts every room in it.
+The configuration store is version 2.2, the state store 2.1. The migration from 1.x turns the
+house state into one zone, named „Dům“ or "House" by the HA language, and puts every room in it.
+2.2 adds the modes of each zone and their replacements; a zone stored without them offers every
+mode.
 
 ## Home Assistant surface
 
@@ -191,7 +205,8 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision
   2026-09-30) and the attribute `zones` holds the mode of each zone. `mixed` is one of the
   options only then, because a select's state must be an option; selecting it is an error.
-- Zones: with two or more zones, one `select` (unique id `zone_<id>_mode`) and one boost
+- Zones: with two or more zones, one `select` (unique id `zone_<id>_mode`, options: the zone's
+  modes) and one boost
   `switch` (`zone_<id>_boost`) per zone. They are added and removed when zones are added and
   removed (`async_add_zone_entities`). A renamed zone renames them: HA caches an entity's name
   and new translation placeholders do not clear it, so `ZoneEntity` clears it itself.

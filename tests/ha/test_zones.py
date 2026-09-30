@@ -124,9 +124,15 @@ async def test_selects_for_the_house_and_each_zone(
     # The zones differ: the house select is "mixed", which only it offers, and lists the zones.
     state = state_of(hass, "select.heating_house_mode")
     assert state.state == "mixed"
-    assert state.attributes["options"] == ["auto", "away", "vacation", "off", "mixed"]
+    assert state.attributes["options"] == ["auto", "away", "vacation", "frost", "off", "mixed"]
     assert state.attributes["zones"] == {"House": "auto", "Upstairs": "away"}
-    assert state_of(hass, upstairs).attributes["options"] == ["auto", "away", "vacation", "off"]
+    assert state_of(hass, upstairs).attributes["options"] == [
+        "auto",
+        "away",
+        "vacation",
+        "frost",
+        "off",
+    ]
     with pytest.raises(ServiceValidationError) as err:
         await hass.services.async_call(
             "select",

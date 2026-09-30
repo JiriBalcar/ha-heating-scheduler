@@ -48,6 +48,7 @@
           "auto": "Normálně",
           "away": "Pryč",
           "vacation": "Dovolená",
+          "frost": "Proti mrazu",
           "off": "Vypnuto",
           "mixed": "Různě"
         }
@@ -58,6 +59,7 @@
           "auto": "Normálně",
           "away": "Pryč",
           "vacation": "Dovolená",
+          "frost": "Proti mrazu",
           "off": "Vypnuto"
         }
       }
@@ -138,6 +140,9 @@
     },
     "boost_duration": {
       "message": "Zatopení naplno trvá 15 minut až 4 hodiny."
+    },
+    "zone_modes": {
+      "message": "Zóna nabízí Normálně a každý režim, který nenabízí, potřebuje náhradu z jejích režimů."
     }
   },
   "selector": {
@@ -146,6 +151,7 @@
         "auto": "Normálně",
         "away": "Pryč",
         "vacation": "Dovolená",
+        "frost": "Proti mrazu",
         "off": "Vypnuto"
       }
     },

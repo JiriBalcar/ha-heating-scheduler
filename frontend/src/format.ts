@@ -210,7 +210,9 @@ export function reasonText(
       ? t("reason.plan", { mode: modeLabel(target.mode, t) })
       : target.source === "house_away" && zone
         ? t("reason.zone_away", { zone })
-        : t(`reason.${target.source}`);
+        : target.source === "house_frost" && zone
+          ? t("reason.zone_frost", { zone })
+          : t(`reason.${target.source}`);
   if (!target.valid_until) return base;
   // A holiday end is always shown with its date: "until 12:00" alone is ambiguous there.
   const until =

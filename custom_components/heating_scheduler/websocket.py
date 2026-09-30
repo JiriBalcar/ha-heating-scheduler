@@ -29,6 +29,7 @@ from .core.config_ops import (
     delete_room,
     delete_temp_set,
     delete_zone,
+    fit_zone,
     put_plan,
     put_room,
     put_settings,
@@ -40,7 +41,7 @@ from .core.config_ops import (
     rooms_using_plan,
     rooms_using_temp_set,
 )
-from .core.model import HOUSE_ID, Config, HouseMode, HouseState, Mode, Room, Zone
+from .core.model import HOUSE_ID, HOUSE_MODES, Config, HouseMode, HouseState, Mode, Room, Zone
 from .core.overrides import ExpiryKind
 from .core.schedule_ops import new_id, normalize_day
 from .core.serde import (
@@ -106,6 +107,7 @@ def _house(house: HouseState, now: Any) -> dict[str, Any]:
             "start": datetime_to_str(vacation.start),
             "end": None if vacation.end is None else datetime_to_str(vacation.end),
             "mode": vacation.mode.value,
+            "replacement": None if vacation.replacement is None else vacation.replacement.value,
             "active": house.vacation_active(now),
         },
     }
@@ -157,6 +159,10 @@ def snapshot(engine: HeatingEngine) -> dict[str, Any]:
                 "id": zone.id,
                 "name": zone.name,
                 "house": _house(zone.house, now),
+                "modes": [mode.value for mode in HOUSE_MODES if mode in zone.modes],
+                "replacements": {
+                    key.value: value.value for key, value in zone.replacements.items()
+                },
                 "rooms": rooms_in_zone(config, zone.id),
             }
             for zone in config.zones.values()
@@ -502,7 +508,16 @@ async def ws_vacation_cancel(
         vol.Required("type"): f"{PREFIX}zone/save",
         vol.Required("revision"): int,
         vol.Required("zone"): vol.Schema(
-            {vol.Optional("id"): vol.Any(None, str), vol.Required("name"): str}
+            {
+                vol.Optional("id"): vol.Any(None, str),
+                vol.Required("name"): str,
+                vol.Optional("modes"): [vol.In([mode.value for mode in HouseMode])],
+                vol.Optional("replacements"): {
+                    vol.In([mode.value for mode in HouseMode]): vol.In(
+                        [mode.value for mode in HouseMode]
+                    )
+                },
+            }
         ),
     }
 )
@@ -511,15 +526,27 @@ async def ws_vacation_cancel(
 async def ws_zone_save(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any], engine: HeatingEngine
 ) -> None:
-    """Create or rename a zone."""
+    """Create a zone, or change its name or modes.
+
+    A zone that no longer offers its current mode switches to the mode's replacement.
+    """
     data = msg["zone"]
     zone_id = data.get("id") or new_id("zone", engine.config.zones)
     existing = engine.config.zones.get(zone_id)
     if data.get("id") and existing is None:
         raise ValidationError("not_found", f"unknown zone {zone_id!r}", id=zone_id)
-    house = existing.house if existing is not None else HouseState()
-    zone = Zone(zone_id, data["name"].strip(), house)
-    await engine.async_apply_config(put_zone(engine.config, zone), msg["revision"])
+    zone = existing if existing is not None else Zone(zone_id, "", HouseState())
+    zone = replace(zone, name=data["name"].strip())
+    if "modes" in data:
+        zone = replace(
+            zone,
+            modes=frozenset(HouseMode(mode) for mode in data["modes"]),
+            replacements={
+                HouseMode(key): HouseMode(value)
+                for key, value in data.get("replacements", {}).items()
+            },
+        )
+    await engine.async_apply_config(put_zone(engine.config, fit_zone(zone)), msg["revision"])
     connection.send_result(msg["id"], {"zone_id": zone_id, "revision": engine.config.revision})
 
 

@@ -1,13 +1,14 @@
 import { LitElement, css, html, nothing } from "lit";
-import { mdiChevronDown, mdiChevronUp, mdiDelete, mdiDotsVertical, mdiHomeFloor1, mdiPencil, mdiPlus } from "@mdi/js";
+import { mdiChevronDown, mdiChevronUp, mdiDelete, mdiDotsVertical, mdiHomeFloor1, mdiPencil, mdiPlus, mdiTune } from "@mdi/js";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { Candidates, HomeAssistant, Snapshot, ZoneData } from "../types";
 import { define } from "./define";
 import { alertDialog, confirmDialog, promptDialog } from "./hs-dialog";
+import { chooseZoneModes } from "./hs-zone-modes-dialog";
 
-/** Zones: add, rename, reorder, delete, and create them from Home Assistant floors. */
+/** Zones: add, rename, choose their modes, reorder, delete, and create them from Home Assistant floors. */
 export class HsAdvZones extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -82,6 +83,15 @@ export class HsAdvZones extends LitElement {
     await this.call("zone/save", { zone: zone ? { id: zone.id, name } : { name } });
   }
 
+  /** The modes the zone offers. A zone in a mode it stops offering switches to the replacement. */
+  private async modes(zone: ZoneData) {
+    const choice = await chooseZoneModes(this, zone);
+    if (!choice) return;
+    // The name as it is now: it may have changed while the dialog was open.
+    const name = this.snapshot.zones.find((item) => item.id === zone.id)?.name ?? zone.name;
+    await this.call("zone/save", { zone: { id: zone.id, name, ...choice } });
+  }
+
   private async move(zone: ZoneData, delta: number) {
     const order = this.snapshot.zones.map((item) => item.id);
     const index = order.indexOf(zone.id);
@@ -107,6 +117,7 @@ export class HsAdvZones extends LitElement {
 
   private menu(zone: ZoneData, action: string) {
     if (action === "edit") void this.edit(zone);
+    else if (action === "modes") void this.modes(zone);
     else if (action === "up") void this.move(zone, -1);
     else if (action === "down") void this.move(zone, 1);
     else if (action === "delete") void this.deleteZone(zone);
@@ -164,6 +175,9 @@ export class HsAdvZones extends LitElement {
               <ha-icon-button slot="trigger" .path=${mdiDotsVertical} .label=${zone.name}></ha-icon-button>
               <ha-dropdown-item value="edit">
                 <ha-svg-icon slot="icon" .path=${mdiPencil}></ha-svg-icon>${t("common.edit")}
+              </ha-dropdown-item>
+              <ha-dropdown-item value="modes" .disabled=${this.busy}>
+                <ha-svg-icon slot="icon" .path=${mdiTune}></ha-svg-icon>${t("adv.zones.modes")}
               </ha-dropdown-item>
               <ha-dropdown-item value="up" .disabled=${this.busy || index === 0}>
                 <ha-svg-icon slot="icon" .path=${mdiChevronUp}></ha-svg-icon>${t("adv.rooms.move_up")}

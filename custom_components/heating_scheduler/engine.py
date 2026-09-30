@@ -44,6 +44,7 @@ from .const import (
 from .core.config_ops import put_zone_house
 from .core.echo import Change, classify_setpoint_change
 from .core.model import (
+    HOUSE_MODES,
     Config,
     HouseMode,
     HouseState,
@@ -71,6 +72,11 @@ _LOGGER = logging.getLogger(__name__)
 
 # The boost temperature of a room whose valves do not say their maximum (HA's default).
 BOOST_FALLBACK_TEMPERATURE = 35.0
+
+
+def _replaced_holiday(zone: Zone) -> HouseMode | None:
+    """Return the mode a zone without Holiday runs during a holiday; None if it has Holiday."""
+    return None if HouseMode.VACATION in zone.modes else zone.instead(HouseMode.VACATION)
 
 
 class HeatingEngine:
@@ -728,18 +734,27 @@ class HeatingEngine:
         return [zone for zone in self.config.zones.values() if zone.id in zone_ids]
 
     def house_mode(self, now: datetime | None = None) -> HouseMode | None:
-        """Return the effective mode shared by all zones, or None if the zones differ."""
+        """Return the mode of the whole house, or None if the zones differ.
+
+        A zone that runs its replacement for a mode it does not offer counts as in that mode:
+        after Holiday for the whole house, a zone without Holiday runs its replacement.
+        """
         at = now or dt_util.utcnow()
-        modes = {zone.house.effective_mode(at) for zone in self.config.zones.values()}
-        return modes.pop() if len(modes) == 1 else None
+        zones = list(self.config.zones.values())
+        for mode in HOUSE_MODES:
+            if all(zone.house.effective_mode(at) is zone.instead(mode) for zone in zones):
+                return mode
+        return None
 
     async def async_set_house_mode(
         self, mode: HouseMode, zone_ids: Collection[str] | None = None
     ) -> None:
         """Select a house mode in some zones (None: all zones).
 
-        Selecting vacation starts a planned vacation now (keeping its end), or an
-        open-ended vacation if none is planned. An active vacation stays as it is.
+        A zone that does not offer `mode` runs its replacement instead. Selecting vacation
+        starts a planned vacation now (keeping its end), or an open-ended vacation if none is
+        planned; in a zone without Holiday, its replacement runs for those dates. An active
+        vacation stays as it is.
         """
         now = dt_util.utcnow()
         config = self.config
@@ -753,12 +768,12 @@ class HeatingEngine:
                 if end is not None and end <= now:
                     end = None
                 kind = vacation.mode if vacation is not None else config.settings.vacation_mode
-                house = HouseState(house.mode, Vacation(now, end, kind))
+                house = HouseState(house.mode, Vacation(now, end, kind, _replaced_holiday(zone)))
             else:
                 if vacation is not None and house.vacation_active(now):
                     # Choosing another mode ends an active vacation. A planned one stays.
                     vacation = None
-                house = HouseState(mode, vacation)
+                house = HouseState(zone.instead(mode), vacation)
             config = put_zone_house(config, zone.id, house)
         if config is not self.config:
             await self._async_commit(config)
@@ -778,7 +793,8 @@ class HeatingEngine:
         vacation = Vacation(begin, end, mode or self.config.settings.vacation_mode)
         config = self.config
         for zone in self.zones_for(zone_ids):
-            config = put_zone_house(config, zone.id, HouseState(zone.house.mode, vacation))
+            zone_vacation = replace(vacation, replacement=_replaced_holiday(zone))
+            config = put_zone_house(config, zone.id, HouseState(zone.house.mode, zone_vacation))
         await self._async_commit(config)
 
     async def async_cancel_vacation(self, zone_ids: Collection[str] | None = None) -> None:

@@ -65,10 +65,19 @@ class HouseMode(StrEnum):
     AUTO = "auto"
     AWAY = "away"
     VACATION = "vacation"
+    FROST = "frost"
     OFF = "off"
 
 
-SELECTABLE_HOUSE_MODES: tuple[HouseMode, ...] = (HouseMode.AUTO, HouseMode.AWAY, HouseMode.OFF)
+# Every house mode, in the order the UI offers them.
+HOUSE_MODES: tuple[HouseMode, ...] = tuple(HouseMode)
+# The modes that are selected as such; a holiday has dates.
+SELECTABLE_HOUSE_MODES: tuple[HouseMode, ...] = (
+    HouseMode.AUTO,
+    HouseMode.AWAY,
+    HouseMode.FROST,
+    HouseMode.OFF,
+)
 
 
 class Source(StrEnum):
@@ -78,6 +87,7 @@ class Source(StrEnum):
     MANUAL = "manual"
     HOUSE_AWAY = "house_away"
     VACATION = "vacation"
+    HOUSE_FROST = "house_frost"
     HOUSE_OFF = "house_off"
     BOOST = "boost"
 
@@ -134,11 +144,16 @@ class Room:
 
 @dataclass(frozen=True, slots=True)
 class Vacation:
-    """A vacation window. `end` None means open-ended."""
+    """A vacation window. `end` None means open-ended.
+
+    `replacement`: in a zone that does not offer Holiday, the mode the zone runs instead
+    during the holiday's dates (a holiday of the whole house).
+    """
 
     start: datetime
     end: datetime | None
     mode: Mode = Mode.FROST
+    replacement: HouseMode | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,17 +175,28 @@ class HouseState:
     def effective_mode(self, at: datetime) -> HouseMode:
         """Return the house mode in effect at `at`."""
         if self.vacation_active(at):
-            return HouseMode.VACATION
+            assert self.vacation is not None
+            return self.vacation.replacement or HouseMode.VACATION
         return self.mode
 
 
 @dataclass(frozen=True, slots=True)
 class Zone:
-    """A part of the house, e.g. a floor, with its own house mode and holiday."""
+    """A part of the house, e.g. a floor, with its own house mode and holiday.
+
+    `modes`: the house modes the zone offers (always Normal). `replacements`: for each mode it
+    does not offer, the mode it runs instead when the whole house gets that mode.
+    """
 
     id: str
     name: str
     house: HouseState = field(default_factory=HouseState)
+    modes: frozenset[HouseMode] = frozenset(HOUSE_MODES)
+    replacements: Mapping[HouseMode, HouseMode] = field(default_factory=dict)
+
+    def instead(self, mode: HouseMode) -> HouseMode:
+        """Return `mode` if the zone offers it, else the mode the zone runs instead."""
+        return mode if mode in self.modes else self.replacements.get(mode, HouseMode.AUTO)
 
 
 @dataclass(frozen=True, slots=True)

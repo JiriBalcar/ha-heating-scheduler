@@ -13,8 +13,9 @@ for phones and tablets, and a Lovelace card.
 
 - Weekly plans with modes: Warm, Saving, Night, Away, Frost guard, Off.
 - Rooms share plans and temperature sets, so you set them once.
-- House modes: Normal, Away, Holiday (planned in advance), Off. For the whole house, or
-  per zone: for example, the first floor is away and the ground floor heats as usual.
+- House modes: Normal, Away, Holiday (planned in advance), Frost guard, Off. For the whole
+  house, or per zone: for example, the first floor is away and the ground floor heats as usual.
+  Each zone offers only the modes it needs.
 - **Boost**: one tap heats every room, one zone or one room at its valves' maximum for a set
   time (default 1 h), for example when you come back from a holiday.
 - Manual changes on the valve knob or in the app last until the next change of the plan.
@@ -61,6 +62,8 @@ Home Assistant.
 7. Optional: **Advanced → Zones** divides the house into zones with their own mode and
    holiday, for example floors. **Create zones from floors** puts each room in a zone named
    after its Home Assistant floor: the floor of the room's area, or else of its valve's area.
+   **Modes** in a zone's menu chooses the modes the zone offers, and what the zone does
+   instead of each mode it leaves out.
 
 **First start:** turn on **Advanced → Settings → Test mode**. The integration then computes
 and logs everything but sends nothing to the valves. Check **Advanced → Log**, then turn
@@ -141,16 +144,21 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 - **+** and **−** change the room by half a degree until the next change of the plan.
   **Back to plan** ends the change at once. Turning the knob on a valve does the same.
 - **Whole house**: **Away** for short absences (press **I'm home — Normal** when back),
-  **Holiday** with a return date (heating comes back by itself), **Off** for summer,
-  **Normal** to follow the plans. In Away, Holiday and Off, room temperatures are fixed.
+  **Holiday** with a return date (heating comes back by itself), **Frost guard** for a house
+  left empty with no return date (every room at the Frost guard temperature), **Off** for
+  summer, **Normal** to follow the plans. In Away, Holiday, Frost guard and Off, room
+  temperatures are fixed.
   Tap the tile for a dialog with big buttons. A reminder with **I'm home — Normal** shows
   above the tiles. To change the return date of a running holiday, tap **Holiday** again.
 - **Zones** (for example floors): each zone has its own tile above its rooms, and its mode
   applies only to its rooms. **Whole house** switches every zone; while the zones differ,
-  it shows **Mixed** and lists the mode of each.
+  it shows **Mixed** and lists the mode of each. A zone can leave out modes: when the whole
+  house gets such a mode, the zone does its replacement, for example the first floor stays
+  Normal while the house is Away. For a holiday of the whole house, the replacement runs for
+  the holiday's dates. A zone in a mode it stops offering switches to the replacement.
 - **Boost**: tap the **Boost** tile and confirm. Every room heats at its valves' maximum for
   the time set in **Advanced → Settings** (default 1 h), then the plans continue. A boost
-  switches Away, Holiday and Off to Normal. During a boost, room temperatures are fixed.
+  switches Away, Holiday, Frost guard and Off to Normal. During a boost, room temperatures are fixed.
   **Stop** ends it early. One room boosts with its thermostat's preset **Boost**, one zone
   with its **Boost** switch (for example in a tile on a dashboard).
 - A **valve problem** shows as an orange exclamation mark on the room's icon, in words under
@@ -164,8 +172,8 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 
 For every room the integration computes the target with a pure function:
 
-1. The mode of the room's zone wins: **Off**, **Holiday** or **Away**. Without zones, the
-   whole house is one zone.
+1. The mode of the room's zone wins: **Off**, **Frost guard**, **Holiday** or **Away**.
+   Without zones, the whole house is one zone.
 2. Otherwise a **boost** wins: every room at the highest temperature its valves allow, until
    the boost ends.
 3. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
@@ -180,14 +188,16 @@ handled: a plan time that does not exist is used at the end of the gap, a time t
 twice is used once.
 
 A change of a zone's mode ends the manual changes in that zone. When a holiday ends, the zone
-returns to the mode it had when the holiday started.
+returns to the mode it had when the holiday started. A zone without Holiday runs its replacement
+for the holiday's dates, then returns the same way.
 
 The whole house, each zone and each room have boosts of their own; a room heats at full while
 any of them covers it, and stopping one leaves the others running. A boost of the house or of a
 zone switches those zones to Normal; a room boosts only while its zone is Normal. A zone that
-leaves Normal (Away, Off, or a holiday, also a planned one that starts) ends its own boost and
-its rooms' boosts; the house's boost ends once no zone is Normal. During a boost, a turn of a
-valve knob is undone, and a room under the boost of its zone or the house takes no changes.
+leaves Normal (Away, Frost guard, Off, or a holiday, also a planned one that starts) ends its
+own boost and its rooms' boosts; the house's boost ends once no zone is Normal. During a boost,
+a turn of a valve knob is undone, and a room under the boost of its zone or the house takes no
+changes.
 
 ## Entities
 
@@ -199,8 +209,8 @@ Entity ids depend on the Home Assistant language; English names are shown.
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |
-| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off for every zone. Mixed (`mixed`) while the zones have different modes; it cannot be selected, and the attribute `zones` shows the mode of each. |
-| `select.heating_mode_<zone>` | zone | The mode of one zone. Only when there are two or more zones. |
+| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Frost guard (`frost`), Off for every zone; a zone without the mode gets its replacement. Mixed (`mixed`) while the zones have different modes; it cannot be selected, and the attribute `zones` shows the mode of each. |
+| `select.heating_mode_<zone>` | zone | The mode of one zone, among the modes it offers. Only when there are two or more zones. |
 | `switch.heating_boost` | house | On while the house's boost runs. On starts a boost for the length in the settings; off ends it. Attributes: `until`, `duration_minutes`. |
 | `switch.heating_boost_<zone>` | zone | The same for one zone. Only when there are two or more zones. |
 | `number.heating_temperature_*` | house | House temperatures of Warm, Saving, Night, Away, Frost guard. |
@@ -213,7 +223,7 @@ Tip: hide the valves themselves from voice assistants and use the room thermosta
 |---|---|
 | `heating_scheduler.set_override` | target: room thermostat; `temperature`; optional `duration` or `until` |
 | `heating_scheduler.clear_override` | target: room thermostat |
-| `heating_scheduler.set_house_mode` | `mode`: `auto`, `away`, `vacation`, `off`; optional `zone` |
+| `heating_scheduler.set_house_mode` | `mode`: `auto`, `away`, `vacation`, `frost`, `off`; optional `zone` |
 | `heating_scheduler.set_vacation` | optional `start`, `end`, `mode` (`frost` or `away`), `zone` |
 | `heating_scheduler.cancel_vacation` | optional `zone` |
 | `heating_scheduler.boost` | optional `duration`, 15 minutes to 4 hours (default: the setting); optional `zone`. To end a boost, turn off its switch. One room: `climate.set_preset_mode` with `boost`. |
@@ -252,8 +262,8 @@ data:
 
 ## Lovelace card
 
-The card switches the mode of the whole house or of one zone (Normal, Away, Holiday, Off), as a
-tile of Home Assistant's own size. It is loaded automatically. Add **Heating Scheduler** from the
+The card switches the mode of the whole house or of one zone (Normal, Away, Holiday, Frost
+guard, Off; a zone's tile only the modes the zone offers), as a tile of Home Assistant's own size. It is loaded automatically. Add **Heating Scheduler** from the
 card picker, or:
 
 ```yaml

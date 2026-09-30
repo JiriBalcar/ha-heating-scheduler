@@ -41,6 +41,7 @@ set_house_mode:
             - auto
             - away
             - vacation
+            - frost
             - "off"
     zone:
       example: "1. patro"

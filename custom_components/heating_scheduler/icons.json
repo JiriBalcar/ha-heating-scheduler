@@ -44,6 +44,7 @@
           "auto": "mdi:home-thermometer-outline",
           "away": "mdi:home-export-outline",
           "vacation": "mdi:bag-suitcase",
+          "frost": "mdi:snowflake",
           "off": "mdi:power",
           "mixed": "mdi:home-switch-outline"
         }
@@ -54,6 +55,7 @@
           "auto": "mdi:home-thermometer-outline",
           "away": "mdi:home-export-outline",
           "vacation": "mdi:bag-suitcase",
+          "frost": "mdi:snowflake",
           "off": "mdi:power"
         }
       }

@@ -57,6 +57,7 @@ _TEMPLATES: dict[str, dict[Source, tuple[str, str]]] = {
         Source.MANUAL: ("Ručně změněno", "Ručně změněno do {until}"),
         Source.HOUSE_AWAY: ("Dům: Pryč", "Dům: Pryč do {until}"),
         Source.VACATION: ("Dovolená", "Dovolená do {until}"),
+        Source.HOUSE_FROST: ("Dům: Proti mrazu", "Dům: Proti mrazu do {until}"),
         Source.HOUSE_OFF: ("Topení vypnuto", "Topení vypnuto do {until}"),
         Source.BOOST: ("Zatápí se naplno", "Zatápí se naplno do {until}"),
     },
@@ -65,6 +66,7 @@ _TEMPLATES: dict[str, dict[Source, tuple[str, str]]] = {
         Source.MANUAL: ("Changed by hand", "Changed by hand until {until}"),
         Source.HOUSE_AWAY: ("House: Away", "House: Away until {until}"),
         Source.VACATION: ("Holiday", "Holiday until {until}"),
+        Source.HOUSE_FROST: ("House: Frost guard", "House: Frost guard until {until}"),
         Source.HOUSE_OFF: ("Heating off", "Heating off until {until}"),
         Source.BOOST: ("Boost", "Boost until {until}"),
     },
@@ -165,8 +167,8 @@ def render_status(
             if upcoming.temperature is not None:
                 text += f" {format_temperature(upcoming.temperature, lang, unit)}"
         return text
-    if target.source is Source.HOUSE_AWAY and zone is not None:
-        return f"{zone}: {MODE_NAMES[lang][TargetMode.AWAY]}{until or ''}"
+    if target.source in (Source.HOUSE_AWAY, Source.HOUSE_FROST) and zone is not None:
+        return f"{zone}: {MODE_NAMES[lang][target.mode]}{until or ''}"
     return render_reason(target.reason, now, tz, lang)
 
 

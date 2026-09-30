@@ -74,6 +74,8 @@ export class HsHouseHints extends LitElement {
           : t(end ? "hints.vacation" : "hints.vacation_open", { until });
       } else if (effective === "off") {
         text = zone ? t("hints.off_zone", { zone: name }) : t("hints.off");
+      } else if (effective === "frost") {
+        text = zone ? t("hints.frost_zone", { zone: name }) : t("hints.frost");
       } else {
         text = zone ? t("hints.away_zone", { zone: name }) : t("hints.away");
       }

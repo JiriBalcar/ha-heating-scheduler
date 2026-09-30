@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import replace
 
-from .model import HOUSE_ID, Config, HouseState, Plan, Room, Settings, TempSet, Zone
+from .model import HOUSE_ID, Config, HouseMode, HouseState, Plan, Room, Settings, TempSet, Zone
 from .validation import ValidationError
 
 
@@ -111,6 +111,22 @@ def reorder_zones(config: Config, order: Sequence[str]) -> Config:
     if sorted(order) != sorted(config.zones) or len(set(order)) != len(order):
         raise ValidationError("invalid_order", "the order must list every zone once")
     return replace(config, zones={zone_id: config.zones[zone_id] for zone_id in order})
+
+
+def fit_zone(zone: Zone) -> Zone:
+    """Return `zone` with its house state moved to the modes it offers.
+
+    A selected mode it no longer offers becomes the replacement; so does a holiday once the
+    zone no longer offers Holiday (it keeps its dates). A zone that offers Holiday again gets
+    its replaced holiday back as a holiday.
+    """
+    house = zone.house
+    mode = zone.instead(house.mode)
+    vacation = house.vacation
+    if vacation is not None:
+        replacement = None if HouseMode.VACATION in zone.modes else zone.instead(HouseMode.VACATION)
+        vacation = replace(vacation, replacement=replacement)
+    return replace(zone, house=HouseState(mode, vacation))
 
 
 def put_zone_house(config: Config, zone_id: str, house: HouseState) -> Config:

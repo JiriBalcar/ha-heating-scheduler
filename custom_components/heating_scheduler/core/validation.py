@@ -11,12 +11,14 @@ from typing import Any
 from .model import (
     DAYS_PER_WEEK,
     HOUSE_ID,
+    HOUSE_MODES,
     MAX_TEMPERATURE,
     MIN_TEMPERATURE,
     SELECTABLE_HOUSE_MODES,
     TEMPERATURE_MODES,
     VACATION_MODES,
     Config,
+    HouseMode,
     HouseState,
     Plan,
     Room,
@@ -148,6 +150,11 @@ def validate_house(house: HouseState) -> None:
     """Raise ValidationError if the house state is inconsistent."""
     if house.mode not in SELECTABLE_HOUSE_MODES:
         raise ValidationError("house_mode", "the selected house mode cannot be vacation")
+    if house.vacation is not None and house.vacation.replacement not in (
+        None,
+        *SELECTABLE_HOUSE_MODES,
+    ):
+        raise ValidationError("house_mode", "a holiday is replaced by a mode without dates")
     vacation = house.vacation
     if vacation is None:
         return
@@ -161,10 +168,31 @@ def validate_house(house: HouseState) -> None:
 
 
 def validate_zone(zone: Zone) -> None:
-    """Raise ValidationError if `zone` is not usable on its own."""
+    """Raise ValidationError if `zone` is not usable on its own.
+
+    A zone offers Normal; every mode it does not offer has a replacement among its modes
+    without dates; its house state uses only modes it offers.
+    """
     _check_id(zone.id, "zone")
     _check_name(zone.name, "zone")
     validate_house(zone.house)
+    if HouseMode.AUTO not in zone.modes:
+        raise ValidationError("zone_modes", "every zone offers Normal")
+    missing = [mode for mode in HOUSE_MODES if mode not in zone.modes]
+    if set(zone.replacements) != set(missing):
+        raise ValidationError("zone_modes", "each mode a zone does not offer needs a replacement")
+    for replacement in zone.replacements.values():
+        if replacement not in zone.modes or replacement not in SELECTABLE_HOUSE_MODES:
+            raise ValidationError("zone_modes", "a replacement is a mode the zone offers")
+    house = zone.house
+    if house.mode not in zone.modes:
+        raise ValidationError("zone_modes", "the zone's mode is one it offers")
+    vacation = house.vacation
+    offers_holiday = HouseMode.VACATION in zone.modes
+    if vacation is not None and (vacation.replacement is None) != offers_holiday:
+        raise ValidationError("zone_modes", "a holiday in a zone without Holiday is replaced")
+    if vacation is not None and vacation.replacement not in (None, *zone.modes):
+        raise ValidationError("zone_modes", "a holiday's replacement is a mode the zone offers")
 
 
 def _check_unique_names(names: list[str], what: str) -> None:
