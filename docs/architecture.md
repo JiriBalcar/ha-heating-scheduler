@@ -210,6 +210,9 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
 - Dialogs follow HA's dialog protocol (`showDialog` / `closeDialog` / `dialog-closed`) and
   are opened through HA's dialog manager, so Back closes them. Messages use HA's toast
   (`hass-notification`); a valve opens HA's entity dialog (`hass-more-info`).
+- Our dialogs dim the page with a black overlay of 32 % instead of HA's `backdrop-filter:
+  brightness(68%)`. Both dim the same, but browsers can draw the filter with a seam: a thin line
+  across the whole page, darkened twice (seen in the user's browser, 2026-09-30).
 - Dialogs keep their arguments in `args`, never in `params`. HA's dialog manager takes an
   element with a `params` property for its newer dialog type: it drops the element after
   closing and creates the next one without `hass`. A test guards this.

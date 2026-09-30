@@ -28,6 +28,15 @@ export class HsHaDialog<P> extends LitElement {
     this.open = false;
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // HA dims the page behind a dialog with `backdrop-filter: brightness(68%)`. Browsers can draw
+    // that filter with a seam: a thin line across the whole page that is darkened twice. A black
+    // overlay of 32 % dims exactly as much and has no seams.
+    this.style.setProperty("--ha-dialog-scrim-backdrop-filter", "none");
+    this.style.setProperty("--mdc-dialog-scrim-color", "rgba(0, 0, 0, 0.32)");
+  }
+
   showDialog(params: P): void {
     if (this.args === undefined) {
       this.start(params);

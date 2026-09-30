@@ -31,6 +31,14 @@ describe("dialogs", () => {
     expect("params" in element).toBe(false);
     expect("dialogNext" in element).toBe(false);
   });
+
+  it.each(DIALOGS)("%s dims the page with an overlay, not a backdrop filter", (tag) => {
+    const element = document.createElement(tag);
+    document.body.appendChild(element);
+    expect(element.style.getPropertyValue("--ha-dialog-scrim-backdrop-filter")).toBe("none");
+    expect(element.style.getPropertyValue("--mdc-dialog-scrim-color")).toBe("rgba(0, 0, 0, 0.32)");
+    element.remove();
+  });
 });
 
 describe("a dialog opened again while it closes", () => {
