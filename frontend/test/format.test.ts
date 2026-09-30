@@ -6,6 +6,7 @@ import {
   nextText,
   reasonText,
   roomTemperature,
+  toCelsius,
   zonedParts,
   zonedToUtc,
   type FormatContext,
@@ -93,6 +94,20 @@ describe("room temperature", () => {
     } as unknown as HomeAssistant;
     expect(roomTemperature(room, hass)).toBe(20.6);
   });
+  it("converts Fahrenheit readings to Celsius", () => {
+    const hass = {
+      config: { time_zone: "America/New_York", unit_system: { temperature: "°F" } },
+      states: {
+        "climate.a": state("heat", { current_temperature: 68 }),
+        "climate.b": state("heat", { current_temperature: 68 }),
+        "sensor.t": state("71.6", { unit_of_measurement: "°F" }),
+      },
+    } as unknown as HomeAssistant;
+    expect(roomTemperature(room, hass)).toBe(20);
+    expect(roomTemperature({ ...room, temperature_entity: "sensor.t" }, hass)).toBe(22);
+    expect(toCelsius(300.15, "K")).toBeCloseTo(27, 5);
+  });
+
   it("prefers the chosen sensor and falls back", () => {
     const hass = {
       states: {

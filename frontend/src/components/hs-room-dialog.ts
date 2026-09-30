@@ -5,7 +5,7 @@ import { errorText, storeFor } from "../store";
 import { baseStyles } from "../styles";
 import type { Candidates, HomeAssistant, RoomData, Snapshot } from "../types";
 import { define } from "./define";
-import type { HsDialog } from "./hs-dialog";
+import { keepMineDialog, type HsDialog } from "./hs-dialog";
 import "./hs-dialog";
 
 /** Create or change a room: name, valves, shown temperature, plan, temperatures. */
@@ -105,8 +105,29 @@ export class HsRoomDialog extends LitElement {
     this.trvs = on ? [...this.trvs, entityId] : this.trvs.filter((id) => id !== entityId);
   }
 
+  /** True if the room was changed elsewhere since the dialog opened. */
+  private changedElsewhere(): RoomData | null {
+    if (!this.room) return null;
+    const current = this.snapshot.rooms.find((room) => room.id === this.room!.id);
+    if (!current) return null;
+    const fields = ["name", "trvs", "plan_id", "temp_set_id", "temperature_entity", "area_id"] as const;
+    const same = fields.every(
+      (field) => JSON.stringify(current[field]) === JSON.stringify(this.room![field]),
+    );
+    return same ? null : current;
+  }
+
   private async save() {
     const t = translator(languageOf(this.hass));
+    const current = this.changedElsewhere();
+    if (current) {
+      if (!(await keepMineDialog(this, t))) {
+        this.room = current;
+        this.prepare();
+        return;
+      }
+      this.room = current;
+    }
     this.saving = true;
     this.error = "";
     const base: RoomData = this.room ?? {
@@ -251,10 +272,24 @@ export async function openRoomDialog(
   element.candidates = candidates;
   element.room = room;
   element.prepare();
+  // Follow newer snapshots (revision, plans, sets) while keeping the draft.
+  const unsubscribe = storeFor(hass).subscribe((latest) => {
+    if (latest) element.snapshot = latest;
+  });
   (host.shadowRoot ?? host).appendChild(element);
   await element.updateComplete;
   const dialog = element.dialog;
-  if (!dialog) return;
-  dialog.addEventListener("hs-closed", () => element.remove(), { once: true });
+  if (!dialog) {
+    unsubscribe();
+    return;
+  }
+  dialog.addEventListener(
+    "hs-closed",
+    () => {
+      unsubscribe();
+      element.remove();
+    },
+    { once: true },
+  );
   await dialog.show();
 }

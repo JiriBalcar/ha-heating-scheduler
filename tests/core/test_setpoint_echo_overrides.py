@@ -130,15 +130,21 @@ def test_expired_pending_write_does_not_hide_manual_change() -> None:
     assert result is Change.MANUAL
 
 
-def test_settle_confirms_and_drops_older_writes() -> None:
+def test_settle_keeps_superseded_writes() -> None:
     older = pending(22.0, 21.0)
     newer = pending(23.0, 22.0)
-    # The older command lands: it is confirmed, the newer one still waits.
-    after_older = settle_pending([older, newer], reported=22.0, hvac_mode="heat", now=NOW, step=0.5)
-    assert [(w.commanded, w.confirmed) for w in after_older] == [(22.0, True), (23.0, False)]
-    # The newer command lands: only it remains.
-    after_newer = settle_pending(after_older, reported=23.0, hvac_mode="heat", now=NOW, step=0.5)
-    assert [(w.commanded, w.confirmed) for w in after_newer] == [(23.0, True)]
+    # The newer command lands first: the older one is superseded but kept.
+    after = settle_pending([older, newer], reported=23.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert [(w.commanded, w.confirmed, w.superseded) for w in after] == [
+        (22.0, False, True),
+        (23.0, True, False),
+    ]
+    # The older command lands late: still an echo, so the engine corrects the TRV.
+    late = classify_setpoint_change(old=23.0, new=22.0, pending=after, now=NOW, step=0.5)
+    assert late is Change.ECHO
+    # A superseded write no longer hides a return to its previous value.
+    back = classify_setpoint_change(old=23.0, new=21.0, pending=after, now=NOW, step=0.5)
+    assert back is Change.MANUAL
 
 
 def test_settle_needs_a_move_for_rounded_confirmation() -> None:
@@ -150,8 +156,34 @@ def test_settle_needs_a_move_for_rounded_confirmation() -> None:
     assert rounded[0].confirmed is True
 
 
+def test_mode_switch_is_confirmed_only_in_the_new_mode() -> None:
+    switch = PendingWrite(
+        commanded=21.0,
+        previous=21.0,
+        until=NOW + timedelta(minutes=5),
+        mode_switch=True,
+        hvac_mode="heat",
+    )
+    # An unrelated report while the TRV is still off: the setpoint matches, the mode not.
+    still_off = settle_pending([switch], reported=21.0, hvac_mode="off", now=NOW, step=0.5)
+    assert still_off[0].confirmed is False
+    # The TRV turns on and reports an intermediate setpoint: an echo, not confirmed yet.
+    middle = classify_setpoint_change(old=21.0, new=5.0, pending=still_off, now=NOW, step=0.5)
+    assert middle is Change.ECHO
+    heating = settle_pending(still_off, reported=5.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert heating[0].confirmed is False
+    done = settle_pending(heating, reported=21.0, hvac_mode="heat", now=NOW, step=0.5)
+    assert done[0].confirmed is True
+
+
 def test_settle_off_write_and_expiry() -> None:
-    off = pending(None, 20.0, mode_switch=True)
+    off = PendingWrite(
+        commanded=None,
+        previous=20.0,
+        until=NOW + timedelta(minutes=5),
+        mode_switch=True,
+        hvac_mode="off",
+    )
     heat = settle_pending([off], reported=20.0, hvac_mode="heat", now=NOW, step=0.5)
     assert heat[0].confirmed is False
     switched = settle_pending([off], reported=20.0, hvac_mode="off", now=NOW, step=0.5)

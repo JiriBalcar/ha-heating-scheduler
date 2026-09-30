@@ -1,4 +1,4 @@
-import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K as kt,L as Dt,M as St,a as p,b as n,c as l,d as c,e as mt,f as ut,g as ft,h as vt,i as gt,j as B,k as M,l as bt,m as yt,n as z,o as K,p as A,q as _,r as U,s as xt,t as $t,u as h,v as u,w as f,x as wt,y as m,z as P}from"./chunks/chunk-FCQ6HUHC.js";var Kt={idle:"#2e7d32",writing:"#1565c0",waiting:"#616161",failed:"#c62828"},X=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},busy:{state:!0}}}constructor(){super(),this.busy=!1}static{this.styles=[m,p`
+import{A as T,B as kt,C as j,D as v,E as b,F as y,G as k,H as C,I as D,J as P,K as Dt,L as St,M as Et,a as p,b as n,c as l,d as c,e as ut,f as ft,g as vt,h as gt,i as bt,j as B,k as M,l as yt,m as xt,n as z,o as K,p as A,q as _,r as U,s as $t,t as wt,u as h,v as u,w as f,x as _t,y as m,z as L}from"./chunks/chunk-C2YFDFWI.js";var Ut={idle:"#2e7d32",writing:"#1565c0",waiting:"#616161",failed:"#c62828"},X=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},busy:{state:!0}}}constructor(){super(),this.busy=!1}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -46,7 +46,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         margin: 0;
         font-weight: 600;
       }
-    `]}get t(){return f(u(this.hass))}async check(){this.busy=!0;try{await v(this.hass).call("reconcile")}catch(s){y(this,b(s,this.t))}finally{this.busy=!1}}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=P(this.hass,u(this.hass),this.snapshot),e=this.snapshot.rooms.every(i=>i.issues.length===0),a=i=>{let r=this.hass.states[i]?.attributes.friendly_name;return typeof r=="string"?r:i};return n`
+    `]}get t(){return f(u(this.hass))}async check(){this.busy=!0;try{await v(this.hass).call("reconcile")}catch(s){y(this,b(s,this.t))}finally{this.busy=!1}}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=L(this.hass,u(this.hass),this.snapshot),e=this.snapshot.rooms.every(i=>i.issues.length===0),a=i=>{let r=this.hass.states[i]?.attributes.friendly_name;return typeof r=="string"?r:i};return n`
       <button class="btn primary" ?disabled=${this.busy} @click=${this.check}>
         <hs-icon .path=${U}></hs-icon>${s("adv.health.check_now")}
       </button>
@@ -57,7 +57,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${i.trv_status.map(r=>n`<dl class="valve">
               <div class="name">
                 ${a(r.entity_id)}
-                <span class="phase" style="background:${Kt[r.phase]}">
+                <span class="phase" style="background:${Ut[r.phase]}">
                   ${s(`adv.health.phase.${r.phase}`)}
                 </span>
               </div>
@@ -120,7 +120,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           grid-column: 1;
         }
       }
-    `]}get t(){return f(u(this.hass))}connectedCallback(){super.connectedCallback(),!this.roomId&&this.snapshot?.rooms.length&&(this.roomId=this.snapshot.rooms[0].id,this.load())}async load(){if(this.roomId){this.loading=!0;try{let s=await v(this.hass).call("log",{room_id:this.roomId});this.entries=s.entries}catch(s){y(this,b(s,this.t))}finally{this.loading=!1}}}label(s){let t=`log.${s}`;return wt.includes(t)?this.t(t):s}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=P(this.hass,u(this.hass),this.snapshot),e=a=>{if(!a)return"";let i=this.hass.states[a]?.attributes.friendly_name;return typeof i=="string"?i:a};return n`
+    `]}get t(){return f(u(this.hass))}connectedCallback(){super.connectedCallback(),!this.roomId&&this.snapshot?.rooms.length&&(this.roomId=this.snapshot.rooms[0].id,this.load())}async load(){if(this.roomId){this.loading=!0;try{let s=await v(this.hass).call("log",{room_id:this.roomId});this.entries=s.entries}catch(s){y(this,b(s,this.t))}finally{this.loading=!1}}}label(s){let t=`log.${s}`;return _t.includes(t)?this.t(t):s}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=L(this.hass,u(this.hass),this.snapshot),e=a=>{if(!a)return"";let i=this.hass.states[a]?.attributes.friendly_name;return typeof i=="string"?i:a};return n`
       <div class="top">
         <label class="field">
           <span>${s("adv.log.room")}</span>
@@ -149,7 +149,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
                     </span>`:l}
               </li>`)}
           </ol>`}
-    `}};h("hs-adv-log",Y);function L(o,s={}){let t={...o,...s};return{id:t.id,name:t.name,trvs:t.trvs,plan_id:t.plan_id,temp_set_id:t.temp_set_id,temperature_entity:t.temperature_entity,area_id:t.area_id}}function I(o,s){let t=new Set(s.map(e=>e.trim().toLowerCase()));if(!t.has(o.trim().toLowerCase()))return o;for(let e=2;;e+=1){let a=`${o} ${e}`;if(!t.has(a.toLowerCase()))return a}}var W=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},candidates:{attribute:!1},room:{attribute:!1},name:{state:!0},trvs:{state:!0},sensor:{state:!0},planId:{state:!0},setId:{state:!0},error:{state:!0},saving:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-adv-log",Y);function I(o,s={}){let t={...o,...s};return{id:t.id,name:t.name,trvs:t.trvs,plan_id:t.plan_id,temp_set_id:t.temp_set_id,temperature_entity:t.temperature_entity,area_id:t.area_id}}function N(o,s){let t=new Set(s.map(e=>e.trim().toLowerCase()));if(!t.has(o.trim().toLowerCase()))return o;for(let e=2;;e+=1){let a=`${o} ${e}`;if(!t.has(a.toLowerCase()))return a}}var W=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},candidates:{attribute:!1},room:{attribute:!1},name:{state:!0},trvs:{state:!0},sensor:{state:!0},planId:{state:!0},setId:{state:!0},error:{state:!0},saving:{state:!0}}}static{this.styles=[m,p`
       .form {
         display: flex;
         flex-direction: column;
@@ -195,7 +195,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         font-weight: 600;
         margin: 0;
       }
-    `]}get dialog(){return this.renderRoot.querySelector("hs-dialog")}prepare(){let s=this.room;this.name=s?.name??"",this.trvs=[...s?.trvs??[]],this.sensor=s?.temperature_entity??"",this.planId=s?.plan_id??"house",this.setId=s?.temp_set_id??"house",this.error="",this.saving=!1}toggle(s,t){this.trvs=t?[...this.trvs,s]:this.trvs.filter(e=>e!==s)}async save(){let s=f(u(this.hass));this.saving=!0,this.error="";let t=this.room??{id:"",name:"",trvs:[],plan_id:"house",temp_set_id:"house",temperature_entity:null,area_id:null,current_temperature:null,target:null,override:null,issues:[],trv_status:[]},e=L(t,{name:this.name.trim(),trvs:this.trvs,temperature_entity:this.sensor||null,plan_id:this.planId,temp_set_id:this.setId});try{await v(this.hass).call("room/save",{revision:this.snapshot.revision,room:{...e,id:this.room?e.id:null}}),this.dialog?.close()}catch(a){this.error=b(a,s)}finally{this.saving=!1}}render(){if(!this.hass||!this.snapshot||!this.candidates)return l;let s=f(u(this.hass)),t=e=>this.snapshot.rooms.find(a=>a.id===e)?.name??"";return n`
+    `]}get dialog(){return this.renderRoot.querySelector("hs-dialog")}prepare(){let s=this.room;this.name=s?.name??"",this.trvs=[...s?.trvs??[]],this.sensor=s?.temperature_entity??"",this.planId=s?.plan_id??"house",this.setId=s?.temp_set_id??"house",this.error="",this.saving=!1}toggle(s,t){this.trvs=t?[...this.trvs,s]:this.trvs.filter(e=>e!==s)}changedElsewhere(){if(!this.room)return null;let s=this.snapshot.rooms.find(a=>a.id===this.room.id);return s?["name","trvs","plan_id","temp_set_id","temperature_entity","area_id"].every(a=>JSON.stringify(s[a])===JSON.stringify(this.room[a]))?null:s:null}async save(){let s=f(u(this.hass)),t=this.changedElsewhere();if(t){if(!await C(this,s)){this.room=t,this.prepare();return}this.room=t}this.saving=!0,this.error="";let e=this.room??{id:"",name:"",trvs:[],plan_id:"house",temp_set_id:"house",temperature_entity:null,area_id:null,current_temperature:null,target:null,override:null,issues:[],trv_status:[]},a=I(e,{name:this.name.trim(),trvs:this.trvs,temperature_entity:this.sensor||null,plan_id:this.planId,temp_set_id:this.setId});try{await v(this.hass).call("room/save",{revision:this.snapshot.revision,room:{...a,id:this.room?a.id:null}}),this.dialog?.close()}catch(i){this.error=b(i,s)}finally{this.saving=!1}}render(){if(!this.hass||!this.snapshot||!this.candidates)return l;let s=f(u(this.hass)),t=e=>this.snapshot.rooms.find(a=>a.id===e)?.name??"";return n`
       <hs-dialog
         wide
         .heading=${this.room?s("adv.rooms.edit_title"):s("adv.rooms.new_title")}
@@ -267,7 +267,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${s("common.save")}
         </button>
       </hs-dialog>
-    `}};h("hs-room-dialog",W);async function Et(o,s,t,e,a){let i=document.createElement("hs-room-dialog");i.hass=s,i.snapshot=t,i.candidates=e,i.room=a,i.prepare(),(o.shadowRoot??o).appendChild(i),await i.updateComplete;let r=i.dialog;r&&(r.addEventListener("hs-closed",()=>i.remove(),{once:!0}),await r.show())}var Z=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},candidates:{state:!0},importChoice:{state:!0},busy:{state:!0}}}constructor(){super(),this.candidates=null,this.importChoice=new Set,this.busy=!1}static{this.styles=[m,p`
+    `}};h("hs-room-dialog",W);async function Mt(o,s,t,e,a){let i=document.createElement("hs-room-dialog");i.hass=s,i.snapshot=t,i.candidates=e,i.room=a,i.prepare();let r=v(s).subscribe(g=>{g&&(i.snapshot=g)});(o.shadowRoot??o).appendChild(i),await i.updateComplete;let d=i.dialog;if(!d){r();return}d.addEventListener("hs-closed",()=>{r(),i.remove()},{once:!0}),await d.show()}var J=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},candidates:{state:!0},importChoice:{state:!0},busy:{state:!0}}}constructor(){super(),this.candidates=null,this.importChoice=new Set,this.busy=!1}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -336,13 +336,13 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           justify-content: flex-start;
         }
       }
-    `]}get t(){return f(u(this.hass))}async loadCandidates(){try{return this.candidates=await v(this.hass).call("candidates"),this.candidates}catch(s){return y(this,b(s,this.t)),null}}async edit(s){let t=await this.loadCandidates();t&&await Et(this,this.hass,this.snapshot,t,s)}async move(s,t){let e=this.snapshot.rooms.map(r=>r.id),a=e.indexOf(s.id),i=a+t;i<0||i>=e.length||([e[a],e[i]]=[e[i],e[a]],await this.call("rooms/reorder",{revision:this.snapshot.revision,order:e}))}async deleteRoom(s){let t=this.t;await D(this,{heading:t("common.delete"),message:t("adv.rooms.delete_confirm",{name:s.name}),confirm:t("common.delete"),cancel:t("common.cancel"),danger:!0})&&await this.call("room/delete",{revision:this.snapshot.revision,room_id:s.id})}async call(s,t){this.busy=!0;try{await v(this.hass).call(s,t)}catch(e){y(this,b(e,this.t))}finally{this.busy=!1}}importDialog(){return this.renderRoot.querySelector("#import")}async openImport(){await this.loadCandidates()&&(this.importChoice=new Set(this.freeAreas().map(t=>t.area_id)),await this.importDialog()?.show())}freeAreas(){let s=new Set(this.snapshot.rooms.flatMap(t=>t.trvs));return(this.candidates?.areas??[]).map(t=>({...t,climates:t.climates.filter(e=>!s.has(e))})).filter(t=>t.climates.length>0)}async runImport(){let s=v(this.hass),t=this.snapshot.revision,e=this.snapshot.rooms.map(i=>i.name),a=new Set(this.snapshot.rooms.flatMap(i=>i.trvs));this.busy=!0;try{for(let i of this.freeAreas()){if(!this.importChoice.has(i.area_id))continue;let r=I(i.name,e);e.push(r);let d=i.climates.filter($=>!a.has($)),g=L({id:"",name:r,trvs:d,plan_id:"house",temp_set_id:"house",temperature_entity:i.temperature_entity,area_id:i.area_id},{});t=(await s.call("room/save",{revision:t,room:{...g,id:null}})).revision}this.importDialog()?.close()}catch(i){y(this,b(i,this.t))}finally{this.busy=!1}}valveNames(s){return s.trvs.length?s.trvs.map(t=>{let e=this.hass.states[t]?.attributes.friendly_name;return typeof e=="string"?e:t}).join(", "):this.t("adv.rooms.none_trvs")}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=i=>this.snapshot.plans.find(r=>r.id===i)?.name??i,e=i=>this.snapshot.temp_sets.find(r=>r.id===i)?.name??i,a=this.snapshot.rooms;return n`
+    `]}get t(){return f(u(this.hass))}async loadCandidates(){try{return this.candidates=await v(this.hass).call("candidates"),this.candidates}catch(s){return y(this,b(s,this.t)),null}}async edit(s){let t=await this.loadCandidates();t&&await Mt(this,this.hass,this.snapshot,t,s)}async move(s,t){let e=this.snapshot.rooms.map(r=>r.id),a=e.indexOf(s.id),i=a+t;i<0||i>=e.length||([e[a],e[i]]=[e[i],e[a]],await this.call("rooms/reorder",{revision:this.snapshot.revision,order:e}))}async deleteRoom(s){let t=this.t;await k(this,{heading:t("common.delete"),message:t("adv.rooms.delete_confirm",{name:s.name}),confirm:t("common.delete"),cancel:t("common.cancel"),danger:!0})&&await this.call("room/delete",{revision:this.snapshot.revision,room_id:s.id})}async call(s,t){this.busy=!0;try{await v(this.hass).call(s,t)}catch(e){y(this,b(e,this.t))}finally{this.busy=!1}}importDialog(){return this.renderRoot.querySelector("#import")}async openImport(){await this.loadCandidates()&&(this.importChoice=new Set(this.freeAreas().map(t=>t.area_id)),await this.importDialog()?.show())}freeAreas(){let s=new Set(this.snapshot.rooms.flatMap(t=>t.trvs));return(this.candidates?.areas??[]).map(t=>({...t,climates:t.climates.filter(e=>!s.has(e))})).filter(t=>t.climates.length>0)}async runImport(){let s=v(this.hass),t=this.snapshot.revision,e=this.snapshot.rooms.map(i=>i.name),a=new Set(this.snapshot.rooms.flatMap(i=>i.trvs));this.busy=!0;try{for(let i of this.freeAreas()){if(!this.importChoice.has(i.area_id))continue;let r=N(i.name,e);e.push(r);let d=i.climates.filter($=>!a.has($)),g=I({id:"",name:r,trvs:d,plan_id:"house",temp_set_id:"house",temperature_entity:i.temperature_entity,area_id:i.area_id},{});t=(await s.call("room/save",{revision:t,room:{...g,id:null}})).revision}this.importDialog()?.close()}catch(i){y(this,b(i,this.t))}finally{this.busy=!1}}valveNames(s){return s.trvs.length?s.trvs.map(t=>{let e=this.hass.states[t]?.attributes.friendly_name;return typeof e=="string"?e:t}).join(", "):this.t("adv.rooms.none_trvs")}render(){if(!this.snapshot||!this.hass)return l;let s=this.t,t=i=>this.snapshot.plans.find(r=>r.id===i)?.name??i,e=i=>this.snapshot.temp_sets.find(r=>r.id===i)?.name??i,a=this.snapshot.rooms;return n`
       <div class="top">
         <button class="btn primary" ?disabled=${this.busy} @click=${()=>this.edit(null)}>
           <hs-icon .path=${_}></hs-icon>${s("adv.rooms.add")}
         </button>
         <button class="btn" ?disabled=${this.busy} @click=${this.openImport}>
-          <hs-icon .path=${bt}></hs-icon>${s("adv.rooms.import")}
+          <hs-icon .path=${yt}></hs-icon>${s("adv.rooms.import")}
         </button>
       </div>
       ${a.length===0?n`<p class="muted">${s("adv.rooms.empty")}</p>`:l}
@@ -355,7 +355,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           </div>
           <div class="buttons">
             <button class="btn icon" ?disabled=${this.busy||r===0} @click=${()=>this.move(i,-1)} aria-label=${s("adv.rooms.move_up")}>
-              <hs-icon .path=${gt}></hs-icon>
+              <hs-icon .path=${bt}></hs-icon>
             </button>
             <button
               class="btn icon"
@@ -363,7 +363,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
               @click=${()=>this.move(i,1)}
               aria-label=${s("adv.rooms.move_down")}
             >
-              <hs-icon .path=${ft}></hs-icon>
+              <hs-icon .path=${vt}></hs-icon>
             </button>
             <button class="btn" ?disabled=${this.busy} @click=${()=>this.edit(i)}>
               <hs-icon .path=${K}></hs-icon>${s("common.edit")}
@@ -398,7 +398,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${s("adv.rooms.import_button")}
         </button>
       </hs-dialog>
-    `}};h("hs-adv-rooms",Z);var Ut=[1,2,3,4,6,8,12,24];function G(o,s){return Object.keys(o).every(t=>o[t]===s[t])}var jt=[1,2,5,10,15,30,60],qt=[10,20,30,60,120,240],J=class extends c{constructor(){super();this.revision=-1;this.base=null;this.busy=!1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},draft:{state:!0},busy:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-adv-rooms",J);var jt=[1,2,3,4,6,8,12,24];function Z(o,s){return Object.keys(o).every(t=>o[t]===s[t])}var qt=[1,2,5,10,15,30,60],Vt=[10,20,30,60,120,240],G=class extends c{constructor(){super();this.revision=-1;this.base=null;this.busy=!1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},draft:{state:!0},busy:{state:!0}}}static{this.styles=[m,p`
       .card {
         padding: 18px;
         display: flex;
@@ -432,7 +432,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         accent-color: var(--hs-accent, #1565c0);
         flex: none;
       }
-    `]}get t(){return f(u(this.hass))}willUpdate(t){t.has("snapshot")&&this.snapshot&&this.snapshot.revision!==this.revision&&(this.revision=this.snapshot.revision,(!this.base||!this.draft||G(this.draft,this.base))&&(this.draft={...this.snapshot.settings},this.base={...this.snapshot.settings}))}set(t,e){this.draft={...this.draft,[t]:e}}get dirty(){return this.base!==null&&!G(this.draft,this.base)}async save(){let t=this.snapshot.settings;if(this.base&&!G(t,this.base)&&!await R(this,this.t)){this.draft={...t},this.base={...t};return}this.busy=!0;try{await v(this.hass).call("settings/save",{revision:this.snapshot.revision,settings:this.draft}),this.base={...this.draft},y(this,this.t("adv.settings.saved"))}catch(e){y(this,b(e,this.t))}finally{this.busy=!1}}select(t,e,a,i,r,d){let g=this.t,w=e.includes(a)?e:[...e,a].sort(($,F)=>$-F);return n`<label class="field">
+    `]}get t(){return f(u(this.hass))}willUpdate(t){t.has("snapshot")&&this.snapshot&&this.snapshot.revision!==this.revision&&(this.revision=this.snapshot.revision,(!this.base||!this.draft||Z(this.draft,this.base))&&(this.draft={...this.snapshot.settings},this.base={...this.snapshot.settings}))}set(t,e){this.draft={...this.draft,[t]:e}}get dirty(){return this.base!==null&&!Z(this.draft,this.base)}async save(){let t=this.snapshot.settings;if(this.base&&!Z(t,this.base)&&!await C(this,this.t)){this.draft={...t},this.base={...t};return}let e={...this.draft};this.busy=!0;try{await v(this.hass).call("settings/save",{revision:this.snapshot.revision,settings:e}),this.base=e,y(this,this.t("adv.settings.saved"))}catch(a){y(this,b(a,this.t))}finally{this.busy=!1}}select(t,e,a,i,r,d){let g=this.t,w=e.includes(a)?e:[...e,a].sort(($,F)=>$-F);return n`<label class="field">
       <span>${t}</span>
       <select class="input" @change=${$=>r(Number($.target.value))}>
         ${w.map($=>n`<option value=${$} ?selected=${$===a}>
@@ -442,9 +442,9 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
       ${d?n`<span class="hint muted">${d}</span>`:l}
     </label>`}render(){if(!this.snapshot||!this.hass||!this.draft)return l;let t=this.t,e=this.draft;return n`
       <div class="card">
-        ${this.select(t("adv.settings.max_override"),Ut,e.max_override_minutes/60,"hours",a=>this.set("max_override_minutes",Math.round(a*60)),t("adv.settings.max_override_hint"))}
-        ${this.select(t("adv.settings.safety_interval"),jt,e.safety_interval_minutes,"minutes",a=>this.set("safety_interval_minutes",a))}
-        ${this.select(t("adv.settings.mismatch_alert"),qt,e.mismatch_alert_minutes,"minutes",a=>this.set("mismatch_alert_minutes",a))}
+        ${this.select(t("adv.settings.max_override"),jt,e.max_override_minutes/60,"hours",a=>this.set("max_override_minutes",Math.round(a*60)),t("adv.settings.max_override_hint"))}
+        ${this.select(t("adv.settings.safety_interval"),qt,e.safety_interval_minutes,"minutes",a=>this.set("safety_interval_minutes",a))}
+        ${this.select(t("adv.settings.mismatch_alert"),Vt,e.mismatch_alert_minutes,"minutes",a=>this.set("mismatch_alert_minutes",a))}
         <div class="field">
           <span>${t("adv.settings.vacation_mode")}</span>
           <div class="choice">
@@ -476,7 +476,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${t("common.save")}
         </button>
       </div>
-    `}};h("hs-adv-settings",J);function Q(o,s){let t=new Set([...Object.keys(o.temperatures),...Object.keys(s.temperatures)]);return o.name.trim()===s.name.trim()&&[...t].every(e=>o.temperatures[e]===s.temperatures[e])}function Vt(o){return Math.min(30,Math.max(5,Math.round(o*2)/2))}var tt=class extends c{constructor(){super();this.revision=-1;this.base={};this.drafts={},this.busy=!1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},drafts:{state:!0},busy:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-adv-settings",G);function Q(o,s){let t=new Set([...Object.keys(o.temperatures),...Object.keys(s.temperatures)]);return o.name.trim()===s.name.trim()&&[...t].every(e=>o.temperatures[e]===s.temperatures[e])}function Ft(o){return Math.min(30,Math.max(5,Math.round(o*2)/2))}var tt=class extends c{constructor(){super();this.revision=-1;this.base={};this.drafts={},this.busy=!1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},drafts:{state:!0},busy:{state:!0}}}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -548,7 +548,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           grid-template-columns: 1fr;
         }
       }
-    `]}get t(){return f(u(this.hass))}willUpdate(t){if(t.has("snapshot")&&this.snapshot&&this.snapshot.revision!==this.revision){this.revision=this.snapshot.revision;let e={},a={};for(let i of this.snapshot.temp_sets){let r={name:i.name,temperatures:{...i.temperatures}},d=this.drafts[i.id],g=this.base[i.id];d&&g&&!Q(d,g)?(e[i.id]=d,a[i.id]=g):(e[i.id]=r,a[i.id]=r)}this.drafts=e,this.base=a}}house(){return this.snapshot.temp_sets.find(t=>t.id==="house")?.temperatures??{}}dirty(t){let e=this.drafts[t.id],a=this.base[t.id];return!!(e&&a&&!Q(e,a))}patch(t,e){this.drafts={...this.drafts,[t]:e(this.drafts[t])}}setValue(t,e,a){this.patch(t,i=>{let r={...i.temperatures};return a===void 0?delete r[e]:r[e]=Vt(a),{...i,temperatures:r}})}async run(t,e){this.busy=!0;try{return await v(this.hass).call(t,{revision:this.snapshot.revision,...e}),!0}catch(a){return y(this,b(a,this.t)),!1}finally{this.busy=!1}}async save(t){let e=this.drafts[t.id],a=this.base[t.id],i={name:t.name,temperatures:t.temperatures};if(a&&!Q(i,a)&&!await R(this,this.t)){this.drafts={...this.drafts,[t.id]:i},this.base={...this.base,[t.id]:i};return}await this.run("temp_set/save",{temp_set:{id:t.id,name:e.name.trim(),temperatures:e.temperatures}})&&(this.base={...this.base,[t.id]:{...e,name:e.name.trim()}})}async deleteSet(t){let e=this.t,a=(t.used_by??[]).map(r=>this.snapshot.rooms.find(d=>d.id===r)?.name).filter(Boolean).join(", ");await D(this,{heading:e("common.delete"),message:a?e("adv.temps.delete_confirm_used",{name:t.name,rooms:a}):e("adv.temps.delete_confirm",{name:t.name}),confirm:e("common.delete"),cancel:e("common.cancel"),danger:!0})&&await this.run("temp_set/delete",{temp_set_id:t.id})}createSet(){let t=I(this.t("adv.temps.new"),this.snapshot.temp_sets.map(e=>e.name));this.run("temp_set/save",{temp_set:{name:t,temperatures:{}}})}stepper(t,e,a){let i=P(this.hass,u(this.hass),this.snapshot),r=this.t;return n`<div class="stepper">
+    `]}get t(){return f(u(this.hass))}willUpdate(t){if(t.has("snapshot")&&this.snapshot&&this.snapshot.revision!==this.revision){this.revision=this.snapshot.revision;let e={},a={};for(let i of this.snapshot.temp_sets){let r={name:i.name,temperatures:{...i.temperatures}},d=this.drafts[i.id],g=this.base[i.id];d&&g&&!Q(d,g)?(e[i.id]=d,a[i.id]=g):(e[i.id]=r,a[i.id]=r)}this.drafts=e,this.base=a}}house(){return this.snapshot.temp_sets.find(t=>t.id==="house")?.temperatures??{}}dirty(t){let e=this.drafts[t.id],a=this.base[t.id];return!!(e&&a&&!Q(e,a))}patch(t,e){this.drafts={...this.drafts,[t]:e(this.drafts[t])}}setValue(t,e,a){this.patch(t,i=>{let r={...i.temperatures};return a===void 0?delete r[e]:r[e]=Ft(a),{...i,temperatures:r}})}async run(t,e){this.busy=!0;try{return await v(this.hass).call(t,{revision:this.snapshot.revision,...e}),!0}catch(a){return y(this,b(a,this.t)),!1}finally{this.busy=!1}}async save(t){let e=this.drafts[t.id],a=this.base[t.id],i={name:t.name,temperatures:t.temperatures};if(a&&!Q(i,a)&&!await C(this,this.t)){this.drafts={...this.drafts,[t.id]:i},this.base={...this.base,[t.id]:i};return}await this.run("temp_set/save",{temp_set:{id:t.id,name:e.name.trim(),temperatures:e.temperatures}})&&(this.base={...this.base,[t.id]:{...e,name:e.name.trim()}})}async deleteSet(t){let e=this.t,a=(t.used_by??[]).map(r=>this.snapshot.rooms.find(d=>d.id===r)?.name).filter(Boolean).join(", ");await k(this,{heading:e("common.delete"),message:a?e("adv.temps.delete_confirm_used",{name:t.name,rooms:a}):e("adv.temps.delete_confirm",{name:t.name}),confirm:e("common.delete"),cancel:e("common.cancel"),danger:!0})&&await this.run("temp_set/delete",{temp_set_id:t.id})}createSet(){let t=N(this.t("adv.temps.new"),this.snapshot.temp_sets.map(e=>e.name));this.run("temp_set/save",{temp_set:{name:t,temperatures:{}}})}stepper(t,e,a){let i=L(this.hass,u(this.hass),this.snapshot),r=this.t;return n`<div class="stepper">
       <button class="btn" @click=${()=>this.setValue(t,e,a-.5)} aria-label=${r("room.cooler")}>
         <hs-icon .path=${z}></hs-icon>
       </button>
@@ -556,7 +556,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
       <button class="btn" @click=${()=>this.setValue(t,e,a+.5)} aria-label=${r("room.warmer")}>
         <hs-icon .path=${A}></hs-icon>
       </button>
-    </div>`}renderSet(t){let e=this.t,a=this.drafts[t.id];if(!a)return l;let i=this.house(),r=t.id==="house",d=P(this.hass,u(this.hass),this.snapshot);return n`<section class="card set">
+    </div>`}renderSet(t){let e=this.t,a=this.drafts[t.id];if(!a)return l;let i=this.house(),r=t.id==="house",d=L(this.hass,u(this.hass),this.snapshot);return n`<section class="card set">
       ${r?n`<h3>${e("adv.temps.house")}</h3><span class="muted">${e("adv.temps.house_hint")}</span>`:n`<label class="field">
             <span>${e("plans.name")}</span>
             <input
@@ -566,9 +566,9 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
               @input=${g=>this.patch(t.id,w=>({...w,name:g.target.value}))}
             />
           </label>`}
-      ${Dt.map(g=>{let w=a.temperatures[g],$=i[g]??20;return n`<div class="mode">
+      ${St.map(g=>{let w=a.temperatures[g],$=i[g]??20;return n`<div class="mode">
           <span class="label">
-            <hs-icon .path=${C[g]} style="color:${S[g]}"></hs-icon>${e(`mode.${g}`)}
+            <hs-icon .path=${P[g]} style="color:${D[g]}"></hs-icon>${e(`mode.${g}`)}
           </span>
           ${r?this.stepper(t.id,g,w??$):n`<div>
                 <label class="own">
@@ -599,7 +599,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
       <button class="btn" ?disabled=${this.busy} @click=${this.createSet}>
         <hs-icon .path=${_}></hs-icon>${t("adv.temps.new")}
       </button>
-    `}};h("hs-adv-temps",tt);var Mt=[{id:"rooms",label:"adv.rooms"},{id:"temps",label:"adv.temps"},{id:"settings",label:"adv.settings"},{id:"health",label:"adv.health"},{id:"log",label:"adv.log"}],et=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},section:{attribute:!1}}}static{this.styles=[m,p`
+    `}};h("hs-adv-temps",tt);var Tt=[{id:"rooms",label:"adv.rooms"},{id:"temps",label:"adv.temps"},{id:"settings",label:"adv.settings"},{id:"health",label:"adv.health"},{id:"log",label:"adv.log"}],et=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},section:{attribute:!1}}}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -635,9 +635,9 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         color: #fff;
         font-weight: 600;
       }
-    `]}navigate(s){this.dispatchEvent(new CustomEvent("hs-navigate",{detail:`/advanced/${s}`,bubbles:!0,composed:!0}))}content(){switch(this.section){case"temps":return n`<hs-adv-temps .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-temps>`;case"settings":return n`<hs-adv-settings .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-settings>`;case"health":return n`<hs-adv-health .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-health>`;case"log":return n`<hs-adv-log .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-log>`;default:return n`<hs-adv-rooms .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-rooms>`}}render(){if(!this.snapshot||!this.hass)return l;let s=f(u(this.hass)),t=Mt.some(e=>e.id===this.section)?this.section:"rooms";return n`
+    `]}navigate(s){this.dispatchEvent(new CustomEvent("hs-navigate",{detail:`/advanced/${s}`,bubbles:!0,composed:!0}))}content(){switch(this.section){case"temps":return n`<hs-adv-temps .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-temps>`;case"settings":return n`<hs-adv-settings .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-settings>`;case"health":return n`<hs-adv-health .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-health>`;case"log":return n`<hs-adv-log .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-log>`;default:return n`<hs-adv-rooms .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-rooms>`}}render(){if(!this.snapshot||!this.hass)return l;let s=f(u(this.hass)),t=Tt.some(e=>e.id===this.section)?this.section:"rooms";return n`
       <div class="sections" role="tablist">
-        ${Mt.map(e=>n`<button
+        ${Tt.map(e=>n`<button
             role="tab"
             aria-current=${e.id===t?"page":"false"}
             @click=${()=>this.navigate(e.id)}
@@ -683,13 +683,13 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
               <hs-icon .path=${_}></hs-icon>${s("adv.rooms.add")}
             </button>
           </div>`:n`<div class="rooms">
-            ${St(this.snapshot.rooms,t=>t.id,t=>n`<hs-room-tile
+            ${Et(this.snapshot.rooms,t=>t.id,t=>n`<hs-room-tile
                   .hass=${this.hass}
                   .room=${t}
                   .snapshot=${this.snapshot}
                 ></hs-room-tile>`)}
           </div>`}
-    `}};h("hs-home-view",st);function Ft(o){let[s,t]=o.split(":").map(Number);return(s??0)*60+(t??0)}function x(o){let s=Math.floor(o/60);return`${String(s).padStart(2,"0")}:${String(o%60).padStart(2,"0")}`}function Ct(o){return Math.round(o/15)*15}function k(o){let s=new Map;for(let a of o)s.set(a.start,a.mode);let t=[...s.entries()].sort((a,i)=>a[0]-i[0]),e=[];for(let[a,i]of t)e.length&&e[e.length-1].mode===i||e.push({start:a,mode:i});return e.length&&e[0].start!==0&&(e[0]={start:0,mode:e[0].mode}),e}function Xt(o){let s=o.map(a=>[...a].sort((i,r)=>i.start-r.start)),t=a=>{for(let i=1;i<=7;i+=1){let r=s[(a-i+7)%7];if(r.length)return r[r.length-1].mode}return null},e=s.map((a,i)=>t(i));return s.map((a,i)=>{if(a.length&&a[0].start===0)return Tt(a);let r=e[i]??a[0]?.mode??"comfort";return Tt([{start:0,mode:r},...a])})}function Tt(o){return k(o)}function H(o){return Xt(o.days.map(s=>s.map(t=>({start:Ft(t.start),mode:t.mode}))))}function Pt(o){return o.map(s=>s.map(t=>({start:x(t.start),mode:t.mode})))}function E(o){return o.map((s,t)=>({index:t,start:s.start,end:o[t+1]?.start??1440,mode:s.mode}))}function Yt(o,s){let t=E(o);return t.find(e=>s>=e.start&&s<e.end)??t[t.length-1]}function Lt(o,s,t){return k(o.map((e,a)=>a===s?{...e,mode:t}:e))}function O(o,s,t){if(s<=0||s>=o.length)return o;let e=o[s-1].start+15,a=(o[s+1]?.start??1440)-15,i=Math.min(a,Math.max(e,Ct(t)));return o.map((r,d)=>d===s?{...r,start:i}:r)}function at(o,s){return o.end-o.start<30?null:Math.min(o.end-15,Math.max(o.start+15,Ct(s)))}function It(o,s,t){let e=Yt(o,s),a=at(e,s);if(a===null)return{day:o,index:e.index};let i=[...o.slice(0,e.index+1),{start:a,mode:t},...o.slice(e.index+1)];if(t===e.mode)return{day:i,index:e.index+1};let r=k(i);return{day:r,index:r.findIndex(d=>d.start===a)}}function Nt(o,s){if(o.length<=1||s<0||s>=o.length)return o;if(s===0){let[,t,...e]=o;return k([{start:0,mode:t.mode},...e])}return k(o.filter((t,e)=>e!==s))}function Rt(o,s,t){return o.map((e,a)=>t.includes(a)?o[s].map(i=>({...i})):e)}function q(o,s){return o.length===s.length&&o.every((t,e)=>t.start===s[e].start&&t.mode===s[e].mode)}function zt(o){switch(o){case"comfort":return"eco";case"night":case"eco":case"away":case"frost":case"off":return"comfort"}}var At=[0,1,2,3,4],Ht=[5,6],it=[0,1,2,3,4,5,6];function V(o){return o/1440*100}var rt=class extends c{constructor(){super();this.moved=!1;this.interactive=!1,this.labels=!1,this.dragIndex=null,this.handleLabel=(t,e)=>e}static{this.properties={day:{attribute:!1},interactive:{type:Boolean},labels:{type:Boolean},handleLabel:{attribute:!1},dragIndex:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-home-view",st);function Xt(o){let[s,t]=o.split(":").map(Number);return(s??0)*60+(t??0)}function x(o){let s=Math.floor(o/60);return`${String(s).padStart(2,"0")}:${String(o%60).padStart(2,"0")}`}function Pt(o){return Math.round(o/15)*15}function S(o){let s=new Map;for(let a of o)s.set(a.start,a.mode);let t=[...s.entries()].sort((a,i)=>a[0]-i[0]),e=[];for(let[a,i]of t)e.length&&e[e.length-1].mode===i||e.push({start:a,mode:i});return e.length&&e[0].start!==0&&(e[0]={start:0,mode:e[0].mode}),e}function Yt(o){let s=o.map(a=>[...a].sort((i,r)=>i.start-r.start)),t=a=>{for(let i=1;i<=7;i+=1){let r=s[(a-i+7)%7];if(r.length)return r[r.length-1].mode}return null},e=s.map((a,i)=>t(i));return s.map((a,i)=>{if(a.length&&a[0].start===0)return Ct(a);let r=e[i]??a[0]?.mode??"comfort";return Ct([{start:0,mode:r},...a])})}function Ct(o){return S(o)}function H(o){return Yt(o.days.map(s=>s.map(t=>({start:Xt(t.start),mode:t.mode}))))}function Lt(o){return o.map(s=>s.map(t=>({start:x(t.start),mode:t.mode})))}function E(o){return o.map((s,t)=>({index:t,start:s.start,end:o[t+1]?.start??1440,mode:s.mode}))}function at(o,s){let t=E(o);return t.find(e=>s>=e.start&&s<e.end)??t[t.length-1]}function It(o,s,t){return S(o.map((e,a)=>a===s?{...e,mode:t}:e))}function O(o,s,t){if(s<=0||s>=o.length)return o;let e=o[s-1].start+15,a=(o[s+1]?.start??1440)-15,i=Math.min(a,Math.max(e,Pt(t)));return o.map((r,d)=>d===s?{...r,start:i}:r)}function it(o,s){return o.end-o.start<30?null:Math.min(o.end-15,Math.max(o.start+15,Pt(s)))}function Nt(o,s,t){let e=at(o,s),a=it(e,s);if(a===null)return{day:o,index:e.index};let i=[...o.slice(0,e.index+1),{start:a,mode:t},...o.slice(e.index+1)];if(t===e.mode)return{day:i,index:e.index+1};let r=S(i);return{day:r,index:r.findIndex(d=>d.start===a)}}function Rt(o,s){if(o.length<=1||s<0||s>=o.length)return o;if(s===0){let[,t,...e]=o;return S([{start:0,mode:t.mode},...e])}return S(o.filter((t,e)=>e!==s))}function zt(o,s,t){return o.map((e,a)=>t.includes(a)?o[s].map(i=>({...i})):e)}function q(o,s){return o.length===s.length&&o.every((t,e)=>t.start===s[e].start&&t.mode===s[e].mode)}function At(o){switch(o){case"comfort":return"eco";case"night":case"eco":case"away":case"frost":case"off":return"comfort"}}var Ht=[0,1,2,3,4],Ot=[5,6],nt=[0,1,2,3,4,5,6];function V(o){return o/1440*100}var ot=class extends c{constructor(){super();this.moved=!1;this.interactive=!1,this.labels=!1,this.dragIndex=null,this.handleLabel=(t,e)=>e}static{this.properties={day:{attribute:!1},interactive:{type:Boolean},labels:{type:Boolean},handleLabel:{attribute:!1},dragIndex:{state:!0}}}static{this.styles=[m,p`
       :host {
         display: block;
         --bar-height: 36px;
@@ -776,9 +776,9 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         <div class="clip">
           ${t.map(a=>{let i=V(a.end-a.start);return n`<div
               class="seg"
-              style="left:${V(a.start)}%;width:${i}%;background:${S[a.mode]}"
+              style="left:${V(a.start)}%;width:${i}%;background:${D[a.mode]}"
             >
-              ${this.labels&&i>=7?n`<hs-icon .path=${C[a.mode]}></hs-icon>`:l}
+              ${this.labels&&i>=7?n`<hs-icon .path=${P[a.mode]}></hs-icon>`:l}
               ${this.labels&&i>=17?x(a.start):l}
             </div>`})}
         </div>
@@ -797,7 +797,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
               </button>`):l}
         ${e?n`<div class="tip" style="left:${V(e.start)}%">${x(e.start)}</div>`:l}
       </div>
-    `}};h("hs-day-bar",rt);var ot=class extends c{static{this.properties={day:{attribute:!1},index:{type:Number},minute:{type:Number},dayName:{},t:{attribute:!1}}}static{this.styles=[m,p`
+    `}};h("hs-day-bar",ot);var lt=class extends c{static{this.properties={day:{attribute:!1},index:{type:Number},minute:{type:Number},dayName:{},t:{attribute:!1}}}static{this.styles=[m,p`
       .section {
         display: flex;
         flex-direction: column;
@@ -845,7 +845,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         flex-direction: column;
         gap: 10px;
       }
-    `]}get dialog(){return this.renderRoot.querySelector("hs-dialog")}change(s,t=this.index){this.day=s,this.index=Math.max(0,Math.min(t,s.length-1)),this.dispatchEvent(new CustomEvent("day-change",{detail:s}))}setMode(s){let t=this.day[this.index].start,e=Lt(this.day,this.index,s);this.change(e,Math.max(0,e.findIndex(a=>a.start>=t)))}moveStart(s){this.change(O(this.day,this.index,this.day[this.index].start+s))}moveEnd(s){let t=this.index+1;this.change(O(this.day,t,this.day[t].start+s))}addChange(s){let t=E(this.day)[this.index],e=It(this.day,s,zt(t.mode));this.minute=null,this.change(e.day,e.index)}removePart(){this.change(Nt(this.day,this.index),Math.max(0,this.index-1)),this.dialog?.close()}render(){if(!this.day||!this.t)return l;let s=this.t,t=E(this.day)[this.index];if(!t)return l;let e=at(t,this.minute??(t.start+t.end)/2),a=t.index===0,i=t.index===this.day.length-1;return n`
+    `]}get dialog(){return this.renderRoot.querySelector("hs-dialog")}change(s,t=this.index){this.day=s,this.index=Math.max(0,Math.min(t,s.length-1)),this.dispatchEvent(new CustomEvent("day-change",{detail:s}))}setMode(s){let t=this.day[this.index].start,e=It(this.day,this.index,s);this.change(e,at(e,t).index)}moveStart(s){this.change(O(this.day,this.index,this.day[this.index].start+s))}moveEnd(s){let t=this.index+1;this.change(O(this.day,t,this.day[t].start+s))}addChange(s){let t=E(this.day)[this.index],e=Nt(this.day,s,At(t.mode));this.minute=null,this.change(e.day,e.index)}removePart(){this.change(Rt(this.day,this.index),Math.max(0,this.index-1)),this.dialog?.close()}render(){if(!this.day||!this.t)return l;let s=this.t,t=E(this.day)[this.index];if(!t)return l;let e=it(t,this.minute??(t.start+t.end)/2),a=t.index===0,i=t.index===this.day.length-1;return n`
       <hs-dialog
         .heading=${`${this.dayName} ${x(t.start)} \u2013 ${x(t.end)}`}
         .closeLabel=${s("common.close")}
@@ -853,13 +853,13 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         <div class="section">
           <span>${s("editor.mode")}</span>
           <div class="modes">
-            ${kt.map(r=>n`<button
+            ${Dt.map(r=>n`<button
                 class="btn mode"
                 aria-pressed=${t.mode===r?"true":"false"}
-                style=${t.mode===r?`background:${S[r]}`:""}
+                style=${t.mode===r?`background:${D[r]}`:""}
                 @click=${()=>this.setMode(r)}
               >
-                <hs-icon .path=${C[r]} style="color:${t.mode===r?"#fff":S[r]}"></hs-icon>
+                <hs-icon .path=${P[r]} style="color:${t.mode===r?"#fff":D[r]}"></hs-icon>
                 ${s(`mode.${r}`)}
               </button>`)}
           </div>
@@ -902,7 +902,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${s("common.close")}
         </button>
       </hs-dialog>
-    `}};h("hs-block-sheet",ot);async function Ot(o,s){let t=document.createElement("hs-block-sheet");t.day=s.day,t.index=s.index,t.minute=s.minute,t.dayName=s.dayName,t.t=s.t,t.addEventListener("day-change",a=>s.onChange(a.detail)),(o.shadowRoot??o).appendChild(t),await t.updateComplete;let e=t.dialog;e&&(e.addEventListener("hs-closed",()=>t.remove(),{once:!0}),await e.show())}var lt=class extends c{constructor(){super();this.result=[];this.chosen=new Set}static{this.properties={source:{type:Number},t:{attribute:!1},chosen:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-block-sheet",lt);async function Bt(o,s){let t=document.createElement("hs-block-sheet");t.day=s.day,t.index=s.index,t.minute=s.minute,t.dayName=s.dayName,t.t=s.t,t.addEventListener("day-change",a=>s.onChange(a.detail)),(o.shadowRoot??o).appendChild(t),await t.updateComplete;let e=t.dialog;e&&(e.addEventListener("hs-closed",()=>t.remove(),{once:!0}),await e.show())}var dt=class extends c{constructor(){super();this.result=[];this.chosen=new Set}static{this.properties={source:{type:Number},t:{attribute:!1},chosen:{state:!0}}}static{this.styles=[m,p`
       .quick {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -939,12 +939,12 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         .closeLabel=${t("common.cancel")}
       >
         <div class="quick">
-          <button class="btn small" @click=${()=>this.pick(At)}>${t("editor.workdays")}</button>
-          <button class="btn small" @click=${()=>this.pick(Ht)}>${t("editor.weekend")}</button>
-          <button class="btn small" @click=${()=>this.pick(it)}>${t("editor.all_days")}</button>
+          <button class="btn small" @click=${()=>this.pick(Ht)}>${t("editor.workdays")}</button>
+          <button class="btn small" @click=${()=>this.pick(Ot)}>${t("editor.weekend")}</button>
+          <button class="btn small" @click=${()=>this.pick(nt)}>${t("editor.all_days")}</button>
         </div>
         <div class="days">
-          ${it.map(e=>n`<label class=${e===this.source?"disabled":""}>
+          ${nt.map(e=>n`<label class=${e===this.source?"disabled":""}>
               <input
                 type="checkbox"
                 .checked=${e===this.source||this.chosen.has(e)}
@@ -959,7 +959,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           <hs-icon .path=${B}></hs-icon>${t("editor.copy")}
         </button>
       </hs-dialog>
-    `}};h("hs-copy-dialog",lt);async function Bt(o,s,t){let e=document.createElement("hs-copy-dialog");e.source=s,e.t=t,(o.shadowRoot??o).appendChild(e),await e.updateComplete;let a=e.dialog;return a?new Promise(i=>{a.addEventListener("hs-closed",()=>{e.remove(),i(e.result)},{once:!0}),a.show()}):[]}var Wt=[0,6,12,18,24],dt=class extends c{static{this.properties={days:{attribute:!1},t:{attribute:!1},selected:{type:Number},changed:{attribute:!1},readonly:{type:Boolean},compact:{type:Boolean}}}constructor(){super(),this.selected=-1,this.changed=new Set,this.readonly=!1,this.compact=!1}static{this.styles=[m,p`
+    `}};h("hs-copy-dialog",dt);async function Kt(o,s,t){let e=document.createElement("hs-copy-dialog");e.source=s,e.t=t,(o.shadowRoot??o).appendChild(e),await e.updateComplete;let a=e.dialog;return a?new Promise(i=>{a.addEventListener("hs-closed",()=>{e.remove(),i(e.result)},{once:!0}),a.show()}):[]}var Wt=[0,6,12,18,24],pt=class extends c{static{this.properties={days:{attribute:!1},t:{attribute:!1},selected:{type:Number},changed:{attribute:!1},readonly:{type:Boolean},compact:{type:Boolean}}}constructor(){super(),this.selected=-1,this.changed=new Set,this.readonly=!1,this.compact=!1}static{this.styles=[m,p`
       :host {
         display: block;
       }
@@ -1058,7 +1058,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
               ${Wt.map(s=>n`<span style="left:${s/24*100}%">${s}</span>`)}
             </div>
           </div>`}
-    `}};h("hs-week-view",dt);var pt=class extends c{constructor(){super();this.loadedId=null;this.baseName="";this.original=[];this.days=[],this.name="",this.saving=!1,this.selected=-1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},plan:{attribute:!1},days:{state:!0},name:{state:!0},selected:{state:!0},saving:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-week-view",pt);var ct=class extends c{constructor(){super();this.loadedId=null;this.baseName="";this.original=[];this.days=[],this.name="",this.saving=!1,this.selected=-1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},plan:{attribute:!1},days:{state:!0},name:{state:!0},selected:{state:!0},saving:{state:!0}}}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -1148,10 +1148,10 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         font-weight: 600;
         color: var(--warning-color, #e65100);
       }
-    `]}get t(){return f(u(this.hass))}get dirty(){return this.name.trim()!==this.baseName||this.days.some((t,e)=>!q(k(t),this.original[e]??[]))}willUpdate(t){(this.plan&&this.plan.id!==this.loadedId||t.has("plan")&&this.plan&&!this.dirty)&&this.load()}load(){this.loadedId=this.plan.id,this.baseName=this.plan.name,this.original=H(this.plan),this.days=this.original.map(t=>t.map(e=>({...e}))),this.name=this.plan.name,this.selected<0&&(this.selected=_t(new Date,this.snapshot.time_zone).weekday)}setDay(t,e){this.days=this.days.map((a,i)=>i===t?e:a)}onMove(t){let{index:e,minute:a}=t.detail;this.setDay(this.selected,O(this.days[this.selected],e,a))}openSheet(t,e){let a=this.selected;Ot(this,{day:this.days[a],index:t,minute:e,dayName:this.t(`day.${a}`),t:this.t,onChange:i=>this.setDay(a,i)})}async copyDay(){let t=await Bt(this,this.selected,this.t);t.length&&(this.days=Rt(this.days,this.selected,t))}changedDays(){return new Set(this.days.map((t,e)=>q(k(t),this.original[e]??[])?-1:e).filter(t=>t>=0))}roomNames(t){return t.map(e=>this.snapshot.rooms.find(a=>a.id===e)?.name).filter(Boolean).join(", ")}preview(){return this.renderRoot.querySelector("#preview")}changedElsewhere(){let t=H(this.plan);return this.plan.name!==this.baseName||t.some((e,a)=>!q(e,this.original[a]??[]))}async save(){let t=this.preview();if(t?.close(),this.changedElsewhere()&&!await R(this,this.t)){this.load();return}this.saving=!0;try{await v(this.hass).call("plan/save",{revision:this.snapshot.revision,plan:{id:this.plan.id,name:this.name.trim(),days:Pt(this.days.map(e=>k(e)))}}),this.baseName=this.name.trim(),this.original=this.days.map(e=>k(e)),this.days=this.original.map(e=>e.map(a=>({...a}))),y(this,this.t("editor.saved"))}catch(e){y(this,b(e,this.t))}finally{this.saving=!1,t?.close()}}async leave(){if(this.dirty){let t=this.t;if(!await D(this,{heading:t("editor.unsaved"),message:t("editor.discard"),confirm:t("editor.discard_button"),cancel:t("common.back"),danger:!0}))return}this.dispatchEvent(new CustomEvent("hs-navigate",{detail:"/plans",bubbles:!0,composed:!0}))}cancel(){if(!this.dirty){this.leave();return}(async()=>{let t=this.t;await D(this,{heading:t("editor.unsaved"),message:t("editor.discard"),confirm:t("editor.discard_button"),cancel:t("common.back"),danger:!0})&&this.load()})()}render(){if(!this.plan||!this.days.length)return l;let t=this.t,e=this.days[this.selected]??this.days[0],a=this.plan.used_by??[],i=this.dirty;return n`
+    `]}get t(){return f(u(this.hass))}get dirty(){return this.name.trim()!==this.baseName||this.days.some((t,e)=>!q(S(t),this.original[e]??[]))}willUpdate(t){(this.plan&&this.plan.id!==this.loadedId||t.has("plan")&&this.plan&&!this.dirty)&&this.load()}load(){this.loadedId=this.plan.id,this.baseName=this.plan.name,this.original=H(this.plan),this.days=this.original.map(t=>t.map(e=>({...e}))),this.name=this.plan.name,this.selected<0&&(this.selected=kt(new Date,this.snapshot.time_zone).weekday)}setDay(t,e){this.days=this.days.map((a,i)=>i===t?e:a)}onMove(t){let{index:e,minute:a}=t.detail;this.setDay(this.selected,O(this.days[this.selected],e,a))}openSheet(t,e){let a=this.selected;Bt(this,{day:this.days[a],index:t,minute:e,dayName:this.t(`day.${a}`),t:this.t,onChange:i=>this.setDay(a,i)})}async copyDay(){let t=await Kt(this,this.selected,this.t);t.length&&(this.days=zt(this.days,this.selected,t))}changedDays(){return new Set(this.days.map((t,e)=>q(S(t),this.original[e]??[])?-1:e).filter(t=>t>=0))}roomNames(t){return t.map(e=>this.snapshot.rooms.find(a=>a.id===e)?.name).filter(Boolean).join(", ")}preview(){return this.renderRoot.querySelector("#preview")}changedElsewhere(){let t=H(this.plan);return this.plan.name!==this.baseName||t.some((e,a)=>!q(e,this.original[a]??[]))}async save(){let t=this.preview();if(t?.close(),this.changedElsewhere()&&!await C(this,this.t)){this.load();return}let e=this.name.trim(),a=this.days.map(i=>S(i));this.saving=!0;try{await v(this.hass).call("plan/save",{revision:this.snapshot.revision,plan:{id:this.plan.id,name:e,days:Lt(a)}}),this.baseName=e,this.original=a,y(this,this.t("editor.saved"))}catch(i){y(this,b(i,this.t))}finally{this.saving=!1,t?.close()}}async leave(){if(this.dirty){let t=this.t;if(!await k(this,{heading:t("editor.unsaved"),message:t("editor.discard"),confirm:t("editor.discard_button"),cancel:t("common.back"),danger:!0}))return}this.dispatchEvent(new CustomEvent("hs-navigate",{detail:"/plans",bubbles:!0,composed:!0}))}cancel(){if(!this.dirty){this.leave();return}(async()=>{let t=this.t;await k(this,{heading:t("editor.unsaved"),message:t("editor.discard"),confirm:t("editor.discard_button"),cancel:t("common.back"),danger:!0})&&this.load()})()}render(){if(!this.plan||!this.days.length)return l;let t=this.t,e=this.days[this.selected]??this.days[0],a=this.plan.used_by??[],i=this.dirty;return n`
       <div class="head">
         <button class="btn" @click=${this.leave}>
-          <hs-icon .path=${mt}></hs-icon>${t("plans.all_plans")}
+          <hs-icon .path=${ut}></hs-icon>${t("plans.all_plans")}
         </button>
         <label class="field name">
           <span class="sr-only">${t("plans.name")}</span>
@@ -1197,10 +1197,10 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${E(e).map(r=>n`<li>
               <button class="part" @click=${()=>this.openSheet(r.index,null)}>
                 <span class="time">${x(r.start)} – ${x(r.end)}</span>
-                <span class="chip" style="background:${S[r.mode]}">
-                  <hs-icon .path=${C[r.mode]}></hs-icon>${t(`mode.${r.mode}`)}
+                <span class="chip" style="background:${D[r.mode]}">
+                  <hs-icon .path=${P[r.mode]}></hs-icon>${t(`mode.${r.mode}`)}
                 </span>
-                <hs-icon .path=${vt}></hs-icon>
+                <hs-icon .path=${gt}></hs-icon>
               </button>
             </li>`)}
         </ul>
@@ -1226,7 +1226,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         </button>
       </hs-dialog>
       ${i?n`<span class="unsaved sr-only">${t("editor.unsaved")}</span>`:l}
-    `}};h("hs-plan-editor",pt);var ct=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},planId:{attribute:!1},newName:{state:!0},newSource:{state:!0},busy:{state:!0}}}constructor(){super(),this.newName="",this.newSource="house",this.busy=!1}static{this.styles=[m,p`
+    `}};h("hs-plan-editor",ct);var ht=class extends c{static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},planId:{attribute:!1},newName:{state:!0},newSource:{state:!0},busy:{state:!0}}}constructor(){super(),this.newName="",this.newSource="house",this.busy=!1}static{this.styles=[m,p`
       :host {
         display: flex;
         flex-direction: column;
@@ -1296,7 +1296,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         flex-direction: column;
         gap: 16px;
       }
-    `]}get t(){return f(u(this.hass))}roomNames(s=[]){return s.map(t=>this.snapshot.rooms.find(e=>e.id===t)?.name).filter(Boolean).join(", ")}navigate(s){this.dispatchEvent(new CustomEvent("hs-navigate",{detail:s,bubbles:!0,composed:!0}))}async run(s){this.busy=!0;try{return await s()}catch(t){return y(this,b(t,this.t)),null}finally{this.busy=!1}}sharesPlan(s){return s.plan_id==="house"?!0:(this.snapshot.plans.find(e=>e.id===s.plan_id)?.used_by??[]).length>1}async assign(s,t){await this.run(()=>v(this.hass).call("room/save",{revision:this.snapshot.revision,room:L(s,{plan_id:t})}))}async ownPlan(s){let t=this.snapshot.plans.find(d=>d.id===s.plan_id);if(!t)return;let e=v(this.hass),a=this.snapshot.revision,i=I(s.name,this.snapshot.plans.map(d=>d.name)),r=await this.run(async()=>{let d=await e.call("plan/save",{revision:a,plan:{name:i,days:t.days}});return await e.call("room/save",{revision:d.revision,room:L(s,{plan_id:d.plan_id})}),d.plan_id});r&&this.navigate(`/plans/${r}`)}async deletePlan(s){let t=this.t,e=s.used_by??[];await D(this,{heading:t("common.delete"),message:e.length?t("plans.delete_confirm_used",{name:s.name,rooms:this.roomNames(e)}):t("plans.delete_confirm",{name:s.name}),confirm:t("common.delete"),cancel:t("common.cancel"),danger:!0})&&await this.run(()=>v(this.hass).call("plan/delete",{revision:this.snapshot.revision,plan_id:s.id}))}newDialog(){return this.renderRoot.querySelector("#new")}openNew(){this.newName=I(this.t("plans.new"),this.snapshot.plans.map(s=>s.name)),this.newSource="house",this.newDialog()?.show()}async create(){let s=this.snapshot.plans.find(e=>e.id===this.newSource);if(!s||!this.newName.trim())return;let t=await this.run(()=>v(this.hass).call("plan/save",{revision:this.snapshot.revision,plan:{name:this.newName.trim(),days:s.days}}));this.newDialog()?.close(),t&&this.navigate(`/plans/${t.plan_id}`)}render(){if(!this.snapshot||!this.hass)return l;let s=this.t;if(this.planId){let t=this.snapshot.plans.find(e=>e.id===this.planId);if(t)return n`<hs-plan-editor .hass=${this.hass} .snapshot=${this.snapshot} .plan=${t}></hs-plan-editor>`}return n`
+    `]}get t(){return f(u(this.hass))}roomNames(s=[]){return s.map(t=>this.snapshot.rooms.find(e=>e.id===t)?.name).filter(Boolean).join(", ")}navigate(s){this.dispatchEvent(new CustomEvent("hs-navigate",{detail:s,bubbles:!0,composed:!0}))}async run(s){this.busy=!0;try{return await s()}catch(t){return y(this,b(t,this.t)),null}finally{this.busy=!1}}sharesPlan(s){return s.plan_id==="house"?!0:(this.snapshot.plans.find(e=>e.id===s.plan_id)?.used_by??[]).length>1}async assign(s,t){await this.run(()=>v(this.hass).call("room/save",{revision:this.snapshot.revision,room:I(s,{plan_id:t})}))}async ownPlan(s){let t=this.snapshot.plans.find(d=>d.id===s.plan_id);if(!t)return;let e=v(this.hass),a=this.snapshot.revision,i=N(s.name,this.snapshot.plans.map(d=>d.name)),r=await this.run(async()=>{let d=await e.call("plan/save",{revision:a,plan:{name:i,days:t.days}});return await e.call("room/save",{revision:d.revision,room:I(s,{plan_id:d.plan_id})}),d.plan_id});r&&this.navigate(`/plans/${r}`)}async deletePlan(s){let t=this.t,e=s.used_by??[];await k(this,{heading:t("common.delete"),message:e.length?t("plans.delete_confirm_used",{name:s.name,rooms:this.roomNames(e)}):t("plans.delete_confirm",{name:s.name}),confirm:t("common.delete"),cancel:t("common.cancel"),danger:!0})&&await this.run(()=>v(this.hass).call("plan/delete",{revision:this.snapshot.revision,plan_id:s.id}))}newDialog(){return this.renderRoot.querySelector("#new")}openNew(){this.newName=N(this.t("plans.new"),this.snapshot.plans.map(s=>s.name)),this.newSource="house",this.newDialog()?.show()}async create(){let s=this.snapshot.plans.find(e=>e.id===this.newSource);if(!s||!this.newName.trim())return;let t=await this.run(()=>v(this.hass).call("plan/save",{revision:this.snapshot.revision,plan:{name:this.newName.trim(),days:s.days}}));this.newDialog()?.close(),t&&this.navigate(`/plans/${t.plan_id}`)}render(){if(!this.snapshot||!this.hass)return l;let s=this.t;if(this.planId){let t=this.snapshot.plans.find(e=>e.id===this.planId);if(t)return n`<hs-plan-editor .hass=${this.hass} .snapshot=${this.snapshot} .plan=${t}></hs-plan-editor>`}return n`
       <section>
         <h2>${s("nav.plans")}</h2>
         <div class="plans">
@@ -1364,7 +1364,7 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
           ${s("plans.create")}
         </button>
       </hs-dialog>
-    `}};h("hs-plans-view",ct);var Zt=[{tab:"home",path:"",icon:$t,label:"nav.home"},{tab:"plans",path:"/plans",icon:ut,label:"nav.plans"},{tab:"advanced",path:"/advanced",icon:xt,label:"nav.advanced"}],ht=class extends c{constructor(){super();this.unsubscribe=null;this.timers=[];this.clock=null;this.messageTimer=null;this.snapshot=null,this.waitedTooLong=!1,this.message="",this.tick=0,this.addEventListener("hs-toast",t=>this.showMessage(t.detail)),this.addEventListener("hs-navigate",t=>this.navigate(t.detail))}static{this.properties={hass:{attribute:!1},narrow:{type:Boolean},route:{attribute:!1},panel:{attribute:!1},snapshot:{state:!0},waitedTooLong:{state:!0},message:{state:!0},tick:{state:!0}}}static{this.styles=[m,p`
+    `}};h("hs-plans-view",ht);var Jt=[{tab:"home",path:"",icon:wt,label:"nav.home"},{tab:"plans",path:"/plans",icon:ft,label:"nav.plans"},{tab:"advanced",path:"/advanced",icon:$t,label:"nav.advanced"}],mt=class extends c{constructor(){super();this.unsubscribe=null;this.timers=[];this.clock=null;this.messageTimer=null;this.snapshot=null,this.waitedTooLong=!1,this.message="",this.tick=0,this.addEventListener("hs-toast",t=>this.showMessage(t.detail)),this.addEventListener("hs-navigate",t=>this.navigate(t.detail))}static{this.properties={hass:{attribute:!1},narrow:{type:Boolean},route:{attribute:!1},panel:{attribute:!1},snapshot:{state:!0},waitedTooLong:{state:!0},message:{state:!0},tick:{state:!0}}}static{this.styles=[m,p`
       :host {
         display: block;
         min-height: 100vh;
@@ -1466,12 +1466,12 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
         ></hs-advanced-view>`;default:return n`<hs-home-view .hass=${this.hass} .snapshot=${this.snapshot}></hs-home-view>`}}render(){if(!this.hass)return l;let t=f(u(this.hass)),e=this.tab;return n`
       <header class="toolbar">
         ${this.narrow?n`<button class="icon-button" @click=${this.toggleMenu} aria-label=${t("nav.menu")}>
-              <hs-icon .path=${yt}></hs-icon>
+              <hs-icon .path=${xt}></hs-icon>
             </button>`:l}
         <h1>${t("app.title")}</h1>
       </header>
       <nav>
-        ${Zt.map(a=>n`<button
+        ${Jt.map(a=>n`<button
             aria-current=${a.tab===e?"page":"false"}
             @click=${()=>this.navigate(a.path)}
           >
@@ -1480,4 +1480,4 @@ import{A as T,B as _t,C as j,D as v,E as b,F as y,G as D,H as R,I as S,J as C,K 
       </nav>
       <main data-tick=${this.tick}>${this.view()}</main>
       ${this.message?n`<div class="toast" role="alert">${this.message}</div>`:l}
-    `}};h("heating-scheduler-panel",ht);export{ht as HeatingSchedulerPanel};
+    `}};h("heating-scheduler-panel",mt);export{mt as HeatingSchedulerPanel};

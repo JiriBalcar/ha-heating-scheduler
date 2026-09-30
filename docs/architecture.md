@@ -86,6 +86,17 @@ those modes are undone.
 - A change of the effective house mode clears all overrides **(decision)**.
 - One `async_track_point_in_utc_time` timer at the earliest next event of all rooms.
 
+## Units
+
+- The scheduler works in °C: plans, temperature sets, overrides, services and the panel.
+- Home Assistant shows climate temperatures in its own unit system and converts service
+  input to each entity's unit. The TRV worker converts at that boundary: setpoints,
+  limits and current temperatures are read in °C, and setpoints are sent in HA's unit.
+  In °F, HA rounds shown values to whole degrees, so converted setpoints are put back on
+  the TRV's step. Display sensors are converted from their own `unit_of_measurement`.
+- The room thermostat and the house temperature numbers declare °C; Home Assistant
+  converts them for display.
+
 ## TRV writes
 
 - Desired off: `set_hvac_mode(off)` if supported, else the TRV's `min_temp`.
@@ -96,6 +107,8 @@ those modes are undone.
 - Verify timeouts 30 s / 60 s / 120 s, 3 attempts, then `failed`; the next safety tick
   tries again. At most 2 writes run at once. Every write uses a new `Context`.
 - Unavailable TRVs are never written; the worker keeps only the latest desired value.
+- Test mode (`dry_run`) stops running write cycles at once, and every send checks it again
+  after waiting for the write limiter.
 
 ## Manual-change detection
 
@@ -103,11 +116,14 @@ those modes are undone.
 - The context does not decide: Home Assistant stamps every state write of a TRV with our
   service context for 5 s (also a knob change), and a late confirmation has a new context.
   Writes still carry our own `Context`, for attribution only.
-- Each TRV keeps a list of pending writes (a newer write does not cancel an older one that
-  may still land). A report is an echo if it matches one of them: the commanded value (one
-  step of rounding allowed until confirmed), or, before confirmation, the previous value
-  (stale report). While a write also switches the HVAC mode, every setpoint change is an
-  echo until the TRV confirms. After confirmation, only the commanded value is an echo.
+- Each TRV keeps a list of pending writes until they expire (a newer write does not cancel
+  an older one that may still land). A report is an echo if it matches one of them: the
+  commanded value (one step of rounding allowed until confirmed), or, before confirmation,
+  the previous value (stale report). While a write also switches the HVAC mode, every
+  setpoint change is an echo until the TRV reports the new mode and the value. After
+  confirmation, only the commanded value is an echo. When a later write is confirmed,
+  older ones are superseded: only their commanded value still counts, so a command that
+  lands late is recognised and the TRV is set back to its target.
 - Anything else is a manual change and becomes an override for the room: until the next
   plan change, capped by the max duration (default 4 h). After 3 s without further knob
   changes, the value goes to the other TRVs of the room.
@@ -129,7 +145,11 @@ The configuration has a revision; websocket writes must send the revision they e
 
 ## Home Assistant surface
 
-- Devices: one per room, one "house" device.
+- Devices: one per room, one "house" device. A room device follows the room's `area_id`
+  when it is set or changed (also to none); an area chosen in Home Assistant for a room
+  without `area_id` is kept.
+- The engine also follows the rooms' display temperature entities, so the panel, the card
+  and the mode sensor show a new room temperature at once.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
 - House: `select` (house mode), five `number` entities (house temperatures).

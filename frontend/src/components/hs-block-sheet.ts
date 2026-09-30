@@ -7,6 +7,7 @@ import {
   alternativeMode,
   moveBoundary,
   removeSegment,
+  segmentAt,
   segments,
   setMode,
   split,
@@ -102,7 +103,8 @@ export class HsBlockSheet extends LitElement {
   private setMode(mode: Mode) {
     const start = this.day[this.index]!.start;
     const day = setMode(this.day, this.index, mode);
-    this.change(day, Math.max(0, day.findIndex((slot) => slot.start >= start)));
+    // After a merge, keep editing the block that now contains this time.
+    this.change(day, segmentAt(day, start).index);
   }
 
   private moveStart(delta: number) {

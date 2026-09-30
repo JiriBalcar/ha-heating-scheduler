@@ -18,8 +18,10 @@ from homeassistant.core import (
     Event,
     EventStateChangedData,
     HomeAssistant,
+    State,
     callback,
 )
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
@@ -60,7 +62,7 @@ from .core.validation import ValidationError, check_temperature, validate_config
 from .health import Issue
 from .log import EventLog, LogEntry, LogKind
 from .storage import HeatingStorage
-from .trv import Desired, TrvWorker, is_available, setpoint_of, step_of
+from .trv import Desired, TrvWorker, is_available, step_of, to_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,6 +84,8 @@ class HeatingEngine:
         self.semaphore = asyncio.Semaphore(WRITE_CONCURRENCY)
         self._holds: dict[str, CALLBACK_TYPE] = {}
         self._listeners: list[Callable[[], None]] = []
+        # Area last written to each room device (see entity.async_sync_devices).
+        self.device_areas: dict[str, str | None] = {}
         self._unsubs: list[CALLBACK_TYPE] = []
         self._state_unsub: CALLBACK_TYPE | None = None
         self._timer_unsub: CALLBACK_TYPE | None = None
@@ -176,6 +180,11 @@ class HeatingEngine:
     def worker_changed(self) -> None:
         """Recompute health now and notify listeners soon."""
         self._update_health(dt_util.utcnow())
+        self._notify_soon()
+
+    @callback
+    def _notify_soon(self) -> None:
+        """Notify listeners once, soon (several calls in one loop iteration notify once)."""
         if self._notify_scheduled:
             return
         self._notify_scheduled = True
@@ -362,25 +371,37 @@ class HeatingEngine:
         for entity_id, room_id in wanted.items():
             if entity_id not in self.workers:
                 self.workers[entity_id] = TrvWorker(self, entity_id, room_id)
+        self._rebuild_tracking()
+
+    def _rebuild_tracking(self) -> None:
+        """Follow the TRVs and the rooms' display temperature entities."""
         if self._state_unsub is not None:
             self._state_unsub()
             self._state_unsub = None
-        if wanted:
+        tracked = set(self.workers)
+        tracked.update(
+            room.temperature_entity
+            for room in self.config.rooms.values()
+            if room.temperature_entity is not None
+        )
+        if tracked:
             self._state_unsub = async_track_state_change_event(
-                self.hass, list(wanted), self._on_trv_event
+                self.hass, sorted(tracked), self._on_state_event
             )
 
     @callback
-    def _on_trv_event(self, event: Event[EventStateChangedData]) -> None:
+    def _on_state_event(self, event: Event[EventStateChangedData]) -> None:
         entity_id = event.data["entity_id"]
-        worker = self.workers.get(entity_id)
-        if worker is None:
-            return
         old_state = event.data["old_state"]
         new_state = event.data["new_state"]
+        worker = self.workers.get(entity_id)
+        if worker is None:
+            # A display temperature entity: only the shown room temperature changed.
+            self._notify_soon()
+            return
         now = dt_util.utcnow()
-        old_value = setpoint_of(old_state) if is_available(old_state) else None
-        new_value = setpoint_of(new_state) if is_available(new_state) else None
+        old_value = worker.setpoint(old_state) if is_available(old_state) else None
+        new_value = worker.setpoint(new_state) if is_available(new_state) else None
         change = classify_setpoint_change(
             old=old_value,
             new=new_value,
@@ -390,6 +411,9 @@ class HeatingEngine:
         )
         worker.settle(new_state, now)
         worker.on_state_change(old_state, new_state)
+        if _current(old_state) != _current(new_state):
+            # The room temperature shown in the UI may use this TRV.
+            self._notify_soon()
         if not self._started:
             return
         if change is Change.MANUAL:
@@ -505,10 +529,16 @@ class HeatingEngine:
                 cancel = self._holds.pop(room_id, None)
                 if cancel is not None:
                     cancel()
+        if self.config.settings.dry_run and not old.settings.dry_run:
+            # Test mode: stop every write cycle now, nothing may be sent any more.
+            for worker in self.workers.values():
+                worker.halt()
         old_trvs = {(room.id, trv) for room in old.rooms.values() for trv in room.trvs}
         new_trvs = {(room.id, trv) for room in self.config.rooms.values() for trv in room.trvs}
         if old_trvs != new_trvs:
             self._rebuild_workers()
+        elif old.rooms != self.config.rooms:
+            self._rebuild_tracking()
         self._apply_tick_interval()
         if old.rooms != self.config.rooms:
             async_dispatcher_send(self.hass, SIGNAL_ROOMS_CHANGED)
@@ -628,24 +658,39 @@ class HeatingEngine:
         self.request_reconcile(retry_failed=True)
 
     def room_temperature(self, room: Room) -> float | None:
-        """Return the temperature to show for a room."""
+        """Return the temperature to show for a room, in °C."""
+        unit = self.hass.config.units.temperature_unit
         if room.temperature_entity is not None:
             state = self.hass.states.get(room.temperature_entity)
             if state is not None and is_available(state):
-                raw: Any = state.attributes.get("current_temperature")
-                if raw is None and state.domain != "climate":
-                    raw = state.state
-                try:
-                    return round(float(raw), 1)
-                except TypeError, ValueError:
-                    pass
+                if state.domain == "climate":
+                    value = _celsius(state.attributes.get("current_temperature"), unit)
+                else:
+                    source_unit = state.attributes.get("unit_of_measurement") or unit
+                    value = _celsius(state.state, str(source_unit))
+                if value is not None:
+                    return round(value, 1)
         values: list[float] = []
         for entity_id in room.trvs:
             state = self.hass.states.get(entity_id)
             if state is None or not is_available(state):
                 continue
-            try:
-                values.append(float(state.attributes["current_temperature"]))
-            except KeyError, TypeError, ValueError:
-                continue
+            value = _celsius(state.attributes.get("current_temperature"), unit)
+            if value is not None:
+                values.append(value)
         return round(sum(values) / len(values), 1) if values else None
+
+
+def _current(state: State | None) -> Any:
+    """Return the current temperature attribute of a state, if any."""
+    return None if state is None else state.attributes.get("current_temperature")
+
+
+def _celsius(raw: Any, unit: str) -> float | None:
+    """Parse a temperature in `unit` and return it in °C, or None."""
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        return to_celsius(float(raw), unit)
+    except TypeError, ValueError, HomeAssistantError:
+        return None

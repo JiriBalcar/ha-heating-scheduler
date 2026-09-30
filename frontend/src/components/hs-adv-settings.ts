@@ -105,13 +105,15 @@ export class HsAdvSettings extends LitElement {
       this.base = { ...server };
       return;
     }
+    // What is sent is what counts as saved; edits made while waiting stay unsaved.
+    const submitted = { ...this.draft };
     this.busy = true;
     try {
       await storeFor(this.hass).call("settings/save", {
         revision: this.snapshot.revision,
-        settings: this.draft,
+        settings: submitted,
       });
-      this.base = { ...this.draft };
+      this.base = submitted;
       toast(this, this.t("adv.settings.saved"));
     } catch (error) {
       toast(this, errorText(error, this.t));

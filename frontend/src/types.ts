@@ -32,7 +32,7 @@ export interface HomeAssistant {
   states: Record<string, HassEntity>;
   language: string;
   locale?: HassLocale;
-  config: { time_zone: string };
+  config: { time_zone: string; unit_system?: { temperature?: string } };
   user?: { name: string; is_admin: boolean };
   themes?: { darkMode?: boolean };
   callWS<T>(message: MessageBase): Promise<T>;

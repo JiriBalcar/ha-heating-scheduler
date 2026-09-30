@@ -26,6 +26,8 @@ Boiler control, valve positions and temperature sensors of the valves are not to
 
 - Home Assistant 2026.9 or newer.
 - Radiator valves as `climate` entities. Tested with Sonoff TRVZB through Zigbee2MQTT.
+- Temperatures in the panel, plans, temperature sets and services are always °C. Home
+  Assistant itself may use °C or °F; the valves always get the right value.
 
 ## Installation
 

@@ -1,4 +1,9 @@
-"""TRV worker: bring one TRV to its desired state, verify, retry, wait while unavailable."""
+"""TRV worker: bring one TRV to its desired state, verify, retry, wait while unavailable.
+
+The scheduler works in °C. Home Assistant shows climate temperatures in its own unit
+system and converts service input to the entity's unit, so values are converted at this
+boundary: reading a TRV state and sending a setpoint.
+"""
 
 from __future__ import annotations
 
@@ -26,20 +31,31 @@ from homeassistant.const import (
     ATTR_TEMPERATURE,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
+    UnitOfTemperature,
 )
 from homeassistant.core import Context, HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import TemperatureConverter
 import voluptuous as vol
 
 from .const import PENDING_GRACE, SERVICE_CALL_TIMEOUT, VERIFY_TIMEOUTS
 from .core.echo import PendingWrite, settle_pending
 from .core.model import MIN_TEMPERATURE, Settings, Source, TargetMode
-from .core.setpoint import device_setpoint, in_sync, normalize_step, same_value, within
+from .core.setpoint import (
+    device_setpoint,
+    in_sync,
+    normalize_step,
+    round_to_step,
+    same_value,
+    within,
+)
 from .health import UNAVAILABLE_GRACE, Issue, IssueKind
 from .log import LogEntry, LogKind
 
 _LOGGER = logging.getLogger(__name__)
+
+CELSIUS = UnitOfTemperature.CELSIUS
 
 # Preferred HVAC modes for heating. `auto` comes last: on many TRVs it runs the
 # TRV's own weekly schedule (Sonoff TRVZB does).
@@ -66,7 +82,7 @@ class Desired:
 
 @dataclass(frozen=True, slots=True)
 class WritePlan:
-    """What to send to a TRV."""
+    """What to send to a TRV (temperatures in °C)."""
 
     hvac_mode: str | None
     temperature: float | None
@@ -85,7 +101,7 @@ class WorkerHost(Protocol):
         ...
 
     def new_context(self) -> Context:
-        """Return a new context and remember it as ours."""
+        """Return a new context for a write."""
         ...
 
     def log_event(self, room_id: str, entry: LogEntry) -> None:
@@ -115,13 +131,37 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def setpoint_of(state: State | None) -> float | None:
-    """Return the target temperature of a climate state."""
-    return None if state is None else _number(state.attributes.get(ATTR_TEMPERATURE))
+def to_celsius(value: float | None, unit: str) -> float | None:
+    """Convert a temperature in `unit` to °C (rounded to hundredths)."""
+    if value is None or unit == CELSIUS:
+        return value
+    return round(TemperatureConverter.convert(value, unit, CELSIUS), 2)
+
+
+def from_celsius(value: float, unit: str) -> float:
+    """Convert a temperature in °C to `unit` (rounded to hundredths)."""
+    if unit == CELSIUS:
+        return value
+    return round(TemperatureConverter.convert(value, CELSIUS, unit), 2)
+
+
+def setpoint_of(state: State | None, unit: str) -> float | None:
+    """Return the target temperature of a climate state in °C.
+
+    `unit` is Home Assistant's temperature unit, in which climate states are shown. In °F,
+    Home Assistant rounds the shown value to whole degrees, so the converted value is put
+    back on the TRV's own step (for example 73 °F → 22.8 °C → 23.0 °C).
+    """
+    if state is None:
+        return None
+    value = to_celsius(_number(state.attributes.get(ATTR_TEMPERATURE)), unit)
+    if value is None or unit == CELSIUS:
+        return value
+    return round_to_step(value, step_of(state))
 
 
 def step_of(state: State | None) -> float | None:
-    """Return the target temperature step of a climate state."""
+    """Return the target temperature step of a climate state (the device's unit)."""
     return None if state is None else _number(state.attributes.get(ATTR_TARGET_TEMP_STEP))
 
 
@@ -159,6 +199,15 @@ class TrvWorker:
         self._changed = asyncio.Event()
 
     # ----- public API -----
+
+    @property
+    def unit(self) -> str:
+        """Return Home Assistant's temperature unit (climate states use it)."""
+        return self._hass.config.units.temperature_unit
+
+    def setpoint(self, state: State | None) -> float | None:
+        """Return the target temperature of a state of this TRV in °C."""
+        return setpoint_of(state, self.unit)
 
     def set_desired(self, desired: Desired, *, retry: bool = False) -> None:
         """Set what the TRV should have and start a write cycle if needed.
@@ -199,6 +248,11 @@ class TrvWorker:
         self.mismatch_since = None
         self._set_phase(Phase.IDLE)
 
+    def halt(self) -> None:
+        """Stop any write cycle now (test mode was turned on)."""
+        self._cancel()
+        self._set_phase(Phase.IDLE)
+
     def stop(self) -> None:
         """Stop the worker for good."""
         self._cancel()
@@ -210,7 +264,7 @@ class TrvWorker:
         available = is_available(new_state)
         self.pending = settle_pending(
             self.pending,
-            reported=setpoint_of(new_state) if available else None,
+            reported=self.setpoint(new_state) if available else None,
             hvac_mode=new_state.state if available and new_state is not None else None,
             now=now,
             step=step_of(new_state),
@@ -254,7 +308,7 @@ class TrvWorker:
         return issues
 
     def as_dict(self) -> dict[str, Any]:
-        """Return diagnostic data for the advanced view."""
+        """Return diagnostic data for the advanced view (temperatures in °C)."""
 
         def iso(value: datetime | None) -> str | None:
             return None if value is None else value.isoformat()
@@ -265,7 +319,7 @@ class TrvWorker:
             "phase": self.phase.value,
             "available": is_available(state),
             "desired": None if self.desired is None else self.desired.temperature,
-            "setpoint": setpoint_of(state),
+            "setpoint": self.setpoint(state),
             "hvac_mode": None if state is None else state.state,
             "last_error": self.last_error,
             "last_write": iso(self.last_write),
@@ -317,8 +371,11 @@ class TrvWorker:
         desired = self.desired
         if desired is None:
             return None
-        setpoint = setpoint_of(state)
+        unit = self.unit
+        setpoint = self.setpoint(state)
         attrs = state.attributes
+        min_temp = to_celsius(_number(attrs.get(ATTR_MIN_TEMP)), unit)
+        max_temp = to_celsius(_number(attrs.get(ATTR_MAX_TEMP)), unit)
         modes = [str(mode) for mode in attrs.get(ATTR_HVAC_MODES) or ()]
         if desired.temperature is None:
             if HVACMode.OFF in modes:
@@ -326,16 +383,11 @@ class TrvWorker:
                     return None
                 return WritePlan(HVACMode.OFF.value, None, setpoint)
             # No off mode: use the TRV's minimum.
-            target = _number(attrs.get(ATTR_MIN_TEMP)) or MIN_TEMPERATURE
+            target = min_temp or MIN_TEMPERATURE
         else:
             target = desired.temperature
         step = step_of(state)
-        value = device_setpoint(
-            target,
-            step=step,
-            min_temp=_number(attrs.get(ATTR_MIN_TEMP)),
-            max_temp=_number(attrs.get(ATTR_MAX_TEMP)),
-        )
+        value = device_setpoint(target, step=step, min_temp=min_temp, max_temp=max_temp)
         heat_mode = heat_mode_of(state)
         need_mode = heat_mode is not None and state.state != heat_mode
         accepted = None
@@ -363,15 +415,18 @@ class TrvWorker:
         if self.mismatch_since is None:
             self.mismatch_since = now
         if self._host.dry_run:
-            if plan != self._dry_run_logged:
-                self._dry_run_logged = plan
-                self._log(LogKind.DRY_RUN, value=plan.temperature, hvac_mode=plan.hvac_mode)
-            self._set_phase(Phase.IDLE)
+            self._log_dry_run(plan)
             return
         self._set_phase(Phase.WRITING)
         self._task = self._host.create_task(
             self._cycle(), f"heating_scheduler write {self.entity_id}"
         )
+
+    def _log_dry_run(self, plan: WritePlan) -> None:
+        if plan != self._dry_run_logged:
+            self._dry_run_logged = plan
+            self._log(LogKind.DRY_RUN, value=plan.temperature, hvac_mode=plan.hvac_mode)
+        self._set_phase(Phase.IDLE)
 
     async def _cycle(self) -> None:
         """Write, verify, retry. Ends idle, waiting or failed."""
@@ -386,53 +441,64 @@ class TrvWorker:
                 self._settled(None)
                 return
             remaining = sum(VERIFY_TIMEOUTS[attempt:], timedelta())
-            if await self._send(plan, remaining) and await self._wait_applied(plan, timeout):
+            sent = await self._send(plan, remaining)
+            if sent is None:
+                # Test mode was turned on: nothing may be sent any more.
+                self._log_dry_run(plan)
+                return
+            if sent and await self._wait_applied(plan, timeout):
                 self._settled(plan)
                 return
             if attempt + 1 < len(VERIFY_TIMEOUTS):
                 self._log(LogKind.RETRY, value=plan.temperature, detail=self.last_error)
         self._failed()
 
-    async def _send(self, plan: WritePlan, remaining: timedelta) -> bool:
-        """Send the plan. Return False if a service call failed."""
-        context = self._host.new_context()
-        now = dt_util.utcnow()
-        self.pending = [
-            *(write for write in self.pending if write.until >= now),
-            PendingWrite(
-                commanded=plan.temperature,
-                previous=plan.previous,
-                until=now + remaining + PENDING_GRACE,
-                mode_switch=plan.hvac_mode is not None,
-            ),
-        ]
-        self.last_write = now
-        self._log(LogKind.WRITE, value=plan.temperature, hvac_mode=plan.hvac_mode)
-        try:
-            async with (
-                asyncio.timeout(SERVICE_CALL_TIMEOUT.total_seconds()),
-                self._host.semaphore,
-            ):
-                if plan.hvac_mode is not None:
-                    await self._hass.services.async_call(
-                        CLIMATE_DOMAIN,
-                        SERVICE_SET_HVAC_MODE,
-                        {ATTR_ENTITY_ID: self.entity_id, ATTR_HVAC_MODE: plan.hvac_mode},
-                        blocking=True,
-                        context=context,
-                    )
-                if plan.temperature is not None:
-                    await self._hass.services.async_call(
-                        CLIMATE_DOMAIN,
-                        SERVICE_SET_TEMPERATURE,
-                        {ATTR_ENTITY_ID: self.entity_id, ATTR_TEMPERATURE: plan.temperature},
-                        blocking=True,
-                        context=context,
-                    )
-        except (HomeAssistantError, TimeoutError, vol.Invalid) as err:
-            self.last_error = str(err) or type(err).__name__
-            _LOGGER.debug("Write to %s failed: %s", self.entity_id, self.last_error)
-            return False
+    async def _send(self, plan: WritePlan, remaining: timedelta) -> bool | None:
+        """Send the plan. False if a service call failed, None if test mode is on."""
+        async with self._host.semaphore:
+            # Checked after waiting for the semaphore: test mode may be on by now.
+            if self._host.dry_run:
+                return None
+            unit = self.unit
+            context = self._host.new_context()
+            now = dt_util.utcnow()
+            self.pending = [
+                *(write for write in self.pending if write.until >= now),
+                PendingWrite(
+                    commanded=plan.temperature,
+                    previous=plan.previous,
+                    until=now + remaining + PENDING_GRACE,
+                    mode_switch=plan.hvac_mode is not None,
+                    hvac_mode=plan.hvac_mode,
+                ),
+            ]
+            self.last_write = now
+            self._log(LogKind.WRITE, value=plan.temperature, hvac_mode=plan.hvac_mode)
+            try:
+                async with asyncio.timeout(SERVICE_CALL_TIMEOUT.total_seconds()):
+                    if plan.hvac_mode is not None:
+                        await self._hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_HVAC_MODE,
+                            {ATTR_ENTITY_ID: self.entity_id, ATTR_HVAC_MODE: plan.hvac_mode},
+                            blocking=True,
+                            context=context,
+                        )
+                    if plan.temperature is not None:
+                        await self._hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_TEMPERATURE,
+                            {
+                                ATTR_ENTITY_ID: self.entity_id,
+                                ATTR_TEMPERATURE: from_celsius(plan.temperature, unit),
+                            },
+                            blocking=True,
+                            context=context,
+                        )
+            except (HomeAssistantError, TimeoutError, vol.Invalid) as err:
+                self.last_error = str(err) or type(err).__name__
+                _LOGGER.debug("Write to %s failed: %s", self.entity_id, self.last_error)
+                return False
         return True
 
     def _applied(self, plan: WritePlan, state: State | None) -> bool:
@@ -443,7 +509,7 @@ class TrvWorker:
             return False
         if plan.temperature is None:
             return True
-        actual = setpoint_of(state)
+        actual = self.setpoint(state)
         if actual is None:
             return False
         step = normalize_step(step_of(state))
@@ -474,7 +540,7 @@ class TrvWorker:
     def _settled(self, plan: WritePlan | None) -> None:
         if plan is not None:
             state = self._hass.states.get(self.entity_id)
-            actual = setpoint_of(state)
+            actual = self.setpoint(state)
             if plan.temperature is not None and actual is not None:
                 self.accepted = (plan.temperature, actual)
             self._log(LogKind.VERIFIED, value=actual, hvac_mode=plan.hvac_mode)

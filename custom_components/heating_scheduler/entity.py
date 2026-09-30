@@ -45,9 +45,15 @@ def room_device_info(room: Room) -> DeviceInfo:
 
 @callback
 def async_sync_devices(hass: HomeAssistant, entry: ConfigEntry, engine: HeatingEngine) -> None:
-    """Create, rename, move and remove room devices to match the configuration."""
+    """Create, rename, move and remove room devices to match the configuration.
+
+    The area of a room device follows the room's `area_id` when it is set, and when it
+    changes (also to none). A device area set by hand in Home Assistant for a room that
+    never had an `area_id` is left alone.
+    """
     registry = dr.async_get(hass)
     rooms = engine.config.rooms
+    synced = engine.device_areas
     for room in rooms.values():
         device = registry.async_get_or_create(
             config_entry_id=entry.entry_id, **room_device_info(room)
@@ -55,10 +61,18 @@ def async_sync_devices(hass: HomeAssistant, entry: ConfigEntry, engine: HeatingE
         changes: dict[str, str | None] = {}
         if device.name != room.name:
             changes["name"] = room.name
-        if room.area_id is not None and device.area_id != room.area_id:
+        if room.id in synced:
+            area_changed = synced[room.id] != room.area_id
+        else:
+            area_changed = room.area_id is not None
+        if area_changed and device.area_id != room.area_id:
             changes["area_id"] = room.area_id
+        synced[room.id] = room.area_id
         if changes:
             registry.async_update_device(device.id, **changes)  # type: ignore[arg-type]
+    for room_id in list(synced):
+        if room_id not in rooms:
+            del synced[room_id]
     for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
         room_ids = {value for domain, value in device.identifiers if domain == DOMAIN}
         if room_ids and HOUSE_DEVICE not in room_ids and not room_ids & set(rooms):

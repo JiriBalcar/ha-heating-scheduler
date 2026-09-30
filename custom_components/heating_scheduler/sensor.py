@@ -36,6 +36,8 @@ class RoomModeSensor(RoomEntity, SensorEntity):
 
     _attr_translation_key = "mode"
     _attr_device_class = SensorDeviceClass.ENUM
+    # The room temperature changes often; keep it out of the recorder history.
+    _unrecorded_attributes = frozenset({"current_temperature"})
     _attr_options = [mode.value for mode in TargetMode]
 
     def __init__(self, engine: HeatingEngine, room_id: str) -> None:

@@ -213,25 +213,33 @@ export function nextText(target: TargetData, now: Date, ctx: FormatContext, t: T
   return t("room.until_next", { until: formatUntil(target.valid_until, now, ctx), next: label });
 }
 
-/** The temperature to show for a room, live from Home Assistant states. */
+/** Convert a temperature in `unit` ("°C", "°F", "K") to °C. */
+export function toCelsius(value: number, unit: string | undefined): number {
+  if (unit === "°F") return ((value - 32) * 5) / 9;
+  if (unit === "K") return value - 273.15;
+  return value;
+}
+
+/** The temperature to show for a room in °C, live from Home Assistant states. */
 export function roomTemperature(room: RoomData, hass: HomeAssistant): number | null {
-  const value = (raw: unknown): number | null => {
+  const haUnit = hass.config?.unit_system?.temperature;
+  const value = (raw: unknown, unit: string | undefined): number | null => {
     const number = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
-    return Number.isFinite(number) ? number : null;
+    return Number.isFinite(number) ? toCelsius(number, unit) : null;
   };
   if (room.temperature_entity) {
     const state = hass.states[room.temperature_entity];
     if (state && state.state !== "unavailable" && state.state !== "unknown") {
       const reading = room.temperature_entity.startsWith("climate.")
-        ? value(state.attributes.current_temperature)
-        : value(state.state);
+        ? value(state.attributes.current_temperature, haUnit)
+        : value(state.state, (state.attributes.unit_of_measurement as string | undefined) ?? haUnit);
       if (reading !== null) return Math.round(reading * 10) / 10;
     }
   }
   const readings = room.trvs
     .map((id) => hass.states[id])
     .filter((state) => state && state.state !== "unavailable" && state.state !== "unknown")
-    .map((state) => value(state.attributes.current_temperature))
+    .map((state) => value(state.attributes.current_temperature, haUnit))
     .filter((reading): reading is number => reading !== null);
   if (readings.length) {
     return Math.round((readings.reduce((sum, v) => sum + v, 0) / readings.length) * 10) / 10;

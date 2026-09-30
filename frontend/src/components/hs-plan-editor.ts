@@ -240,19 +240,17 @@ export class HsPlanEditor extends LitElement {
       this.load();
       return;
     }
+    // What is sent is what counts as saved; edits made while waiting stay unsaved.
+    const name = this.name.trim();
+    const days = this.days.map((day) => normalize(day));
     this.saving = true;
     try {
       await storeFor(this.hass).call("plan/save", {
         revision: this.snapshot.revision,
-        plan: {
-          id: this.plan.id,
-          name: this.name.trim(),
-          days: toPlanDays(this.days.map((day) => normalize(day))),
-        },
+        plan: { id: this.plan.id, name, days: toPlanDays(days) },
       });
-      this.baseName = this.name.trim();
-      this.original = this.days.map((day) => normalize(day));
-      this.days = this.original.map((day) => day.map((slot) => ({ ...slot })));
+      this.baseName = name;
+      this.original = days;
       toast(this, this.t("editor.saved"));
     } catch (error) {
       toast(this, errorText(error, this.t));
