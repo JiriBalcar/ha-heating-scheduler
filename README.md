@@ -26,6 +26,9 @@ Boiler control, valve positions and temperature sensors of the valves are not to
 
 - Home Assistant 2026.9 or newer.
 - Radiator valves as `climate` entities. Tested with Sonoff TRVZB through Zigbee2MQTT.
+- The panel and the card are built from Home Assistant's own components and look like the
+  rest of Home Assistant. HA changes these components between releases, so after an HA
+  update the panel may need a new release of this integration.
 - Temperatures in the panel, plans, temperature sets and services are always °C. Home
   Assistant itself may use °C or °F; the valves always get the right value.
 
@@ -68,17 +71,17 @@ test mode off.
 
 ## Návod pro každý den (česky)
 
-**Co vidím.** Každá místnost má svou kartu:
+**Co vidím.** Každá místnost má svou dlaždici:
 
-- **V místnosti** je teplota, která v místnosti je teď.
-- Velké číslo je teplota, kterou má místnost mít.
-- Barevný štítek říká, co se děje teď: **Teplo**, **Úspora**, **Noc**, **Pryč**,
+- Pod názvem je teplota v místnosti a co se děje teď a potom, například
+  „20,4 °C · Teplo do 22:00 → Noc 18,0 °C“.
+- Číslo mezi **−** a **+** je teplota, kterou má místnost mít.
+- Barevná ikona vlevo ukazuje režim: **Teplo**, **Úspora**, **Noc**, **Pryč**,
   **Proti mrazu**, **Vypnuto** nebo **Ručně**.
-- Text vedle štítku říká, co přijde potom, například „do 22:00 → Noc 18,0 °C“.
 
 **Chci tepleji nebo chladněji.** Klepněte na **+** nebo **−**. Každé klepnutí je půl stupně.
-Změna platí do další změny v plánu. Karta má pak fialový okraj a štítek **Ručně**.
-Tlačítko **Zpět na plán** změnu hned zruší.
+Změna platí do další změny v plánu. Dlaždice má pak fialovou ikonu ruky a text
+**Ručně změněno**. Tlačítko **Zpět na plán** změnu hned zruší.
 
 **Otočil jsem kolečkem na hlavici.** To je totéž jako **+** nebo **−**. Ostatní hlavice
 v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí samo.
@@ -95,24 +98,31 @@ v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí sa
 Během režimů Pryč, Dovolená a Vypnuto nejde teplota v místnosti měnit. Nejdřív přepněte dům
 na **Normálně**.
 
-**Oranžový vykřičník.** Některá hlavice neodpovídá nebo nepřijala teplotu. Klepněte na
-vykřičník, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
+**Oranžový vykřičník** na ikoně místnosti: některá hlavice neodpovídá nebo nepřijala
+teplotu. Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
 
-**Změna plánu.** Otevřete **Plány**, vyberte plán a klepněte na den. Časy změníte posunutím
-bílých úchytů nebo klepnutím na úsek. **Kopírovat den do…** zkopíruje den na jiné dny.
-Nakonec klepněte na **Uložit**.
+**Změna plánu.** Otevřete **Plány**, u plánu klepněte na **Změnit plán** a pak na den.
+Časy změníte posunutím bílých úchytů nebo klepnutím na úsek. **Kopírovat den do…**
+zkopíruje den na jiné dny. Nakonec klepněte na **Uložit**.
+
+**Větší písmo.** V nastavení aplikace Home Assistant nastavte **Page zoom** (přiblížení
+stránky), například na 125 %. Zvětší se celá aplikace.
 
 ## Everyday guide (English)
 
-- Each room shows the temperature **in the room**, the temperature it is **set to**, what
-  happens now (a coloured label) and what comes next ("until 22:00 → Night 18.0 °C").
+- Each room is a tile: the temperature in the room and what happens now and next
+  ("20.4 °C · Warm until 22:00 → Night 18.0 °C"), the temperature it is **set to** between
+  **−** and **+**, and a coloured icon for the mode.
 - **+** and **−** change the room by half a degree until the next change of the plan.
   **Back to plan** ends the change at once. Turning the knob on a valve does the same.
 - **Whole house**: **Away** for short absences (press **I'm home — Normal** when back),
   **Holiday** with a return date (heating comes back by itself), **Off** for summer,
   **Normal** to follow the plans. In Away, Holiday and Off, room temperatures are fixed.
-- An **orange exclamation mark** means a valve has a problem; tap it for an explanation.
-- **Plans**: tap a day, drag the white handles or tap a part, then **Save**.
+- An **orange exclamation mark** on a room's icon means a valve has a problem; tap the icon
+  for an explanation.
+- **Plans**: tap **Change plan** and a day, drag the white handles or tap a part, then
+  **Save**.
+- **Larger text**: set **Page zoom** in the Companion app settings, for example to 125 %.
 
 ## How it works
 
@@ -178,7 +188,7 @@ The card is loaded automatically. Add **Heating Scheduler** from the card picker
 type: custom:heating-scheduler-card
 room: room_1a2b3c4d   # optional; without it the card shows all rooms
 show_house: true       # optional: the house mode strip
-compact: false         # optional: smaller tiles
+compact: false         # optional: − / + next to the room name
 ```
 
 ## Development
@@ -200,7 +210,9 @@ cd frontend && npm ci && npm run check
 ```
 
 `npm run check` type-checks, runs the frontend tests and builds the bundles into
-`custom_components/heating_scheduler/dist/` (committed, so HACS needs no build step).
+`custom_components/heating_scheduler/dist/` (committed, so HACS needs no build step):
+`heating-scheduler-panel.js` holds the panel and the card, and `heating-scheduler-card.js`
+is the small loader that Home Assistant loads on start.
 
 A local instance with simulated valves lives in `dev/`:
 
@@ -211,6 +223,9 @@ uv run python dev/seed.py
 ```bash
 uv run hass -c dev/config
 ```
+
+The action `fake_trv.set_offline` (`entity_id`, `offline`) takes a simulated valve offline,
+to see how problems are shown.
 
 Design notes: [docs/architecture.md](docs/architecture.md). Original specification:
 [docs/spec.md](docs/spec.md).

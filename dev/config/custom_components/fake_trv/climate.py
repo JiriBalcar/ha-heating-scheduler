@@ -9,8 +9,10 @@ from typing import Any
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import ClimateEntityFeature, HVACAction, HVACMode
 from homeassistant.const import UnitOfTemperature
-from homeassistant.core import Context, HomeAssistant, callback
-from homeassistant.helpers import area_registry as ar, entity_registry as er
+from homeassistant.core import Context, HomeAssistant, ServiceCall, callback
+import voluptuous as vol
+
+from homeassistant.helpers import area_registry as ar, config_validation as cv, entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
@@ -31,6 +33,22 @@ async def async_setup_platform(
             suffix = f"_{index + 1}" if count > 1 else ""
             entities.append(FakeTrv(slug, f"{slug}_hlavice{suffix}"))
     async_add_entities(entities)
+
+    # Simulate a valve that stops answering, e.g. with empty batteries. A domain service,
+    # because HA does not call entity services on unavailable entities.
+    by_id = {entity.entity_id: entity for entity in entities}
+
+    async def set_offline(call: ServiceCall) -> None:
+        for entity_id in call.data["entity_id"]:
+            if entity_id in by_id:
+                by_id[entity_id].set_offline(call.data["offline"])
+
+    hass.services.async_register(
+        DOMAIN,
+        "set_offline",
+        set_offline,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_ids, vol.Required("offline"): bool}),
+    )
 
     @callback
     def assign_areas(_now: Any = None) -> None:
@@ -111,6 +129,11 @@ class FakeTrv(ClimateEntity):
             self._attr_target_temperature = value
 
         self._report_later(apply)
+
+    @callback
+    def set_offline(self, offline: bool) -> None:
+        self._attr_available = not offline
+        self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         def apply() -> None:

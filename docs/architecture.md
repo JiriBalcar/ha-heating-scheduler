@@ -162,18 +162,42 @@ The configuration has a revision; websocket writes must send the revision they e
 
 ## Frontend
 
-- TypeScript + Lit 3 (no decorators), built with esbuild into `dist/`: an entry for the
-  panel and one for the Lovelace card, with a shared chunk, so custom elements are defined
-  once. The bundles are committed; CI checks that they match the source.
-- The panel is registered with `panel_custom` (`require_admin: false`); the card is loaded
-  with `add_extra_js_url`. URLs carry a hash of the bundles for cache busting.
-- Own components only (native `<dialog>`, native date/time inputs, bundled MDI paths).
+- TypeScript + Lit 3 (no decorators), built with esbuild into `dist/` as two bundles:
+  `heating-scheduler-panel.js` (panel, card, all components) and `heating-scheduler-card.js`
+  (a small card loader). The bundles are committed; CI checks that they match the source.
+- The panel is registered with `panel_custom` (`require_admin: false`, `handle_safe_area:
+  true`); the card loader is loaded with `add_extra_js_url`. URLs carry a hash of the bundles
+  for cache busting.
+- **Card loader (decision, 2026-09-30).** HA's service worker serves an old copy of the page,
+  and so an old card URL, for a while after an update. The loader therefore imports the main
+  bundle by the URL in HA's live panel list, and the card and the panel always run the same
+  code. The loader itself is small and rarely changes.
+- **Element registration.** HA's app installs a scoped custom element registry polyfill; the
+  card loader can run before it. Our elements are defined only after HA has defined its root
+  element (`components/define.ts`); an earlier definition breaks all our elements.
+- **HA look and components (decision, 2026-09-30).** The UI uses HA's own elements wherever
+  HA has one: page layout with tabs (`hass-tabs-subpage`), `ha-card`, tile parts
+  (`ha-tile-*`), `ha-control-select`, `ha-control-number-buttons`, `ha-control-button`,
+  `ha-dialog`, `ha-form` with selectors (entity, area, date, time, select), `ha-select`,
+  `ha-input`, `ha-switch`, `ha-settings-row`, `ha-md-list-item`, `ha-dropdown`, `ha-alert`,
+  `ha-button`, `ha-icon-button`, `ha-svg-icon`. Own elements remain only where HA has none:
+  day bars, week view, the time stepper. HA guarantees none of these to a custom panel; they
+  come with chunks HA loads in the background, and the panel waits for them (`ha.ts`). HA
+  changes its internal elements between releases, so an HA update can require a release of
+  this integration (accepted by the user).
+- Dialogs follow HA's dialog protocol (`showDialog` / `closeDialog` / `dialog-closed`) and
+  are opened through HA's dialog manager, so Back closes them. Messages use HA's toast
+  (`hass-notification`); a valve opens HA's entity dialog (`hass-more-info`).
+- **Sizes (decision, 2026-09-30, deviates from the spec).** Exact HA sizes: 42 px controls
+  and 14 px text, as in HA's tile card. The spec asks for 48 px touch targets; the user
+  accepted HA sizes because the Companion app's page zoom enlarges everything (115 % gives
+  48 px).
 - One websocket subscription per connection (`store.ts`) feeds the panel and every card.
 - Panel strings are bundled (cs, en) and chosen from the user's HA language; Czech is the
   default. Entity, service and error strings use HA translation files.
 - All times are shown in the house's time zone (plans are house wall time).
-- Filled buttons use a fixed dark blue (`--hs-accent`) so white text passes WCAG AA in the
-  default light and dark themes; mode colours are fixed and always come with an icon and a word.
+- Colours are HA theme colours (`--deep-orange-color`, ...); a mode colour always comes with
+  an icon and a word.
 - Pure plan-editing operations live in `frontend/src/schedule/ops.ts` (vitest).
 
 ## Testing
