@@ -1,13 +1,20 @@
 {
   "domain": "heating_scheduler",
   "name": "Heating Scheduler",
-  "codeowners": [],
+  "codeowners": [
+    "@JiriBalcar"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
-  "documentation": "https://github.com/OWNER/ha-heating-scheduler",
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/JiriBalcar/ha-heating-scheduler",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/OWNER/ha-heating-scheduler/issues",
+  "issue_tracker": "https://github.com/JiriBalcar/ha-heating-scheduler/issues",
   "requirements": [],
   "single_config_entry": true,
   "version": "1.0.0"
