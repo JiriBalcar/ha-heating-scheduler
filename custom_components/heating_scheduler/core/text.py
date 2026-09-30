@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, tzinfo
 
-from .model import Reason, Source, TargetMode
+from .model import Reason, RoomTarget, Source, TargetMode
 
 DEFAULT_LANGUAGE = "cs"
 LANGUAGES = ("cs", "en")
@@ -101,6 +101,73 @@ def format_until(until: datetime, now: datetime, tz: tzinfo, lang: str | None) -
     if lang == "cs":
         return f"{local.day}. {local.month}. {clock}"
     return f"{local.day} {_MONTHS_EN[local.month - 1]} {clock}"
+
+
+# The first valve problem of a room, by the kind of health issue, as the panel shows it.
+ISSUE_TEXTS: dict[str, dict[str, str]] = {
+    "cs": {
+        "unavailable": "Hlavice neodpovídá",
+        "write_failed": "Hlavice nepřijala teplotu",
+        "mismatch": "Hlavice má jinou teplotu",
+    },
+    "en": {
+        "unavailable": "A valve does not respond",
+        "write_failed": "A valve did not take the temperature",
+        "mismatch": "A valve has a different temperature",
+    },
+}
+_NO_TRVS = {"cs": "Zatím bez hlavic.", "en": "No radiator valves yet."}
+_UNTIL = {"cs": "do", "en": "until"}
+
+
+def format_temperature(celsius: float, lang: str | None, unit: str = "°C") -> str:
+    """Return '18,0 °C' in Czech, '18.0 °C' in English; in °F when Home Assistant uses it."""
+    value = celsius * 9 / 5 + 32 if unit == "°F" else celsius
+    text = f"{value:.1f}"
+    return f"{text.replace('.', ',') if language(lang) == 'cs' else text} {unit}"
+
+
+def render_status(
+    target: RoomTarget,
+    now: datetime,
+    tz: tzinfo,
+    lang: str | None,
+    *,
+    zone: str | None = None,
+    issue: str | None = None,
+    no_trvs: bool = False,
+    unit: str = "°C",
+) -> str:
+    """Return a room's state as the panel's room tile shows it after the temperature.
+
+    "Warm until 22:00 → Night 18.0 °C" while the plan runs; otherwise the reason, with the
+    zone's name for Away while the house has zones (`zone`). A valve problem (`issue`, the kind
+    of the first health issue) comes first.
+    """
+    lang = language(lang)
+    if issue is not None:
+        return ISSUE_TEXTS[lang].get(issue, issue)
+    if no_trvs:
+        return _NO_TRVS[lang]
+    until = (
+        None
+        if target.valid_until is None
+        else f" {_UNTIL[lang]} {format_until(target.valid_until, now, tz, lang)}"
+    )
+    if target.source is Source.PLAN:
+        text = MODE_NAMES[lang][target.mode]
+        if until is None:
+            return text
+        text += until
+        upcoming = target.next
+        if upcoming is not None:
+            text += f" → {MODE_NAMES[lang][upcoming.mode]}"
+            if upcoming.temperature is not None:
+                text += f" {format_temperature(upcoming.temperature, lang, unit)}"
+        return text
+    if target.source is Source.HOUSE_AWAY and zone is not None:
+        return f"{zone}: {MODE_NAMES[lang][TargetMode.AWAY]}{until or ''}"
+    return render_reason(target.reason, now, tz, lang)
 
 
 def render_reason(reason: Reason, now: datetime, tz: tzinfo, lang: str | None) -> str:

@@ -305,14 +305,7 @@ export const cs: Record<TextKey, string> = {
   "error.unknown_zone": "Zóna už neexistuje.",
   "error.unknown": "Něco se nepovedlo: {message}",
 
-  "card.name": "Plánovač topení",
-  "card.description": "Místnosti s teplotami, plány a ručními změnami.",
-  "card.room": "Místnost",
+  "card.whole_house_only": "Karta ukazuje celý dům. Se dvěma a více zónami může ukázat jednu zónu.",
   "card.zone": "Zóna",
   "card.whole_house": "Celý dům",
-  "card.all_rooms": "Všechny místnosti",
-  "card.compact": "Kompaktní seznam",
-  "card.show_house": "Zobrazit režim domu",
-  "card.show_rooms": "Zobrazit místnosti",
-  "card.open_panel": "Otevřít topení",
 };

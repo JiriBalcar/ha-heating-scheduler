@@ -92,6 +92,9 @@
               "manual": "Ručně",
               "boost": "Naplno"
             }
+          },
+          "status": {
+            "name": "Stav"
           }
         }
       }

@@ -37,18 +37,19 @@ export interface HomeAssistant {
   user?: { name: string; is_admin: boolean };
   themes?: { darkMode?: boolean };
   localize?: (key: string) => string;
+  /** HA's device and entity registries, as its frontend holds them. */
+  devices?: Record<string, { id: string; identifiers?: [string, string][] }>;
+  entities?: Record<string, { entity_id: string; device_id?: string | null }>;
   callWS<T>(message: MessageBase): Promise<T>;
 }
 
 /** Options of the Lovelace card. */
 export interface CardConfig {
   type: string;
-  room?: string;
+  /** A zone's id; without it, the whole house. */
   zone?: string;
-  compact?: boolean;
-  show_house?: boolean;
-  /** False: only the house tile (or the zone's tile), for example instead of the house mode entity. */
-  show_rooms?: boolean;
+  /** Set by HA's dashboard editor in a sections view. */
+  grid_options?: { rows?: number | "auto"; columns?: number | "full" };
 }
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";

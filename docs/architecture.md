@@ -185,7 +185,7 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
 - Room thermostat: `heat` during a manual change or a boost. The preset `boost` is always
-  listed: it starts the room's own boost.
+  listed: it starts the room's own boost. The attribute `status` holds the room tile's text.
 - House: `select` (house mode), `switch` (boost; attributes `until`, `duration_minutes`), five
   `number` entities (house temperatures). The house mode
   select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision
@@ -276,8 +276,18 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   entity: its entity dialog shows a dropdown, and its tile feature for selects turns the
   button style off. HA uses the upright selector only for alarm modes and fan speeds. An
   `alarm_control_panel` entity was rejected: HA fixes its labels (Disarmed, Vacation, Custom
-  bypass), and voice assistants and HomeKit would treat it as a security alarm. For big
-  buttons on a dashboard, the card has `show_rooms: false`.
+  bypass), and voice assistants and HomeKit would treat it as a security alarm.
+- **Dashboard card (decision, 2026-10-01).** The Lovelace card is only the house tile or a
+  zone's tile (`zone`), because HA's tile feature for a `select` is a dropdown. Rooms and boosts
+  use HA's own tile cards: the room thermostat's attribute `status` holds the room tile's text
+  ("Warm until 22:00 → Night 18.0 °C", `render_status`) for `state_content`, and its presets,
+  Boost included, fit HA's preset feature. The card matches HA's tile exactly: two grid rows
+  (`getGridOptions`), and in a sections view (`layout` "grid", rows not "auto") HA's fixed info
+  height, as HA's tile card decides it. The hints above the tile need a card that can grow, so
+  a fixed-height card leaves them out. HA draws the round background of a tile icon only for an
+  interactive icon, so every icon has an action: the house icon opens the house dialog; a room
+  icon explains a valve problem, or opens HA's dialog of the room's thermostat, as a tap on the
+  room tile does (the thermostat is found through the room's device in HA's registries).
 - **Zones in the UI (decision, 2026-09-30).** With one zone, the overview has one house
   tile and the rooms. With two or more zones, it has a Whole house tile, then each zone's
   tile followed by its rooms. The Whole house tile sets every zone; while the zones differ,
@@ -289,8 +299,8 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   HA's one height (the house selector is 42 px, like the room tiles). A valve problem shows in
   the room tile's status line in the warning colour, and in one alert above the tiles. Holiday
   tapped during a holiday opens the Holiday dialog with its dates, to change them.
-- **Boost tile (decision, 2026-09-30).** The overview has a Boost tile after the Whole house
-  tile; a card for the whole house has it under the house tile. A tap on the tile or its
+- **Boost tile (decision, 2026-09-30).** The panel's overview has a Boost tile after the Whole
+  house tile (on a dashboard, HA's tile card of the boost switch). A tap on the tile or its
   button asks first, in HA's dialog box. The button stays off from the tap to the new state:
   HA's dialog box needs about a second to close, and a second tap in that time would ask
   again over it. During a boost, room tiles show Boost in red with a fire icon, and − / + are

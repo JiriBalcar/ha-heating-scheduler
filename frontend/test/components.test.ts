@@ -14,6 +14,7 @@ import "../src/components/hs-house-hints";
 import "../src/components/hs-plan-editor";
 import "../src/components/hs-room-card";
 import "../src/components/hs-temps-view";
+import { gridOptions } from "../src/card-config";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
 import type { Candidates, HomeAssistant, HouseData, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
 
@@ -332,31 +333,46 @@ describe("rooms in Advanced", () => {
 });
 
 describe("card", () => {
-  it("shows only the house tile without rooms", async () => {
+  async function card(config: Record<string, unknown>, layout?: string): Promise<Any> {
     const hass = fakeHass(async () => undefined);
-    const card = document.createElement("hs-card") as Any;
-    card.setConfig({ type: "custom:heating-scheduler-card", show_rooms: false });
-    card.hass = hass;
-    document.body.appendChild(card);
+    const element = document.createElement("hs-card") as Any;
+    element.setConfig({ type: "custom:heating-scheduler-card", ...config });
+    element.layout = layout;
+    element.hass = hass;
+    document.body.appendChild(element);
     hass.push(snapshot(1, { zones: ZONES, rooms: [BEDROOM, KITCHEN] }));
-    await card.updateComplete;
-    expect(card.shadowRoot.querySelectorAll("hs-house-card")).toHaveLength(1);
-    expect(card.shadowRoot.querySelectorAll("hs-room-card")).toHaveLength(0);
+    await element.updateComplete;
+    return element;
+  }
+
+  it("is the tile of the whole house or of a zone, with the hints above it", async () => {
+    const house = await card({});
+    expect(house.shadowRoot.querySelectorAll("hs-house-card")).toHaveLength(1);
+    expect(house.shadowRoot.querySelector("hs-house-card").zone).toBeNull();
+    expect(house.shadowRoot.querySelector("hs-house-hints")).not.toBeNull();
+    expect(house.shadowRoot.querySelectorAll("hs-room-card, hs-boost-card")).toHaveLength(0);
+    const upstairs = await card({ zone: "up" });
+    expect(upstairs.shadowRoot.querySelector("hs-house-card").zone.id).toBe("up");
   });
 
-  it("shows the boost tile for the whole house, not for a zone", async () => {
-    const tiles = async (config: Record<string, unknown>) => {
-      const hass = fakeHass(async () => undefined);
-      const card = document.createElement("hs-card") as Any;
-      card.setConfig({ type: "custom:heating-scheduler-card", show_rooms: false, ...config });
-      card.hass = hass;
-      document.body.appendChild(card);
-      hass.push(snapshot(1, { zones: ZONES, rooms: [BEDROOM, KITCHEN] }));
-      await card.updateComplete;
-      return card.shadowRoot.querySelectorAll("hs-boost-card").length;
-    };
-    expect(await tiles({})).toBe(1);
-    expect(await tiles({ zone: "up" })).toBe(0);
+  it("fills two rows of a dashboard grid like HA's tile, without the hints", async () => {
+    const element = await card({ zone: "up" }, "grid");
+    const tile = element.shadowRoot.querySelector("hs-house-card");
+    expect(tile.fixed).toBe(true);
+    expect(element.shadowRoot.querySelector("hs-house-hints")).toBeNull();
+    await tile.updateComplete;
+    expect(tile.shadowRoot.querySelector("ha-tile-container").fixedInfoHeight).toBe(true);
+    // Rows set to "auto" in HA's editor: the tile takes its own height, with the hints.
+    const auto = await card({ zone: "up", grid_options: { rows: "auto" } }, "grid");
+    expect(auto.shadowRoot.querySelector("hs-house-card").fixed).toBe(false);
+    expect(gridOptions()).toEqual({ columns: 12, min_columns: 6, rows: 2, min_rows: 2 });
+  });
+
+  it("has HA's round icon, which opens the house dialog", async () => {
+    const element = await card({});
+    const tile = element.shadowRoot.querySelector("hs-house-card");
+    await tile.updateComplete;
+    expect(tile.shadowRoot.querySelector("ha-tile-icon").interactive).toBe(true);
   });
 });
 
@@ -507,16 +523,28 @@ describe("house hints", () => {
 });
 
 describe("room tile status", () => {
-  it("says first when a valve has a problem, and is short in the compact card", async () => {
+  it("says first when a valve has a problem", async () => {
     const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
     const broken = { ...BEDROOM, issues: [{ kind: "unavailable" as const, entity_id: "climate.bed", since: null }] };
     const tile = await mount("hs-room-card", { snapshot: data, room: broken });
     const status = tile.shadowRoot.querySelector('[slot="secondary"]');
     expect(status.textContent.trim()).toBe("19.0 °C · A valve does not respond");
     expect(status.classList.contains("problem")).toBe(true);
-    const warm = { ...KITCHEN, target: { mode: "comfort" as const, temperature: 21, source: "plan" as const, valid_until: "2026-10-05T20:00:00Z", next: null } };
-    const compact = await mount("hs-room-card", { snapshot: data, room: warm, compact: true });
-    expect(text(compact.shadowRoot, '[slot="secondary"]')).toBe("19.0 °C · Warm");
+  });
+
+  it("opens HA's dialog of the room's thermostat, like HA's tile", async () => {
+    const hass = fakeHass(async () => undefined) as Any;
+    hass.devices = { dev1: { id: "dev1", identifiers: [["heating_scheduler", "bed"]] } };
+    hass.entities = {
+      "sensor.bed_mode": { entity_id: "sensor.bed_mode", device_id: "dev1" },
+      "climate.bedroom": { entity_id: "climate.bedroom", device_id: "dev1" },
+    };
+    const tile = await mount("hs-room-card", { hass, snapshot: snapshot(1, { zones: ZONES, rooms: [BEDROOM] }), room: BEDROOM });
+    const opened: string[] = [];
+    tile.addEventListener("hass-more-info", (event: CustomEvent<{ entityId: string }>) => opened.push(event.detail.entityId));
+    tile.shadowRoot.querySelector("ha-tile-container").dispatchEvent(new CustomEvent("action", { detail: { action: "tap" } }));
+    tile.shadowRoot.querySelector("ha-tile-icon").dispatchEvent(new CustomEvent("action", { detail: { action: "tap" } }));
+    expect(opened).toEqual(["climate.bedroom", "climate.bedroom"]);
   });
 });
 

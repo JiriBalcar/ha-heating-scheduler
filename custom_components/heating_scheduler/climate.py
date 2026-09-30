@@ -30,6 +30,7 @@ from .core.model import (
 )
 from .core.overrides import ExpiryKind
 from .core.resolve import effective_temperatures
+from .core.text import render_status
 from .core.validation import ValidationError
 from .engine import HeatingEngine
 from .entity import RoomEntity, async_add_room_entities
@@ -179,6 +180,30 @@ class RoomThermostat(RoomEntity, ClimateEntity):
                     return mode.value
             return MANUAL_PRESET
         return target.mode.value if target.mode.value in PRESETS else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return `status`: the room's state in words, as the panel's room tile shows it
+        ("Warm until 22:00 → Night 18.0 °C"), for a tile card's `state_content`."""
+        room = self.room
+        target = self.target
+        if room is None or target is None:
+            return {}
+        engine = self._engine
+        issues = engine.health.get(room.id, [])
+        zone = engine.config.zone_of(room).name if len(engine.config.zones) > 1 else None
+        return {
+            "status": render_status(
+                target,
+                dt_util.utcnow(),
+                dt_util.get_default_time_zone(),
+                self.hass.config.language,
+                zone=zone,
+                issue=issues[0].kind.value if issues else None,
+                no_trvs=not room.trvs,
+                unit=self.hass.config.units.temperature_unit,
+            )
+        }
 
     # ----- actions -----
 

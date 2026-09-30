@@ -29,16 +29,20 @@ export class HsHouseCard extends LitElement {
     hass: { attribute: false },
     snapshot: { attribute: false },
     zone: { attribute: false },
+    fixed: { type: Boolean },
     busy: { state: true },
   };
   declare hass: HomeAssistant;
   declare snapshot: Snapshot;
   declare zone: ZoneData | null;
+  /** The dashboard's grid gives the tile a fixed height: HA's fixed info height, like its tile. */
+  declare fixed: boolean;
   declare busy: boolean;
 
   constructor() {
     super();
     this.zone = null;
+    this.fixed = false;
     this.busy = false;
   }
 
@@ -47,6 +51,7 @@ export class HsHouseCard extends LitElement {
     css`
       :host {
         display: block;
+        height: 100%;
       }
       ha-card {
         height: 100%;
@@ -108,6 +113,11 @@ export class HsHouseCard extends LitElement {
     showDialog(this, "hs-house-dialog", { zoneId: this.zone?.id ?? null, snapshot: this.snapshot });
   }
 
+  private iconAction(event: Event) {
+    event.stopPropagation();
+    this.openDialog();
+  }
+
   /** The secondary line: what this part of the house does now. */
   private status(): string {
     const t = this.t;
@@ -139,8 +149,19 @@ export class HsHouseCard extends LitElement {
     const name = this.zone ? this.zone.name : t("house.title");
     return html`
       <ha-card style="--tile-color:${color}">
-        <ha-tile-container .interactive=${true} .actionHandlerOptions=${{}} @action=${this.openDialog}>
-          <ha-tile-icon slot="icon" .iconPath=${effective ? HOUSE_ICONS[effective] : MIXED_ICON}></ha-tile-icon>
+        <ha-tile-container
+          .interactive=${true}
+          .actionHandlerOptions=${{}}
+          .fixedInfoHeight=${this.fixed}
+          @action=${this.openDialog}
+        >
+          <ha-tile-icon
+            slot="icon"
+            .iconPath=${effective ? HOUSE_ICONS[effective] : MIXED_ICON}
+            .interactive=${true}
+            .actionHandlerOptions=${{}}
+            @action=${this.iconAction}
+          ></ha-tile-icon>
           <ha-tile-info slot="info">
             <span slot="primary">${name}</span>
             <span slot="secondary">${this.status()}</span>

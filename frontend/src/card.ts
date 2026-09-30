@@ -1,28 +1,31 @@
 // The real Lovelace card and its editor, in the main bundle. card-loader.ts shows them.
-import { repeat } from "lit/directives/repeat.js";
+//
+// The card switches the mode of the whole house or of one zone (Normal / Away / Holiday / Off) as
+// an HA tile of HA's size. Rooms and boosts use HA's own tile cards: a room's thermostat shows
+// its state with `state_content: [current_temperature, status]`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { checkCardConfig, fixedHeight } from "./card-config";
 import { define } from "./components/define";
-import "./components/hs-boost-card";
 import "./components/hs-house-card";
 import "./components/hs-house-hints";
-import "./components/hs-room-card";
-import { languageOf, translator, type TextKey } from "./i18n";
+import { languageOf, translator } from "./i18n";
 import { acquireScrim, releaseScrim } from "./scrim";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
 import type { CardConfig, HomeAssistant, Snapshot } from "./types";
-import { roomsOf } from "./zones";
 
-const ALL_ROOMS = "all";
 const WHOLE_HOUSE = "house:all";
 
 export class HeatingSchedulerCard extends LitElement {
   static override properties = {
     hass: { attribute: false },
+    layout: { attribute: false },
     config: { state: true },
     snapshot: { state: true },
   };
   declare hass: HomeAssistant;
+  /** "grid" in a sections view: HA sets it on every card. */
+  declare layout: string | undefined;
   declare config: CardConfig;
   declare snapshot: Snapshot | null;
 
@@ -38,10 +41,11 @@ export class HeatingSchedulerCard extends LitElement {
     css`
       :host {
         display: block;
+        height: 100%;
       }
       .stack {
+        height: 100%;
         display: grid;
-        /* minmax(0, …): the compact tiles must not make the card wider than the dashboard column. */
         grid-template-columns: minmax(0, 1fr);
         gap: var(--ha-space-2, 8px);
       }
@@ -56,23 +60,12 @@ export class HeatingSchedulerCard extends LitElement {
   ];
 
   setConfig(config: CardConfig): void {
-    if (!config || typeof config !== "object") throw new Error("Invalid configuration");
-    if (config.room !== undefined && typeof config.room !== "string") {
-      throw new Error("room must be a room id");
-    }
+    checkCardConfig(config);
     this.config = { ...config };
   }
 
   getCardSize(): number {
-    const rooms = this.config?.show_rooms === false ? 0 : this.config?.room ? 1 : (this.snapshot?.rooms.length ?? 2);
-    // The house tile, and the boost tile in a card for the whole house.
-    const house = this.showHouse ? (this.config?.zone ? 3 : 6) : 0;
-    return house + rooms * (this.config?.compact ? 3 : 5);
-  }
-
-  /** The house tile shows when the card asks for it, and always when it shows no rooms. */
-  private get showHouse(): boolean {
-    return Boolean(this.config?.show_house) || this.config?.show_rooms === false;
+    return 3;
   }
 
   override connectedCallback(): void {
@@ -102,38 +95,18 @@ export class HeatingSchedulerCard extends LitElement {
     const snapshot = this.snapshot;
     if (!snapshot) return html`<ha-card class="status">${t("common.loading")}</ha-card>`;
     const zone = snapshot.zones.find((item) => item.id === this.config.zone) ?? null;
-    const rooms =
-      this.config.show_rooms === false
-        ? []
-        : this.config.room
-          ? snapshot.rooms.filter((room) => room.id === this.config.room)
-          : zone
-            ? roomsOf(snapshot, zone)
-            : snapshot.rooms;
+    // With a fixed height from the grid, the tile fills it like HA's tile; the hints have no room.
+    const fixed = fixedHeight(this.config, this.layout);
     return html`
       <div class="stack">
-        ${this.showHouse
-          ? html`<hs-house-hints .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-hints>
-              <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>
-              ${zone ? nothing : html`<hs-boost-card .hass=${this.hass} .snapshot=${snapshot}></hs-boost-card>`}`
-          : nothing}
-        ${repeat(
-          rooms,
-          (room) => room.id,
-          (room) =>
-            html`<hs-room-card
-              .hass=${this.hass}
-              .room=${room}
-              .snapshot=${snapshot}
-              ?compact=${this.config.compact ?? false}
-            ></hs-room-card>`,
-        )}
+        ${fixed ? nothing : html`<hs-house-hints .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-hints>`}
+        <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone} .fixed=${fixed}></hs-house-card>
       </div>
     `;
   }
 }
 
-/** Visual editor of the card: zone, room, house mode, rooms, compact tiles. */
+/** Visual editor of the card: the whole house or one zone. */
 export class HeatingSchedulerCardEditor extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -172,77 +145,41 @@ export class HeatingSchedulerCardEditor extends LitElement {
   }
 
   private schema() {
-    const rooms = this.snapshot?.rooms ?? [];
     const zones = this.snapshot?.zones ?? [];
-    const zone =
-      zones.length > 1
-        ? [
-            {
-              name: "zone",
-              selector: {
-                select: {
-                  mode: "dropdown",
-                  options: [
-                    { value: WHOLE_HOUSE, label: this.t("card.whole_house") },
-                    ...zones.map((item) => ({ value: item.id, label: item.name })),
-                  ],
-                },
-              },
-            },
-          ]
-        : [];
     return [
-      ...zone,
       {
-        name: "room",
+        name: "zone",
         selector: {
           select: {
             mode: "dropdown",
             options: [
-              { value: ALL_ROOMS, label: this.t("card.all_rooms") },
-              ...rooms.map((room) => ({ value: room.id, label: room.name })),
+              { value: WHOLE_HOUSE, label: this.t("card.whole_house") },
+              ...zones.map((item) => ({ value: item.id, label: item.name })),
             ],
           },
         },
       },
-      { name: "show_house", selector: { boolean: {} } },
-      { name: "show_rooms", selector: { boolean: {} } },
-      { name: "compact", selector: { boolean: {} } },
     ];
   }
 
-  private label = (field: { name: string }): string => this.t(`card.${field.name}` as TextKey);
+  private label = (): string => this.t("card.zone");
 
   private changed(event: CustomEvent<{ value: Record<string, unknown> }>) {
-    const value = event.detail.value;
-    const config: CardConfig = {
-      ...this.config,
-      room: value.room === ALL_ROOMS ? undefined : (value.room as string | undefined),
-      zone: value.zone === WHOLE_HOUSE ? undefined : (value.zone as string | undefined),
-      show_house: value.show_house ? true : undefined,
-      // Rooms are shown unless the card says otherwise.
-      show_rooms: value.show_rooms === false ? false : undefined,
-      compact: value.compact ? true : undefined,
-    };
-    for (const key of Object.keys(config) as (keyof CardConfig)[]) {
-      if (config[key] === undefined || config[key] === "") delete config[key];
-    }
+    const zone = event.detail.value.zone;
+    const { zone: _previous, ...rest } = this.config;
+    const config: CardConfig = zone && zone !== WHOLE_HOUSE ? { ...rest, zone: zone as string } : rest;
     this.config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
   }
 
   override render() {
     if (!this.hass || !this.config) return nothing;
-    const data = {
-      room: this.config.room ?? ALL_ROOMS,
-      zone: this.config.zone ?? WHOLE_HOUSE,
-      show_house: this.config.show_house ?? false,
-      show_rooms: this.config.show_rooms ?? true,
-      compact: this.config.compact ?? false,
-    };
+    if ((this.snapshot?.zones.length ?? 0) < 2) {
+      return html`<p>${this.t("card.whole_house_only")}</p>`;
+    }
     return html`<ha-form
       .hass=${this.hass}
-      .data=${data}
+      .data=${{ zone: this.config.zone ?? WHOLE_HOUSE }}
       .schema=${this.schema()}
       .computeLabel=${this.label}
       @value-changed=${this.changed}

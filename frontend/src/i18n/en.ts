@@ -303,16 +303,9 @@ export const en = {
   "error.unknown_zone": "The zone no longer exists.",
   "error.unknown": "Something went wrong: {message}",
 
-  "card.name": "Heating Scheduler",
-  "card.description": "Rooms with their temperatures, plans and manual changes.",
-  "card.room": "Room",
+  "card.whole_house_only": "The card shows the whole house. With two or more zones, it can show one zone.",
   "card.zone": "Zone",
   "card.whole_house": "Whole house",
-  "card.all_rooms": "All rooms",
-  "card.compact": "Compact list",
-  "card.show_house": "Show the house mode",
-  "card.show_rooms": "Show the rooms",
-  "card.open_panel": "Open Heating",
 } as const;
 
 export type TextKey = keyof typeof en;

@@ -90,6 +90,11 @@ export class HsBoostCard extends LitElement {
     }
   }
 
+  private iconAction(event: Event) {
+    event.stopPropagation();
+    void this.toggle();
+  }
+
   override render() {
     if (!this.snapshot || !this.hass) return nothing;
     const t = this.t;
@@ -102,7 +107,13 @@ export class HsBoostCard extends LitElement {
     return html`
       <ha-card style="--tile-color:${color}">
         <ha-tile-container .interactive=${true} .actionHandlerOptions=${{}} @action=${this.toggle}>
-          <ha-tile-icon slot="icon" .iconPath=${MODE_ICONS.boost}></ha-tile-icon>
+          <ha-tile-icon
+            slot="icon"
+            .iconPath=${MODE_ICONS.boost}
+            .interactive=${true}
+            .actionHandlerOptions=${{}}
+            @action=${this.iconAction}
+          ></ha-tile-icon>
           <ha-tile-info slot="info">
             <span slot="primary">${t("boost.title")}</span>
             <span slot="secondary">${status}</span>

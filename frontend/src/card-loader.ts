@@ -5,6 +5,7 @@
 // update. The main bundle's URL comes from HA's live panel list instead, so the card and the panel
 // always run the same code, and this file stays small and rarely changes.
 import { define } from "./components/define";
+import { checkCardConfig, gridOptions } from "./card-config";
 import { registerIcons } from "./icons";
 import type { CardConfig, HomeAssistant } from "./types";
 
@@ -14,12 +15,13 @@ registerIcons();
 const PANEL = "heating-scheduler";
 const BUNDLE = "heating-scheduler-panel.js";
 const TEXTS = {
-  cs: { name: "Heating Scheduler", description: "Místnosti a režim domu z plánovače topení." },
-  en: { name: "Heating Scheduler", description: "Rooms and house mode of the heating scheduler." },
+  cs: { name: "Heating Scheduler", description: "Režim domu nebo zóny: Normálně, Pryč, Dovolená, Vypnuto." },
+  en: { name: "Heating Scheduler", description: "The mode of the house or a zone: Normal, Away, Holiday, Off." },
 };
 
 interface InnerCard extends HTMLElement {
   hass?: HomeAssistant;
+  layout?: string;
   setConfig(config: CardConfig): void;
   getCardSize?(): number | Promise<number>;
 }
@@ -44,17 +46,12 @@ function loadBundle(hass?: HomeAssistant): Promise<unknown> {
 class HeatingSchedulerCardLoader extends HTMLElement {
   private config?: CardConfig;
   private hassValue?: HomeAssistant;
+  private layoutValue?: string;
   private inner?: InnerCard;
   private creating = false;
 
   setConfig(config: CardConfig): void {
-    if (!config || typeof config !== "object") throw new Error("Invalid configuration");
-    if (config.room !== undefined && typeof config.room !== "string") {
-      throw new Error("room must be a room id");
-    }
-    if (config.zone !== undefined && typeof config.zone !== "string") {
-      throw new Error("zone must be a zone id");
-    }
+    checkCardConfig(config);
     this.config = config;
     this.inner?.setConfig(config);
   }
@@ -67,6 +64,16 @@ class HeatingSchedulerCardLoader extends HTMLElement {
 
   get hass(): HomeAssistant | undefined {
     return this.hassValue;
+  }
+
+  /** "grid" in a sections view: HA sets it on every card. */
+  set layout(layout: string | undefined) {
+    this.layoutValue = layout;
+    if (this.inner) this.inner.layout = layout;
+  }
+
+  get layout(): string | undefined {
+    return this.layoutValue;
   }
 
   private async create() {
@@ -83,21 +90,22 @@ class HeatingSchedulerCardLoader extends HTMLElement {
     const inner = document.createElement("hs-card") as InnerCard;
     if (this.config) inner.setConfig(this.config);
     inner.hass = this.hassValue;
+    inner.layout = this.layoutValue;
     this.inner = inner;
     root.replaceChildren(inner);
   }
 
   connectedCallback(): void {
     this.style.display = "block";
+    this.style.height = "100%";
   }
 
   getCardSize(): number | Promise<number> {
-    if (this.inner?.getCardSize) return this.inner.getCardSize();
-    return this.config?.room || this.config?.show_rooms === false ? 3 : 6;
+    return this.inner?.getCardSize?.() ?? 3;
   }
 
   getGridOptions() {
-    return { columns: 12, min_columns: 6, rows: "auto" };
+    return gridOptions();
   }
 
   static async getConfigElement(): Promise<HTMLElement> {
@@ -106,7 +114,7 @@ class HeatingSchedulerCardLoader extends HTMLElement {
   }
 
   static getStubConfig(): Partial<CardConfig> {
-    return { show_house: true };
+    return {};
   }
 }
 

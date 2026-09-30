@@ -3,6 +3,8 @@
 // HA guarantees none of its elements to a custom panel: they come with chunks that HA loads in
 // the background (mostly for its entity dialog). The panel waits for the ones it uses.
 
+import type { HomeAssistant } from "./types";
+
 /** HA elements that the panel and the card use. */
 export const HA_ELEMENTS = [
   "hass-tabs-subpage",
@@ -41,6 +43,17 @@ export async function whenDefined(tags: readonly string[], timeout = 10000): Pro
 /** Fire an event that crosses shadow roots, as HA's own `fireEvent` does. */
 export function fire<T>(node: EventTarget, type: string, detail?: T): void {
   node.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }));
+}
+
+/** The room's thermostat entity, found through the room's device in HA's registries. */
+export function roomThermostat(hass: HomeAssistant, roomId: string): string | undefined {
+  const device = Object.values(hass.devices ?? {}).find((item) =>
+    item.identifiers?.some(([domain, id]) => domain === "heating_scheduler" && id === roomId),
+  );
+  if (!device) return undefined;
+  return Object.values(hass.entities ?? {}).find(
+    (item) => item.device_id === device.id && item.entity_id.startsWith("climate."),
+  )?.entity_id;
 }
 
 /** Show a short message in HA's own toast. */

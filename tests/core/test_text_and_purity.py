@@ -7,12 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.heating_scheduler.core.model import Reason, Source, TargetMode
+from custom_components.heating_scheduler.core.model import (
+    Reason,
+    RoomTarget,
+    Source,
+    Target,
+    TargetMode,
+)
 from custom_components.heating_scheduler.core.text import (
     format_until,
     language,
     mode_name,
     render_reason,
+    render_status,
 )
 from tests.builders import PRAGUE, prague
 
@@ -67,6 +74,31 @@ def test_format_until() -> None:
 )
 def test_render_reason(reason: Reason, lang: str, expected: str) -> None:
     assert render_reason(reason, NOW, PRAGUE, lang) == expected
+
+
+def _target(
+    source: Source, mode: TargetMode, *, ends: bool, upcoming: Target | None = None
+) -> RoomTarget:
+    end = prague(2026, 10, 5, 22) if ends else None
+    return RoomTarget(mode, 21.0, Reason(source, mode, end), end, upcoming)
+
+
+def test_render_status_as_the_room_tile_shows_it() -> None:
+    night = Target(TargetMode.NIGHT, 18.0, Source.PLAN)
+    plan = _target(Source.PLAN, TargetMode.COMFORT, ends=True, upcoming=night)
+    assert render_status(plan, NOW, PRAGUE, "en") == "Warm until 22:00 → Night 18.0 °C"
+    assert render_status(plan, NOW, PRAGUE, "cs") == "Teplo do 22:00 → Noc 18,0 °C"
+    assert render_status(plan, NOW, PRAGUE, "en", unit="°F") == "Warm until 22:00 → Night 64.4 °F"
+    frost = _target(Source.PLAN, TargetMode.FROST, ends=False)
+    assert render_status(frost, NOW, PRAGUE, "en") == "Frost guard"
+    away = _target(Source.HOUSE_AWAY, TargetMode.AWAY, ends=False)
+    assert render_status(away, NOW, PRAGUE, "cs") == "Dům: Pryč"
+    assert render_status(away, NOW, PRAGUE, "cs", zone="1. patro") == "1. patro: Pryč"
+    manual = _target(Source.MANUAL, TargetMode.MANUAL, ends=True, upcoming=night)
+    assert render_status(manual, NOW, PRAGUE, "en") == "Changed by hand until 22:00"
+    # A valve problem comes first; a room without valves says so.
+    assert render_status(plan, NOW, PRAGUE, "cs", issue="unavailable") == "Hlavice neodpovídá"
+    assert render_status(plan, NOW, PRAGUE, "en", no_trvs=True) == "No radiator valves yet."
 
 
 def test_mode_names_exist_for_every_mode() -> None:

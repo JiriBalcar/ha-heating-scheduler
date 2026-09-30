@@ -195,7 +195,7 @@ Entity ids depend on the Home Assistant language; English names are shown.
 
 | Entity | Per | Purpose |
 |---|---|---|
-| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change or boost, `off` = off. The preset is the mode; a manual change shows the mode with its temperature, or Manual; a boost shows Boost. The preset Boost starts the room's own boost; another preset or `auto` ends it. |
+| `climate.<room>` | room | Room thermostat for voice assistants and thermostat cards. `auto` = plan, `heat` = manual change or boost, `off` = off. The preset is the mode; a manual change shows the mode with its temperature, or Manual; a boost shows Boost. The preset Boost starts the room's own boost; another preset or `auto` ends it. Attribute `status`: the room's state in words ("Warm until 22:00 → Night 18.0 °C"), for a tile card's `state_content`. |
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |
@@ -252,21 +252,41 @@ data:
 
 ## Lovelace card
 
-The card is loaded automatically. Add **Heating Scheduler** from the card picker, or:
+The card switches the mode of the whole house or of one zone (Normal, Away, Holiday, Off), as a
+tile of Home Assistant's own size. It is loaded automatically. Add **Heating Scheduler** from the
+card picker, or:
 
 ```yaml
 type: custom:heating-scheduler-card
-room: room_1a2b3c4d   # optional; without it the card shows all rooms
-zone: zone_1a2b3c4d   # optional: the zone's tile and its rooms
-show_house: true       # optional: the house mode tile
-show_rooms: false      # optional: only the house tile (or the zone's tile), no rooms
-compact: false         # optional: − / + next to the room name
+zone: zone_1a2b3c4d   # optional: the zone's tile; without it, the whole house
 ```
 
-The card editor lists the rooms and zones by name. Home Assistant shows a `select` entity only
-as a dropdown; for big buttons on a dashboard, use this card with `show_rooms: false` instead of
-the house mode entity. A tap on the house tile opens a dialog like the one of an alarm panel.
-A card for the whole house also shows the **Boost** tile under the house tile.
+A tap on the tile opens a dialog like the one of an alarm panel. In a sections view the tile takes
+two rows, like Home Assistant's tile card with one feature. The reminders (back to Normal, a
+planned holiday) show above the tile only where the card can grow: in other views, or with rows
+set to "auto".
+
+Rooms and boosts use Home Assistant's own tile cards. The room thermostat's `status` shows what
+the room does and until when, as in the panel:
+
+```yaml
+type: tile
+entity: climate.living_room
+state_content:
+  - current_temperature
+  - status
+features:
+  - type: target-temperature
+  - type: climate-preset-modes
+    style: icons
+```
+
+```yaml
+type: tile
+entity: switch.heating_boost   # or the switch of one zone
+features:
+  - type: toggle
+```
 
 A dashboard shows "Custom element doesn't exist: heating-scheduler-card" when the page was opened
 before the integration was installed. Reload the page (in the Home Assistant app: close the app

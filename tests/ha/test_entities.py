@@ -251,3 +251,13 @@ async def test_rooms_added_renamed_and_removed(
     )
     assert entities.async_get("sensor.bedroom_heating_mode") is None
     assert hass.states.get("sensor.bedroom_heating_mode") is None
+
+
+async def test_thermostat_status_says_until_when_like_the_room_tile(
+    hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
+) -> None:
+    store(hass_storage, two_rooms())
+    await setup_entry(hass)
+    state = hass.states.get(THERMOSTAT)
+    assert state is not None
+    assert state.attributes["status"] == "Warm until 22:00 → Night 18.0 °C"

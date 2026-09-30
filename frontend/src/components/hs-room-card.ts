@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { mdiCalendarSync, mdiExclamationThick } from "@mdi/js";
 import { formatContext, formatTemp, formatUntil, modeLabel, reasonText, roomTemperature } from "../format";
+import { fire, roomThermostat } from "../ha";
 import { languageOf, translator } from "../i18n";
 import { MODE_COLORS, MODE_ICONS, roomTemperatures } from "../modes";
 import { errorText, storeFor, toast } from "../store";
@@ -17,21 +18,20 @@ const SEND_DELAY = 1000;
 const FORMAT = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
 /**
- * One room as an HA tile: mode icon, name, temperature and status, − / + and Back to plan.
- * `compact` puts − / + next to the name, like a tile card with an inline feature.
+ * One room as an HA tile: mode icon, name, temperature and status, − / + and Back to plan. A tap
+ * opens HA's dialog of the room's thermostat, like HA's tile card; with a valve problem, the icon
+ * explains the problem.
  */
 export class HsRoomCard extends LitElement {
   static override properties = {
     hass: { attribute: false },
     room: { attribute: false },
     snapshot: { attribute: false },
-    compact: { type: Boolean, reflect: true },
     pending: { state: true },
   };
   declare hass: HomeAssistant;
   declare room: RoomData;
   declare snapshot: Snapshot;
-  declare compact: boolean;
   declare pending: number | null;
 
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -43,7 +43,6 @@ export class HsRoomCard extends LitElement {
   constructor() {
     super();
     this.pending = null;
-    this.compact = false;
   }
 
   static override styles = [
@@ -93,9 +92,6 @@ export class HsRoomCard extends LitElement {
       }
       ha-control-button span {
         margin-inline-start: 8px;
-      }
-      .inline {
-        --feature-height: 36px;
       }
     `,
   ];
@@ -169,13 +165,20 @@ export class HsRoomCard extends LitElement {
     }
   }
 
-  private showProblems() {
-    openProblemDialog(this, this.room);
+  private showThermostat() {
+    const entityId = roomThermostat(this.hass, this.room.id);
+    if (entityId) fire(this, "hass-more-info", { entityId });
+  }
+
+  private iconAction(event: Event) {
+    event.stopPropagation();
+    if (this.room.issues.length > 0) openProblemDialog(this, this.room);
+    else this.showThermostat();
   }
 
   /**
    * "20.2 °C · Night until 6:00 → Warm 21.5 °C". A valve problem comes first: "20.2 °C · A valve
-   * does not respond". The compact card has room only for the temperature and the mode.
+   * does not respond".
    */
   private status(): string {
     const room = this.room;
@@ -189,10 +192,7 @@ export class HsRoomCard extends LitElement {
     if (issue) parts.push(t(`room.issue.${issue.kind}`));
     else if (room.trvs.length === 0) parts.push(t("room.no_trvs"));
     else if (this.pending !== null) parts.push(modeLabel("manual", t));
-    else if (this.compact) {
-      const manual = target?.source === "manual";
-      parts.push(modeLabel(manual ? "manual" : (target?.mode ?? "off"), t));
-    } else if (target?.source === "plan") {
+    else if (target?.source === "plan") {
       // "Warm until 22:00 → Night 18.0 °C"
       const now = new Date();
       const mode = modeLabel(target.mode, t);
@@ -250,12 +250,13 @@ export class HsRoomCard extends LitElement {
     const control = this.control(canChange);
     return html`
       <ha-card style="--tile-color:${MODE_COLORS[mode]}">
-        <ha-tile-container .featurePosition=${this.compact ? "inline" : "bottom"}>
+        <ha-tile-container .interactive=${true} .actionHandlerOptions=${{}} @action=${this.showThermostat}>
           <ha-tile-icon
             slot="icon"
             .iconPath=${MODE_ICONS[mode]}
-            .interactive=${problems}
-            @action=${this.showProblems}
+            .interactive=${true}
+            .actionHandlerOptions=${{}}
+            @action=${this.iconAction}
             title=${problems ? t("room.problem") : modeLabel(mode, t)}
           >
             ${problems
@@ -266,22 +267,17 @@ export class HsRoomCard extends LitElement {
             <span slot="primary">${room.name}</span>
             <span slot="secondary" class=${room.issues.length ? "problem" : ""}>${this.status()}</span>
           </ha-tile-info>
-          ${this.compact
-            ? html`<div slot="features-inline" class="features inline">${control}</div>`
-            : nothing}
-          ${!this.compact || (manual && canChange)
-            ? html`<div slot="features" class="features">
-                ${this.compact ? nothing : control}
-                ${manual && canChange
-                  ? html`<ha-control-button-group>
-                      <ha-control-button .label=${t("room.back_to_plan")} @click=${this.backToPlan}>
-                        <ha-svg-icon .path=${mdiCalendarSync}></ha-svg-icon>
-                        <span>${t("room.back_to_plan")}</span>
-                      </ha-control-button>
-                    </ha-control-button-group>`
-                  : nothing}
-              </div>`
-            : nothing}
+          <div slot="features" class="features">
+            ${control}
+            ${manual && canChange
+              ? html`<ha-control-button-group>
+                  <ha-control-button .label=${t("room.back_to_plan")} @click=${this.backToPlan}>
+                    <ha-svg-icon .path=${mdiCalendarSync}></ha-svg-icon>
+                    <span>${t("room.back_to_plan")}</span>
+                  </ha-control-button>
+                </ha-control-button-group>`
+              : nothing}
+          </div>
         </ha-tile-container>
       </ha-card>
     `;
