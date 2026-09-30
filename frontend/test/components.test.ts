@@ -287,6 +287,16 @@ describe("zones on the overview", () => {
 });
 
 describe("house dialog", () => {
+  it("has the names of the modes; the tile shows icons only", async () => {
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
+    const tile = await mount("hs-house-card", { snapshot: data });
+    expect(tile.shadowRoot.querySelector("ha-control-select").hasAttribute("hide-option-label")).toBe(true);
+    const dialog = await mount("hs-house-dialog", {});
+    dialog.showDialog({ zoneId: null, snapshot: data });
+    await dialog.updateComplete;
+    expect(dialog.shadowRoot.querySelector("ha-control-select").hasAttribute("hide-option-label")).toBe(false);
+  });
+
   it("shows the state of the whole house or of a zone in big letters", async () => {
     const temp_sets = [{ id: "house", name: "House", temperatures: { comfort: 21, away: 16 }, used_by: [] }];
     const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM], temp_sets });

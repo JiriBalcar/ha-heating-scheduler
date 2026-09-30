@@ -252,6 +252,7 @@ ${C}`);return}await V.showAlertDialog(e,{title:H,text:C}),await h2()}var S2=clas
             <ha-control-select
               .options=${V}
               .value=${C??void 0}
+              hide-option-label
               .label=${r}
               .disabled=${this.busy}
               @value-changed=${this.selected}

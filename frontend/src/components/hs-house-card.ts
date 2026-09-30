@@ -18,8 +18,9 @@ import { chooseHouseMode } from "./house-actions";
 import "./hs-house-dialog";
 
 /**
- * The house mode as an HA tile: Normal / Away / Holiday / Off. A tap on the tile opens the house
- * dialog with big buttons, like HA's alarm panel dialog. Hints (back to Normal, a planned holiday)
+ * The house mode as an HA tile: Normal / Away / Holiday / Off, as icons only, like HA's alarm modes.
+ * A tap on the tile opens the house dialog with big buttons and their names, like HA's alarm panel
+ * dialog. Hints (back to Normal, a planned holiday)
  * are shown once above the tiles (hs-house-hints), so every tile has one height.
  * With a `zone`, the tile shows and sets that zone; without one, the whole house (every zone).
  */
@@ -148,6 +149,7 @@ export class HsHouseCard extends LitElement {
             <ha-control-select
               .options=${options}
               .value=${effective ?? undefined}
+              hide-option-label
               .label=${name}
               .disabled=${this.busy}
               @value-changed=${this.selected}
