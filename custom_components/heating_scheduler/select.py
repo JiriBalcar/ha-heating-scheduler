@@ -146,8 +146,12 @@ class ZoneModeSelect(HeatingEntity, SelectEntity):
 
     @callback
     def _handle_engine_update(self) -> None:
-        if (zone := self.zone) is not None:
+        zone = self.zone
+        if zone is not None and self._attr_translation_placeholders != {"zone": zone.name}:
             self._attr_translation_placeholders = {"zone": zone.name}
+            # HA caches the name, and new placeholders do not clear it (only a new _attr_name
+            # does, in the same way). Without this, a renamed zone keeps its old name.
+            self.__dict__.pop("name", None)
         super()._handle_engine_update()
 
     @property

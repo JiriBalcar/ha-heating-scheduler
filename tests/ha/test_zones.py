@@ -194,8 +194,17 @@ async def test_zone_commands(
     ws = Ws(await hass_ws_client(hass))
     result = await ws.ok("zone/save", revision=0, zone={"name": "Upstairs"})
     upstairs = result["zone_id"]
+    await settle(hass)
+    entity_id = zone_select(hass, upstairs)
+    assert entity_id is not None
     await ws.ok("zone/save", revision=1, zone={"id": upstairs, "name": "First floor"})
+    await settle(hass)
     assert engine.config.zones[upstairs].name == "First floor"
+    # The zone's select follows the new name, in its state and in the entity registry.
+    assert state_of(hass, entity_id).attributes["friendly_name"] == "Heating Mode First floor"
+    entry_after = er.async_get(hass).async_get(entity_id)
+    assert entry_after is not None and entry_after.original_name == "Mode First floor"
+    assert zone_select(hass, upstairs) == entity_id
     assert await ws.error("zone/save", revision=0, zone={"name": "X"}) == "revision_conflict"
     room = config_to_dict(engine.config)["rooms"][1]
     await ws.ok("room/save", revision=2, room={**room, "zone_id": upstairs})

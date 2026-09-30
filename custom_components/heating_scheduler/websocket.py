@@ -580,6 +580,8 @@ def zones_from_floors(config: Config, room_floors: dict[str, tuple[str, str]]) -
 def _room_floors(hass: HomeAssistant, engine: HeatingEngine) -> dict[str, tuple[str, str]]:
     """Map rooms on a floor to (floor id, floor name), in floor order.
 
+    HA keeps its floors in the order the user gives them on its Areas page.
+
     A room is in its own area, or else in the area of its first valve that has one.
     """
     areas = ar.async_get(hass)
