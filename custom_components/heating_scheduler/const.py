@@ -21,6 +21,8 @@ PANEL_FILE: Final = "heating-scheduler-panel.js"
 CARD_FILE: Final = "heating-scheduler-card.js"
 # The brand dial in one colour; the card loader registers it (frontend/src/icons.ts).
 PANEL_ICON: Final = "heating-scheduler:dial"
+# The project's name, in every language (user's decision, 2026-09-30).
+PANEL_TITLE: Final = "Heating Scheduler"
 
 # TRV writes.
 VERIFY_TIMEOUTS: Final[tuple[timedelta, ...]] = (

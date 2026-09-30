@@ -51,7 +51,7 @@ Home Assistant.
 ## Setup
 
 1. **Settings → Devices & services → Add integration → Heating Scheduler.**
-2. Open **Topení / Heating** in the sidebar.
+2. Open **Heating Scheduler** in the sidebar.
 3. **Advanced → Rooms → Add rooms from areas** creates one room per Home Assistant area that
    has valves. You can also add rooms by hand and pick their valves.
 4. Optional: choose a **Temperature shown** sensor per room. It is used only for display.
@@ -263,7 +263,7 @@ A card for the whole house also shows the **Boost** tile under the house tile.
 
 A dashboard shows "Custom element doesn't exist: heating-scheduler-card" when the page was opened
 before the integration was installed. Reload the page (in the Home Assistant app: close the app
-completely and open it again), or open **Topení / Heating** in the sidebar once.
+completely and open it again), or open **Heating Scheduler** in the sidebar once.
 
 ## Development
 

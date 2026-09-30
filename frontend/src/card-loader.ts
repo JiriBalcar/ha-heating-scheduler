@@ -14,8 +14,8 @@ registerIcons();
 const PANEL = "heating-scheduler";
 const BUNDLE = "heating-scheduler-panel.js";
 const TEXTS = {
-  cs: { name: "Topení", description: "Místnosti a režim domu z plánovače topení." },
-  en: { name: "Heating", description: "Rooms and house mode of the heating scheduler." },
+  cs: { name: "Heating Scheduler", description: "Místnosti a režim domu z plánovače topení." },
+  en: { name: "Heating Scheduler", description: "Rooms and house mode of the heating scheduler." },
 };
 
 interface InnerCard extends HTMLElement {

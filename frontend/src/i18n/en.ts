@@ -1,6 +1,6 @@
 // English texts. Keys are shared with cs.ts; a test checks that both have the same keys.
 export const en = {
-  "app.title": "Heating",
+  "app.title": "Heating Scheduler",
   "nav.home": "Overview",
   "nav.plans": "Plans",
   "nav.advanced": "Advanced",

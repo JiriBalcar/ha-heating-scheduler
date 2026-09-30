@@ -15,15 +15,14 @@ from .const import (
     PANEL_COMPONENT,
     PANEL_FILE,
     PANEL_ICON,
+    PANEL_TITLE,
     PANEL_URL_PATH,
     STATIC_URL,
     VERSION,
 )
-from .core.text import language
 
 DIST = Path(__file__).parent / "dist"
 _DATA_KEY = f"{DOMAIN}_frontend"
-SIDEBAR_TITLES = {"cs": "Topení", "en": "Heating"}
 
 
 def _cache_key() -> str:
@@ -52,7 +51,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name=PANEL_COMPONENT,
-        sidebar_title=SIDEBAR_TITLES[language(hass.config.language)],
+        sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         module_url=f"{STATIC_URL}/{PANEL_FILE}?v={key}",
         require_admin=False,

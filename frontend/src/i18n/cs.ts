@@ -2,7 +2,7 @@
 import type { TextKey } from "./en";
 
 export const cs: Record<TextKey, string> = {
-  "app.title": "Topení",
+  "app.title": "Heating Scheduler",
   "nav.home": "Přehled",
   "nav.plans": "Plány",
   "nav.advanced": "Rozšířené",

@@ -2,12 +2,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Plánovač topení",
-        "description": "Nastaví plánovač topení. Místnosti a termostatické hlavice přidáte potom v panelu Topení."
+        "title": "Heating Scheduler",
+        "description": "Nastaví plánovač topení. Místnosti a termostatické hlavice přidáte potom v panelu Heating Scheduler."
       }
     },
     "abort": {
-      "single_instance_allowed": "Plánovač topení je už nastavený."
+      "single_instance_allowed": "Heating Scheduler je už nastavený."
     }
   },
   "device": {
