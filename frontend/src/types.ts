@@ -43,6 +43,7 @@ export interface HomeAssistant {
 export interface CardConfig {
   type: string;
   room?: string;
+  zone?: string;
   compact?: boolean;
   show_house?: boolean;
 }
@@ -121,6 +122,7 @@ export interface RoomData {
   temp_set_id: string;
   temperature_entity: string | null;
   area_id: string | null;
+  zone_id: string;
   current_temperature: number | null;
   target: TargetData | null;
   override: OverrideData | null;
@@ -143,10 +145,25 @@ export interface SettingsData {
   dry_run: boolean;
 }
 
+/** The house mode and holiday of a zone. */
+export interface HouseData {
+  mode: HouseMode;
+  effective: HouseMode;
+  vacation: VacationData | null;
+}
+
+/** A part of the house, e.g. a floor, with its own mode and holiday. */
+export interface ZoneData {
+  id: string;
+  name: string;
+  house: HouseData;
+  rooms: string[];
+}
+
 export interface Snapshot {
   revision: number;
   time_zone: string;
-  house: { mode: HouseMode; effective: HouseMode; vacation: VacationData | null };
+  zones: ZoneData[];
   settings: SettingsData;
   plans: PlanData[];
   temp_sets: TempSetData[];
@@ -173,4 +190,5 @@ export interface Candidates {
     unit: string | null;
   }[];
   areas: { area_id: string; name: string; climates: string[]; temperature_entity: string | null }[];
+  floors: { floor_id: string; name: string; rooms: string[] }[];
 }

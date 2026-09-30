@@ -19,6 +19,7 @@ interface RoomForm {
   temperature_entity?: string;
   plan_id: string;
   temp_set_id: string;
+  zone_id: string;
 }
 
 const LABELS: Record<keyof RoomForm, TextKey> = {
@@ -27,6 +28,7 @@ const LABELS: Record<keyof RoomForm, TextKey> = {
   temperature_entity: "adv.rooms.temperature_entity",
   plan_id: "adv.rooms.plan",
   temp_set_id: "adv.rooms.temp_set",
+  zone_id: "adv.rooms.zone",
 };
 
 /** Create or change a room: name, valves, shown temperature, plan, temperatures. */
@@ -78,6 +80,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       temperature_entity: room?.temperature_entity ?? undefined,
       plan_id: room?.plan_id ?? "house",
       temp_set_id: room?.temp_set_id ?? "house",
+      zone_id: room?.zone_id ?? this.snapshot.zones[0]?.id ?? "house",
     };
     this.error = "";
     this.saving = false;
@@ -118,6 +121,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       temp_set_id: "house",
       temperature_entity: null,
       area_id: null,
+      zone_id: this.data.zone_id,
       current_temperature: null,
       target: null,
       override: null,
@@ -130,6 +134,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       temperature_entity: this.data.temperature_entity || null,
       plan_id: this.data.plan_id,
       temp_set_id: this.data.temp_set_id,
+      zone_id: this.data.zone_id,
     });
     try {
       await storeFor(this.hass).call("room/save", {
@@ -153,8 +158,24 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       ...candidates.temperature_entities.map((sensor) => sensor.entity_id),
       ...candidates.climates.map((climate) => climate.entity_id),
     ];
+    const zones =
+      this.snapshot.zones.length > 1
+        ? [
+            {
+              name: "zone_id",
+              required: true,
+              selector: {
+                select: {
+                  mode: "dropdown",
+                  options: this.snapshot.zones.map((zone) => ({ value: zone.id, label: zone.name })),
+                },
+              },
+            },
+          ]
+        : [];
     return [
       { name: "name", required: true, selector: { text: {} } },
+      ...zones,
       { name: "trvs", selector: { entity: { multiple: true, include_entities: free } } },
       { name: "temperature_entity", selector: { entity: { include_entities: sensors } } },
       {
@@ -182,12 +203,12 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
   private helper = (field: { name: string }): string | undefined => {
     const t = this.t;
     if (field.name === "temperature_entity") return `${t("adv.rooms.sensor_empty")} ${t("adv.rooms.sensor_hint")}`;
-    if (field.name === "trvs" && this.params?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
+    if (field.name === "trvs" && this.args?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
     return undefined;
   };
 
   override render() {
-    if (!this.params || !this.hass || !this.snapshot) return nothing;
+    if (!this.args || !this.hass || !this.snapshot) return nothing;
     const t = this.t;
     return html`
       <ha-dialog
@@ -198,7 +219,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
         <ha-form
           .hass=${this.hass}
           .data=${this.data}
-          .schema=${this.schema(this.params.candidates)}
+          .schema=${this.schema(this.args.candidates)}
           .computeLabel=${this.label}
           .computeHelper=${this.helper}
           @value-changed=${(e: CustomEvent<{ value: RoomForm }>) => (this.data = { ...this.data, ...e.detail.value })}

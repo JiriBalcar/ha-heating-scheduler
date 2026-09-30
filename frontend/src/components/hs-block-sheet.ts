@@ -110,7 +110,7 @@ export class HsBlockSheet extends HsHaDialog<BlockParams> {
   private change(day: Day, index = this.index) {
     this.day = day;
     this.index = Math.max(0, Math.min(index, day.length - 1));
-    this.params?.onChange(day);
+    this.args?.onChange(day);
   }
 
   setMode(mode: Mode) {
@@ -154,7 +154,7 @@ export class HsBlockSheet extends HsHaDialog<BlockParams> {
   }
 
   override render() {
-    if (!this.params || !this.day) return nothing;
+    if (!this.args || !this.day) return nothing;
     const t = this.t;
     const segment = segments(this.day)[this.index];
     if (!segment) return nothing;
@@ -164,7 +164,7 @@ export class HsBlockSheet extends HsHaDialog<BlockParams> {
     return html`
       <ha-dialog
         .open=${this.open}
-        header-title=${`${this.params.dayName} ${toHHMM(segment.start)} – ${toHHMM(segment.end)}`}
+        header-title=${`${this.args.dayName} ${toHHMM(segment.start)} – ${toHHMM(segment.end)}`}
         @closed=${this.onClosed}
       >
         <p class="label">${t("editor.mode")}</p>

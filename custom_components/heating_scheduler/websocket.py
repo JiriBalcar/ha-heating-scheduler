@@ -578,14 +578,23 @@ def zones_from_floors(config: Config, room_floors: dict[str, tuple[str, str]]) -
 
 
 def _room_floors(hass: HomeAssistant, engine: HeatingEngine) -> dict[str, tuple[str, str]]:
-    """Map rooms whose area is on a floor to (floor id, floor name), in floor order."""
+    """Map rooms on a floor to (floor id, floor name), in floor order.
+
+    A room is in its own area, or else in the area of its first valve that has one.
+    """
     areas = ar.async_get(hass)
     floors = fr.async_get(hass)
+    entities = er.async_get(hass)
+    devices = dr.async_get(hass)
     order = {floor.floor_id: index for index, floor in enumerate(floors.async_list_floors())}
     found: list[tuple[int, str, str, str]] = []
     for room in engine.config.rooms.values():
-        area = areas.async_get_area(room.area_id) if room.area_id else None
-        floor = floors.async_get_floor(area.floor_id) if area and area.floor_id else None
+        area_id = room.area_id or next(
+            (found_area for trv in room.trvs if (found_area := _area_of(trv, entities, devices))),
+            None,
+        )
+        entry = areas.async_get_area(area_id) if area_id else None
+        floor = floors.async_get_floor(entry.floor_id) if entry and entry.floor_id else None
         if floor is not None:
             found.append((order.get(floor.floor_id, 0), room.id, floor.floor_id, floor.name))
     found.sort(key=lambda item: item[0])

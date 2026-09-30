@@ -17,6 +17,7 @@ describe("payload helpers", () => {
       temp_set_id: "house",
       temperature_entity: null,
       area_id: "obyvak",
+      zone_id: "house",
       current_temperature: 20,
       target: null,
       override: null,
@@ -31,6 +32,7 @@ describe("payload helpers", () => {
       temp_set_id: "house",
       temperature_entity: null,
       area_id: "obyvak",
+      zone_id: "house",
     });
   });
 });

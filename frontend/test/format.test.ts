@@ -71,6 +71,11 @@ describe("reason and next", () => {
     const vacation: TargetData = { ...plan, mode: "frost", temperature: 7, source: "vacation" };
     expect(reasonText(vacation, NOW, en, t)).toBe("Holiday until Tue 6 Oct 06:00");
   });
+  it("names the part of the house that is away", () => {
+    const away: TargetData = { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null };
+    expect(reasonText(away, NOW, en, t)).toBe("House: Away");
+    expect(reasonText(away, NOW, en, t, "1st floor")).toBe("1st floor: Away");
+  });
   it("has no next text without a change", () => {
     expect(nextText({ ...plan, valid_until: null, next: null }, NOW, en, t)).toBeNull();
   });

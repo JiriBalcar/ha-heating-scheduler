@@ -20,6 +20,7 @@ from custom_components.heating_scheduler.core.model import (
     Config,
     HouseMode,
     HouseState,
+    Room,
     Source,
     Zone,
 )
@@ -221,10 +222,17 @@ async def test_zones_from_floors(
     areas = ar.async_get(hass)
     living_area = areas.async_create("Living", floor_id=ground.floor_id)
     bed_area = areas.async_create("Bed", floor_id=first.floor_id)
+    # A room without an area of its own is on the floor of its valve's area.
+    registry = er.async_get(hass)
+    attic_trv = registry.async_get_or_create(
+        "climate", "test", "attic", suggested_object_id="attic"
+    )
+    registry.async_update_entity(attic_trv.entity_id, area_id=bed_area.id)
     config = two_rooms()
     rooms = {
         "living": replace(config.rooms["living"], area_id=living_area.id),
         "bedroom": replace(config.rooms["bedroom"], area_id=bed_area.id),
+        "attic": Room("attic", "Attic", (attic_trv.entity_id,)),
     }
     store(hass_storage, replace(config, rooms=rooms))
     entry = await setup_entry(hass)
@@ -233,7 +241,7 @@ async def test_zones_from_floors(
     candidates = await ws.ok("candidates")
     assert [(item["name"], item["rooms"]) for item in candidates["floors"]] == [
         ("Ground floor", ["living"]),
-        ("First floor", ["bedroom"]),
+        ("First floor", ["bedroom", "attic"]),
     ]
     await ws.ok("zones/from_floors", revision=0)
     names = {zone.name: zone.id for zone in engine.config.zones.values()}
@@ -241,6 +249,7 @@ async def test_zones_from_floors(
     assert list(names) == ["Ground floor", "First floor"]
     assert engine.config.rooms["living"].zone_id == names["Ground floor"]
     assert engine.config.rooms["bedroom"].zone_id == names["First floor"]
+    assert engine.config.rooms["attic"].zone_id == names["First floor"]
     # Running it again changes nothing.
     await ws.ok("zones/from_floors", revision=1)
     assert {zone.name for zone in engine.config.zones.values()} == set(names)

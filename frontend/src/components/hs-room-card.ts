@@ -6,6 +6,7 @@ import { MODE_COLORS, MODE_ICONS, roomTemperatures } from "../modes";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, RoomData, Snapshot } from "../types";
+import { zoneOf } from "../zones";
 import { define } from "./define";
 import { openProblemDialog } from "./hs-problem-dialog";
 
@@ -192,7 +193,10 @@ export class HsRoomCard extends LitElement {
         const label = next.temperature === null ? modeLabel(next.mode, t) : `${modeLabel(next.mode, t)} ${formatTemp(next.temperature, ctx)}`;
         parts[parts.length - 1] += ` → ${label}`;
       }
-    } else if (target) parts.push(reasonText(target, new Date(), ctx, t));
+    } else if (target) {
+      const zone = this.snapshot.zones.length > 1 ? zoneOf(this.snapshot, room).name : undefined;
+      parts.push(reasonText(target, new Date(), ctx, t, zone));
+    }
     return parts.join(" · ");
   }
 
@@ -226,7 +230,7 @@ export class HsRoomCard extends LitElement {
     if (!room || !this.snapshot || !this.hass) return nothing;
     const t = this.t;
     const target = room.target;
-    const canChange = this.snapshot.house.effective === "auto" && target !== null;
+    const canChange = zoneOf(this.snapshot, room).house.effective === "auto" && target !== null;
     const manual = this.pending !== null || target?.source === "manual";
     const mode = manual ? "manual" : (target?.mode ?? "off");
     const problems = room.issues.length > 0;

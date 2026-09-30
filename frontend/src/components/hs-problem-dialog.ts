@@ -18,6 +18,10 @@ export class HsProblemDialog extends HsHaDialog<ProblemParams> {
       display: block;
       margin-bottom: var(--ha-space-3, 12px);
     }
+    ha-alert ha-button::part(base) {
+      /* The alert makes its action as narrow as the longest word, and HA lets button labels wrap. */
+      white-space: nowrap;
+    }
     .since {
       display: block;
       color: var(--secondary-text-color);
@@ -44,7 +48,7 @@ export class HsProblemDialog extends HsHaDialog<ProblemParams> {
   }
 
   override render() {
-    const room = this.params?.room;
+    const room = this.args?.room;
     if (!room || !this.hass) return nothing;
     const lang = languageOf(this.hass);
     const t = translator(lang);

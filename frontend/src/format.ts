@@ -187,12 +187,23 @@ export function modeLabel(mode: TargetMode, t: Translate): string {
   return t(`mode.${mode}`);
 }
 
-/** "Plan: Night until 06:00", "Holiday until 12. 10. 12:00", ... */
-export function reasonText(target: TargetData, now: Date, ctx: FormatContext, t: Translate): string {
+/**
+ * "Plan: Night until 06:00", "Holiday until 12. 10. 12:00", ...
+ * With `zone` (the name of the room's part of the house), "1. patro: Away" and not "House: Away".
+ */
+export function reasonText(
+  target: TargetData,
+  now: Date,
+  ctx: FormatContext,
+  t: Translate,
+  zone?: string,
+): string {
   const base =
     target.source === "plan"
       ? t("reason.plan", { mode: modeLabel(target.mode, t) })
-      : t(`reason.${target.source}`);
+      : target.source === "house_away" && zone
+        ? t("reason.zone_away", { zone })
+        : t(`reason.${target.source}`);
   if (!target.valid_until) return base;
   // A holiday end is always shown with its date: "until 12:00" alone is ambiguous there.
   const until =

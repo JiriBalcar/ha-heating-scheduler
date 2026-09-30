@@ -48,6 +48,9 @@ class HeatingSchedulerCardLoader extends HTMLElement {
     if (config.room !== undefined && typeof config.room !== "string") {
       throw new Error("room must be a room id");
     }
+    if (config.zone !== undefined && typeof config.zone !== "string") {
+      throw new Error("zone must be a zone id");
+    }
     this.config = config;
     this.inner?.setConfig(config);
   }

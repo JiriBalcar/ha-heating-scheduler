@@ -386,13 +386,13 @@ export class HsSavePlanDialog extends HsHaDialog<SavePlanParams> {
   `;
 
   override showDialog(params: SavePlanParams): void {
-    this.params?.resolve(false);
+    this.args?.resolve(false);
     this.confirmed = false;
     super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
-    this.params?.resolve(this.confirmed);
+    this.args?.resolve(this.confirmed);
   }
 
   private answer(save: boolean) {
@@ -401,7 +401,7 @@ export class HsSavePlanDialog extends HsHaDialog<SavePlanParams> {
   }
 
   override render() {
-    const p = this.params;
+    const p = this.args;
     if (!p) return nothing;
     const t = translator(languageOf(this.hass));
     return html`

@@ -182,6 +182,8 @@ export class HsAdvRooms extends LitElement {
     const planName = (id: string) => this.snapshot.plans.find((plan) => plan.id === id)?.name ?? id;
     const setName = (id: string) => this.snapshot.temp_sets.find((set) => set.id === id)?.name ?? id;
     const rooms = this.snapshot.rooms;
+    const zones = this.snapshot.zones.length;
+    const zoneName = (id: string) => this.snapshot.zones.find((zone) => zone.id === id)?.name ?? id;
     return html`
       <div class="actions">
         <ha-button .disabled=${this.busy} @click=${() => this.edit(null)}>
@@ -198,7 +200,8 @@ export class HsAdvRooms extends LitElement {
             <span slot="headline">${room.name}</span>
             <span slot="supporting-text">${t("adv.rooms.trvs")}: ${this.valveNames(room)}</span>
             <span slot="supporting-text">
-              ${t("adv.rooms.plan")}: ${planName(room.plan_id)} · ${t("adv.rooms.temp_set")}: ${setName(room.temp_set_id)}
+              ${zones > 1 ? `${t("adv.rooms.zone")}: ${zoneName(room.zone_id)} · ` : ""}${t("adv.rooms.plan")}:
+              ${planName(room.plan_id)} · ${t("adv.rooms.temp_set")}: ${setName(room.temp_set_id)}
             </span>
             <ha-dropdown
               slot="end"
@@ -248,14 +251,14 @@ export class HsImportRoomsDialog extends HsHaDialog<ImportParams> {
   `;
 
   override showDialog(params: ImportParams): void {
-    this.params?.resolve([]);
+    this.args?.resolve([]);
     this.chosen = params.areas.map((area) => area.area_id);
     this.result = [];
     super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
-    this.params?.resolve(this.result);
+    this.args?.resolve(this.result);
   }
 
   private add() {
@@ -264,9 +267,9 @@ export class HsImportRoomsDialog extends HsHaDialog<ImportParams> {
   }
 
   override render() {
-    if (!this.params) return nothing;
+    if (!this.args) return nothing;
     const t = translator(languageOf(this.hass));
-    const areas = this.params.areas;
+    const areas = this.args.areas;
     const schema = [
       {
         name: "areas",

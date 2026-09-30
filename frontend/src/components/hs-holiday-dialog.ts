@@ -4,12 +4,14 @@ import { showDialog } from "../ha";
 import { languageOf, translator } from "../i18n";
 import { houseTemperature } from "../modes";
 import { errorText, storeFor, toast } from "../store";
-import type { Snapshot } from "../types";
+import type { Snapshot, ZoneData } from "../types";
 import { define } from "./define";
 import { HsHaDialog, confirmDialog } from "./hs-dialog";
 
 interface HolidayParams {
   snapshot: Snapshot;
+  /** The zone of the holiday; null for the whole house. */
+  zone: ZoneData | null;
 }
 
 interface HolidayData {
@@ -80,14 +82,14 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
   /** An instant from "YYYY-MM-DD" and "HH:MM[:SS]" in the house's time zone. */
   private instant(date: string | undefined, time: string | undefined): Date | null {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2})/.exec(`${date ?? ""} ${time ?? ""}`);
-    if (!match || !this.params) return null;
+    if (!match || !this.args) return null;
     const [year, month, day, hour, minute] = match.slice(1).map(Number) as [number, number, number, number, number];
-    return zonedToUtc(year, month, day, hour, minute, this.params.snapshot.time_zone);
+    return zonedToUtc(year, month, day, hour, minute, this.args.snapshot.time_zone);
   }
 
   private schema() {
     const t = this.t;
-    const snapshot = this.params!.snapshot;
+    const snapshot = this.args!.snapshot;
     const ctx = formatContext(this.hass, languageOf(this.hass), snapshot);
     const temperature = (mode: "frost" | "away") => formatTemp(houseTemperature(snapshot, mode), ctx);
     return [
@@ -144,7 +146,7 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
 
   private async submit() {
     const t = this.t;
-    const snapshot = this.params!.snapshot;
+    const snapshot = this.args!.snapshot;
     const ctx = formatContext(this.hass, languageOf(this.hass), snapshot);
     const end = this.instant(this.data.end_date, this.data.end_time);
     if (!end) {
@@ -159,9 +161,15 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
     }
     const temp = formatTemp(houseTemperature(snapshot, this.data.mode), ctx);
     const to = formatDateTime(end.toISOString(), ctx);
-    const message = begin
-      ? t("vacation.confirm", { from: formatDateTime(begin.toISOString(), ctx), to, temp })
-      : t("vacation.confirm_now", { to, temp });
+    const zone = this.args!.zone;
+    const from = begin ? formatDateTime(begin.toISOString(), ctx) : "";
+    const message = zone
+      ? begin
+        ? t("vacation.confirm_zone", { zone: zone.name, from, to, temp })
+        : t("vacation.confirm_now_zone", { zone: zone.name, to, temp })
+      : begin
+        ? t("vacation.confirm", { from, to, temp })
+        : t("vacation.confirm_now", { to, temp });
     const ok = await confirmDialog(this, {
       heading: t("vacation.title"),
       message,
@@ -174,6 +182,7 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
         start: begin ? begin.toISOString() : null,
         end: end.toISOString(),
         mode: this.data.mode,
+        zone_id: zone?.id,
       });
       this.closeDialog();
     } catch (error) {
@@ -182,10 +191,14 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
   }
 
   override render() {
-    if (!this.params || !this.hass) return nothing;
+    if (!this.args || !this.hass) return nothing;
     const t = this.t;
     return html`
-      <ha-dialog .open=${this.open} header-title=${t("vacation.title")} @closed=${this.onClosed}>
+      <ha-dialog
+        .open=${this.open}
+        header-title=${this.args.zone ? t("vacation.title_zone", { zone: this.args.zone.name }) : t("vacation.title")}
+        @closed=${this.onClosed}
+      >
         <ha-form
           .hass=${this.hass}
           .data=${this.data}
@@ -209,6 +222,6 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
 
 define("hs-holiday-dialog", HsHolidayDialog);
 
-export function openHolidayDialog(host: HTMLElement, snapshot: Snapshot): void {
-  showDialog(host, "hs-holiday-dialog", { snapshot });
+export function openHolidayDialog(host: HTMLElement, snapshot: Snapshot, zone: ZoneData | null): void {
+  showDialog(host, "hs-holiday-dialog", { snapshot, zone });
 }

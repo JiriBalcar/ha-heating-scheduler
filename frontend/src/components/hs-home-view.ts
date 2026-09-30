@@ -2,12 +2,16 @@ import { repeat } from "lit/directives/repeat.js";
 import { LitElement, css, html, nothing } from "lit";
 import { languageOf, translator } from "../i18n";
 import { baseStyles } from "../styles";
-import type { HomeAssistant, Snapshot } from "../types";
+import type { HomeAssistant, RoomData, Snapshot } from "../types";
+import { roomsOf } from "../zones";
 import { define } from "./define";
 import "./hs-house-card";
 import "./hs-room-card";
 
-/** The simple view: house mode and one tile per room, laid out like a dashboard. */
+/**
+ * The simple view, laid out like a dashboard: the house mode and one tile per room. With two or
+ * more zones, a whole-house tile comes first, then each zone's tile with the zone's rooms.
+ */
 export class HsHomeView extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -21,6 +25,10 @@ export class HsHomeView extends LitElement {
     css`
       :host {
         display: block;
+      }
+      .zones {
+        display: grid;
+        gap: var(--ha-space-6, 24px);
       }
       .grid {
         display: grid;
@@ -47,28 +55,52 @@ export class HsHomeView extends LitElement {
     );
   }
 
+  private rooms(rooms: RoomData[]) {
+    return repeat(
+      rooms,
+      (room) => room.id,
+      (room) => html`<hs-room-card .hass=${this.hass} .room=${room} .snapshot=${this.snapshot}></hs-room-card>`,
+    );
+  }
+
   override render() {
     if (!this.snapshot) return nothing;
     const t = translator(languageOf(this.hass));
-    return html`
-      ${this.snapshot.settings.dry_run
-        ? html`<ha-alert alert-type="warning">${t("adv.dry_run_banner")}</ha-alert>`
-        : nothing}
-      <div class="grid">
-        <hs-house-card .hass=${this.hass} .snapshot=${this.snapshot}></hs-house-card>
-        ${this.snapshot.rooms.length === 0
-          ? html`<ha-card class="empty">
-              <p>${t("adv.rooms.empty")}</p>
-              <ha-button @click=${this.addRooms}>${t("adv.rooms.add")}</ha-button>
-            </ha-card>`
-          : repeat(
-              this.snapshot.rooms,
-              (room) => room.id,
-              (room) =>
-                html`<hs-room-card .hass=${this.hass} .room=${room} .snapshot=${this.snapshot}></hs-room-card>`,
-            )}
-      </div>
-    `;
+    const snapshot = this.snapshot;
+    const alert = snapshot.settings.dry_run
+      ? html`<ha-alert alert-type="warning">${t("adv.dry_run_banner")}</ha-alert>`
+      : nothing;
+    if (snapshot.rooms.length === 0) {
+      return html`${alert}
+        <div class="grid">
+          <hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>
+          <ha-card class="empty">
+            <p>${t("adv.rooms.empty")}</p>
+            <ha-button @click=${this.addRooms}>${t("adv.rooms.add")}</ha-button>
+          </ha-card>
+        </div>`;
+    }
+    if (snapshot.zones.length < 2) {
+      return html`${alert}
+        <div class="grid">
+          <hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>
+          ${this.rooms(snapshot.rooms)}
+        </div>`;
+    }
+    return html`${alert}
+      <div class="zones">
+        <div class="grid">
+          <hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>
+        </div>
+        ${repeat(
+          snapshot.zones,
+          (zone) => zone.id,
+          (zone) => html`<div class="grid">
+            <hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>
+            ${this.rooms(roomsOf(snapshot, zone))}
+          </div>`,
+        )}
+      </div>`;
   }
 }
 

@@ -8,8 +8,10 @@ import { languageOf, translator, type TextKey } from "./i18n";
 import { storeFor } from "./store";
 import { baseStyles } from "./styles";
 import type { CardConfig, HomeAssistant, Snapshot } from "./types";
+import { roomsOf } from "./zones";
 
 const ALL_ROOMS = "all";
+const WHOLE_HOUSE = "house:all";
 
 export class HeatingSchedulerCard extends LitElement {
   static override properties = {
@@ -82,13 +84,16 @@ export class HeatingSchedulerCard extends LitElement {
     const t = translator(languageOf(this.hass));
     const snapshot = this.snapshot;
     if (!snapshot) return html`<ha-card class="status">${t("common.loading")}</ha-card>`;
+    const zone = snapshot.zones.find((item) => item.id === this.config.zone) ?? null;
     const rooms = this.config.room
       ? snapshot.rooms.filter((room) => room.id === this.config.room)
-      : snapshot.rooms;
+      : zone
+        ? roomsOf(snapshot, zone)
+        : snapshot.rooms;
     return html`
       <div class="stack">
         ${this.config.show_house
-          ? html`<hs-house-card .hass=${this.hass} .snapshot=${snapshot}></hs-house-card>`
+          ? html`<hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>`
           : nothing}
         ${repeat(
           rooms,
@@ -146,7 +151,26 @@ export class HeatingSchedulerCardEditor extends LitElement {
 
   private schema() {
     const rooms = this.snapshot?.rooms ?? [];
+    const zones = this.snapshot?.zones ?? [];
+    const zone =
+      zones.length > 1
+        ? [
+            {
+              name: "zone",
+              selector: {
+                select: {
+                  mode: "dropdown",
+                  options: [
+                    { value: WHOLE_HOUSE, label: this.t("card.whole_house") },
+                    ...zones.map((item) => ({ value: item.id, label: item.name })),
+                  ],
+                },
+              },
+            },
+          ]
+        : [];
     return [
+      ...zone,
       {
         name: "room",
         selector: {
@@ -171,6 +195,7 @@ export class HeatingSchedulerCardEditor extends LitElement {
     const config: CardConfig = {
       ...this.config,
       room: value.room === ALL_ROOMS ? undefined : (value.room as string | undefined),
+      zone: value.zone === WHOLE_HOUSE ? undefined : (value.zone as string | undefined),
       show_house: Boolean(value.show_house),
       compact: Boolean(value.compact),
     };
@@ -185,6 +210,7 @@ export class HeatingSchedulerCardEditor extends LitElement {
     if (!this.hass || !this.config) return nothing;
     const data = {
       room: this.config.room ?? ALL_ROOMS,
+      zone: this.config.zone ?? WHOLE_HOUSE,
       show_house: this.config.show_house ?? false,
       compact: this.config.compact ?? false,
     };

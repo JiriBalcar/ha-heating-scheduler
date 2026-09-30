@@ -8,15 +8,18 @@ import { define } from "./define";
  * A dialog that Home Assistant's dialog manager shows (see `showDialog` in ../ha). HA creates the
  * element once, sets `hass`, calls `showDialog(params)`, and calls `closeDialog()` on Back.
  * Subclasses render `<ha-dialog .open=${this.open} @closed=${this.onClosed}>`.
+ *
+ * The parameters are kept in `args`, not `params`: HA takes an element with a `params` property
+ * for its newer dialog type, drops it after closing and creates the next one without `hass`.
  */
 export class HsHaDialog<P> extends LitElement {
   static override properties: PropertyDeclarations = {
     hass: { attribute: false },
-    params: { state: true },
+    args: { state: true },
     open: { state: true },
   };
   declare hass: HomeAssistant;
-  declare params: P | undefined;
+  declare args: P | undefined;
   declare open: boolean;
 
   constructor() {
@@ -25,7 +28,7 @@ export class HsHaDialog<P> extends LitElement {
   }
 
   showDialog(params: P): void {
-    this.params = params;
+    this.args = params;
     this.open = true;
   }
 
@@ -34,14 +37,14 @@ export class HsHaDialog<P> extends LitElement {
     return true;
   }
 
-  /** Runs when the dialog has closed, before `params` is cleared. */
+  /** Runs when the dialog has closed, before `args` is cleared. */
   protected dialogClosed(): void {}
 
   protected onClosed(event: Event): void {
     // Only the dialog itself, not a "closed" event of a field inside it.
     if (event.target !== event.currentTarget) return;
     this.dialogClosed();
-    this.params = undefined;
+    this.args = undefined;
     fire(this, "dialog-closed", { dialog: this.localName });
   }
 }
@@ -70,13 +73,13 @@ export class HsConfirmDialog extends HsHaDialog<ConfirmParams> {
 
   override showDialog(params: ConfirmParams): void {
     // A new question replaces one that is still open.
-    this.params?.resolve(false);
+    this.args?.resolve(false);
     this.confirmed = false;
     super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
-    this.params?.resolve(this.confirmed);
+    this.args?.resolve(this.confirmed);
   }
 
   private answer(confirmed: boolean) {
@@ -85,7 +88,7 @@ export class HsConfirmDialog extends HsHaDialog<ConfirmParams> {
   }
 
   override render() {
-    const p = this.params;
+    const p = this.args;
     if (!p) return nothing;
     return html`
       <ha-dialog .open=${this.open} type="alert" prevent-scrim-close @closed=${this.onClosed}>

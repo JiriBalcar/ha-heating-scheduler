@@ -283,14 +283,14 @@ export class HsNewPlanDialog extends HsHaDialog<NewPlanParams> {
   private result: NewPlan | null = null;
 
   override showDialog(params: NewPlanParams): void {
-    this.params?.resolve(null);
+    this.args?.resolve(null);
     this.data = { name: params.name, source: "house" };
     this.result = null;
     super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
-    this.params?.resolve(this.result);
+    this.args?.resolve(this.result);
   }
 
   private get t() {
@@ -304,7 +304,7 @@ export class HsNewPlanDialog extends HsHaDialog<NewPlanParams> {
   }
 
   override render() {
-    if (!this.params) return nothing;
+    if (!this.args) return nothing;
     const t = this.t;
     const schema = [
       { name: "name", required: true, selector: { text: {} } },
@@ -314,7 +314,7 @@ export class HsNewPlanDialog extends HsHaDialog<NewPlanParams> {
         selector: {
           select: {
             mode: "dropdown",
-            options: this.params.plans.map((plan) => ({ value: plan.id, label: plan.name })),
+            options: this.args.plans.map((plan) => ({ value: plan.id, label: plan.name })),
           },
         },
       },

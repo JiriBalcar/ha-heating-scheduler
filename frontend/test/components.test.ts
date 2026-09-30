@@ -3,9 +3,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import "../src/components/hs-adv-settings";
 import "../src/components/hs-block-sheet";
+import "../src/components/hs-house-card";
 import "../src/components/hs-plan-editor";
+import "../src/components/hs-room-card";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
-import type { Candidates, HomeAssistant, PlanData, Snapshot } from "../src/types";
+import type { Candidates, HomeAssistant, HouseData, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -44,7 +46,7 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
   return {
     revision,
     time_zone: "Europe/Prague",
-    house: { mode: "auto", effective: "auto", vacation: null },
+    zones: [{ id: "house", name: "House", house: { mode: "auto", effective: "auto", vacation: null }, rooms: [] }],
     settings: {
       max_override_minutes: 240,
       safety_interval_minutes: 5,
@@ -66,7 +68,7 @@ beforeAll(async () => {
   // Our elements are defined once Home Assistant has defined its root element.
   customElements.define("home-assistant", class extends HTMLElement {});
   await Promise.all(
-    ["hs-adv-settings", "hs-block-sheet", "hs-plan-editor", "hs-room-dialog"].map((name) =>
+    ["hs-adv-settings", "hs-block-sheet", "hs-house-card", "hs-plan-editor", "hs-room-card", "hs-room-dialog"].map((name) =>
       customElements.whenDefined(name),
     ),
   );
@@ -194,7 +196,7 @@ describe("room dialog (F07)", () => {
       return { room_id: "room_new", revision: 3 };
     });
     installDialogManager(hass);
-    const candidates: Candidates = { climates: [], temperature_entities: [], areas: [] };
+    const candidates: Candidates = { climates: [], temperature_entities: [], areas: [], floors: [] };
     openRoomDialog(document.body, snapshot(1), candidates, null);
     const dialog = await shownDialog("hs-room-dialog");
     dialog.data = { ...dialog.data, name: "New room" };
@@ -204,5 +206,50 @@ describe("room dialog (F07)", () => {
     await dialog.save();
     expect(revisions).toEqual([1, 2]);
     expect(dialog.error).toBe("");
+  });
+});
+
+describe("zones on the overview", () => {
+  const AUTO: HouseData = { mode: "auto", effective: "auto", vacation: null };
+  const AWAY: HouseData = { mode: "away", effective: "away", vacation: null };
+  const ZONES: ZoneData[] = [
+    { id: "down", name: "Ground floor", house: AUTO, rooms: [] },
+    { id: "up", name: "1st floor", house: AWAY, rooms: ["bed"] },
+  ];
+  const BEDROOM: RoomData = {
+    id: "bed",
+    name: "Bedroom",
+    trvs: ["climate.bed"],
+    plan_id: "house",
+    temp_set_id: "house",
+    temperature_entity: null,
+    area_id: null,
+    zone_id: "up",
+    current_temperature: 19,
+    target: { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null },
+    override: null,
+    issues: [],
+    trv_status: [],
+  };
+
+  async function show(tag: string, props: Record<string, unknown>): Promise<string> {
+    const element = document.createElement(tag) as Any;
+    Object.assign(element, { hass: fakeHass(async () => undefined), ...props });
+    document.body.appendChild(element);
+    await element.updateComplete;
+    return element.shadowRoot.querySelector('[slot="secondary"]').textContent.replace(/\s+/g, " ").trim();
+  }
+
+  it("shows each zone when the zones differ", async () => {
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
+    expect(await show("hs-house-card", { snapshot: data })).toBe("Ground floor: Normal · 1st floor: Away");
+  });
+
+  it("speaks of the zone, not the whole house", async () => {
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
+    expect(await show("hs-house-card", { snapshot: data, zone: ZONES[1] })).toBe(
+      "This part of the house is set to Away.",
+    );
+    expect(await show("hs-room-card", { snapshot: data, room: BEDROOM })).toBe("19.0 °C · 1st floor: Away");
   });
 });

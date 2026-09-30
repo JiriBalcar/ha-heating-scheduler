@@ -28,14 +28,14 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
   `;
 
   override showDialog(params: CopyParams): void {
-    this.params?.resolve([]);
+    this.args?.resolve([]);
     this.chosen = [];
     this.result = [];
     super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
-    this.params?.resolve(this.result);
+    this.args?.resolve(this.result);
   }
 
   private get t() {
@@ -43,7 +43,7 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
   }
 
   private pick(days: number[]) {
-    const source = this.params?.source;
+    const source = this.args?.source;
     this.chosen = days.filter((day) => day !== source);
   }
 
@@ -57,9 +57,9 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
   }
 
   override render() {
-    if (!this.params) return nothing;
+    if (!this.args) return nothing;
     const t = this.t;
-    const source = this.params.source;
+    const source = this.args.source;
     const schema = [
       {
         name: "days",

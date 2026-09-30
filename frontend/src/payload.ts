@@ -12,6 +12,7 @@ export function roomPayload(room: RoomData, patch: Partial<RoomData> = {}) {
     temp_set_id: merged.temp_set_id,
     temperature_entity: merged.temperature_entity,
     area_id: merged.area_id,
+    zone_id: merged.zone_id,
   };
 }
 
