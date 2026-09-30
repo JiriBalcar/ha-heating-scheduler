@@ -166,6 +166,25 @@ describe("saving keeps edits made while waiting (F05)", () => {
   });
 });
 
+/** Stands in for HA's dialog manager: create the dialog once, give it hass, show it. */
+function installDialogManager(hass: HomeAssistant) {
+  document.addEventListener("show-dialog", async (event) => {
+    const { dialogTag, dialogImport, dialogParams } = (event as CustomEvent).detail;
+    await dialogImport();
+    let element = document.body.querySelector(dialogTag) as Any;
+    if (!element) element = document.body.appendChild(document.createElement(dialogTag));
+    element.hass = hass;
+    element.showDialog(dialogParams);
+  });
+}
+
+async function shownDialog(tag: string): Promise<Any> {
+  await new Promise((resolve) => setTimeout(resolve));
+  const element = document.body.querySelector(tag) as Any;
+  await element.updateComplete;
+  return element;
+}
+
 describe("room dialog (F07)", () => {
   it("saves with the newest revision after a conflict", async () => {
     const revisions: number[] = [];
@@ -174,10 +193,11 @@ describe("room dialog (F07)", () => {
       if (message.revision !== 2) throw { code: "revision_conflict", message: "conflict" };
       return { room_id: "room_new", revision: 3 };
     });
+    installDialogManager(hass);
     const candidates: Candidates = { climates: [], temperature_entities: [], areas: [] };
-    await openRoomDialog(document.body, hass, snapshot(1), candidates, null);
-    const dialog = document.body.querySelector("hs-room-dialog") as Any;
-    dialog.name = "New room";
+    openRoomDialog(document.body, snapshot(1), candidates, null);
+    const dialog = await shownDialog("hs-room-dialog");
+    dialog.data = { ...dialog.data, name: "New room" };
     await dialog.save();
     expect(dialog.error).not.toBe("");
     hass.push(snapshot(2));

@@ -5,7 +5,6 @@ import { baseStyles } from "../styles";
 import type { HomeAssistant, SettingsData, Snapshot } from "../types";
 import { define } from "./define";
 import { keepMineDialog } from "./hs-dialog";
-import "./hs-dialog";
 
 const OVERRIDE_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
 
@@ -40,38 +39,24 @@ export class HsAdvSettings extends LitElement {
   static override styles = [
     baseStyles,
     css`
-      .card {
-        padding: 18px;
+      :host {
+        display: block;
+        max-width: 760px;
+      }
+      ha-settings-row {
+        border-top: 1px solid var(--divider-color);
+      }
+      ha-settings-row:first-child {
+        border-top: none;
+      }
+      ha-select {
+        min-width: 140px;
+      }
+      .card-actions {
         display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-      .hint {
-        font-size: 15px;
-        font-weight: 400;
-      }
-      .choice {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-      .choice .btn[aria-pressed="true"] {
-        background: var(--hs-accent, #1565c0);
-        border-color: var(--hs-accent, #1565c0);
-        color: #fff;
-      }
-      .check {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        min-height: 52px;
-        font-size: 18px;
-      }
-      .check input {
-        width: 28px;
-        height: 28px;
-        accent-color: var(--hs-accent, #1565c0);
-        flex: none;
+        justify-content: flex-end;
+        border-top: 1px solid var(--divider-color);
+        padding: var(--ha-space-2, 8px);
       }
     `,
   ];
@@ -122,20 +107,32 @@ export class HsAdvSettings extends LitElement {
     }
   }
 
-  private select(label: string, values: number[], current: number, unit: "hours" | "minutes", onChange: (v: number) => void, hint?: string) {
+  /** A setting row with a dropdown of hours or minutes. */
+  private choice(
+    heading: string,
+    values: number[],
+    current: number,
+    unit: "hours" | "minutes",
+    onChange: (value: number) => void,
+    description?: string,
+  ) {
     const t = this.t;
-    const options = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
-    return html`<label class="field">
-      <span>${label}</span>
-      <select class="input" @change=${(e: Event) => onChange(Number((e.target as HTMLSelectElement).value))}>
-        ${options.map(
-          (value) => html`<option value=${value} ?selected=${value === current}>
-            ${t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value })}
-          </option>`,
-        )}
-      </select>
-      ${hint ? html`<span class="hint muted">${hint}</span>` : nothing}
-    </label>`;
+    const all = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
+    const options = all.map((value) => ({
+      value: String(value),
+      label: t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
+    }));
+    return html`<ha-settings-row>
+      <span slot="heading">${heading}</span>
+      ${description ? html`<span slot="description">${description}</span>` : nothing}
+      <ha-select
+        .options=${options}
+        .value=${String(current)}
+        @selected=${(e: CustomEvent<{ value?: string }>) => {
+          if (e.detail.value !== undefined) onChange(Number(e.detail.value));
+        }}
+      ></ha-select>
+    </ha-settings-row>`;
   }
 
   override render() {
@@ -143,8 +140,8 @@ export class HsAdvSettings extends LitElement {
     const t = this.t;
     const draft = this.draft;
     return html`
-      <div class="card">
-        ${this.select(
+      <ha-card>
+        ${this.choice(
           t("adv.settings.max_override"),
           OVERRIDE_HOURS,
           draft.max_override_minutes / 60,
@@ -152,43 +149,38 @@ export class HsAdvSettings extends LitElement {
           (hours) => this.set("max_override_minutes", Math.round(hours * 60)),
           t("adv.settings.max_override_hint"),
         )}
-        ${this.select(t("adv.settings.safety_interval"), SAFETY_MINUTES, draft.safety_interval_minutes, "minutes", (m) =>
+        ${this.choice(t("adv.settings.safety_interval"), SAFETY_MINUTES, draft.safety_interval_minutes, "minutes", (m) =>
           this.set("safety_interval_minutes", m),
         )}
-        ${this.select(t("adv.settings.mismatch_alert"), MISMATCH_MINUTES, draft.mismatch_alert_minutes, "minutes", (m) =>
+        ${this.choice(t("adv.settings.mismatch_alert"), MISMATCH_MINUTES, draft.mismatch_alert_minutes, "minutes", (m) =>
           this.set("mismatch_alert_minutes", m),
         )}
-        <div class="field">
-          <span>${t("adv.settings.vacation_mode")}</span>
-          <div class="choice">
-            <button
-              class="btn"
-              aria-pressed=${draft.vacation_mode === "frost" ? "true" : "false"}
-              @click=${() => this.set("vacation_mode", "frost")}
-            >
-              ${t("adv.settings.frost")}
-            </button>
-            <button
-              class="btn"
-              aria-pressed=${draft.vacation_mode === "away" ? "true" : "false"}
-              @click=${() => this.set("vacation_mode", "away")}
-            >
-              ${t("adv.settings.away")}
-            </button>
-          </div>
-        </div>
-        <label class="check">
-          <input
-            type="checkbox"
+        <ha-settings-row>
+          <span slot="heading">${t("adv.settings.vacation_mode")}</span>
+          <ha-select
+            .options=${[
+              { value: "frost", label: t("adv.settings.frost") },
+              { value: "away", label: t("adv.settings.away") },
+            ]}
+            .value=${draft.vacation_mode}
+            @selected=${(e: CustomEvent<{ value?: "frost" | "away" }>) => {
+              if (e.detail.value) this.set("vacation_mode", e.detail.value);
+            }}
+          ></ha-select>
+        </ha-settings-row>
+        <ha-settings-row>
+          <span slot="heading">${t("adv.settings.dry_run")}</span>
+          <ha-switch
             .checked=${draft.dry_run}
             @change=${(e: Event) => this.set("dry_run", (e.target as HTMLInputElement).checked)}
-          />
-          ${t("adv.settings.dry_run")}
-        </label>
-        <button class="btn primary" ?disabled=${this.busy || !this.dirty} @click=${this.save}>
-          ${t("common.save")}
-        </button>
-      </div>
+          ></ha-switch>
+        </ha-settings-row>
+        <div class="card-actions">
+          <ha-button .disabled=${this.busy || !this.dirty} .loading=${this.busy} @click=${this.save}>
+            ${t("common.save")}
+          </ha-button>
+        </div>
+      </ha-card>
     `;
   }
 }

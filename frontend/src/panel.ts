@@ -139,7 +139,7 @@ export class HeatingSchedulerPanel extends LitElement {
         return html`<hs-advanced-view
           .hass=${this.hass}
           .snapshot=${this.snapshot}
-          .section=${parts[1] ?? "rooms"}
+          .section=${parts[1] ?? ""}
         ></hs-advanced-view>`;
       default:
         return html`<hs-home-view .hass=${this.hass} .snapshot=${this.snapshot}></hs-home-view>`;

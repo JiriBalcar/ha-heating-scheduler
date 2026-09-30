@@ -6,7 +6,6 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, LogEntryData, Snapshot } from "../types";
 import { define } from "./define";
-import "./hs-icon";
 
 /** Recent writes, confirmations and manual changes of one room. */
 export class HsAdvLog extends LitElement {
@@ -36,41 +35,45 @@ export class HsAdvLog extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: var(--ha-space-4, 16px);
+        max-width: 760px;
       }
       .top {
         display: flex;
-        gap: 10px;
-        align-items: flex-end;
         flex-wrap: wrap;
+        align-items: center;
+        gap: var(--ha-space-2, 8px);
       }
-      .top .field {
-        flex: 1 1 220px;
+      ha-select {
+        min-width: 200px;
+      }
+      .muted {
+        color: var(--secondary-text-color);
+      }
+      p {
+        margin: 0;
       }
       ol {
         list-style: none;
         margin: 0;
         padding: 0;
-        display: flex;
-        flex-direction: column;
       }
       li {
         display: grid;
-        grid-template-columns: minmax(130px, auto) 1fr;
-        gap: 4px 14px;
-        padding: 10px 14px;
-        border-bottom: 1px solid var(--divider-color, #e0e0e0);
-        font-size: 16px;
+        grid-template-columns: minmax(120px, auto) 1fr;
+        gap: 0 var(--ha-space-4, 16px);
+        padding: var(--ha-space-2, 8px) var(--ha-space-4, 16px);
+        border-top: 1px solid var(--divider-color);
       }
-      li:last-child {
-        border-bottom: none;
+      li:first-child {
+        border-top: none;
       }
       .what {
-        font-weight: 700;
+        font-weight: var(--ha-font-weight-medium, 500);
       }
       .detail {
         grid-column: 2;
-        font-size: 14px;
+        font-size: var(--ha-font-size-s, 12px);
       }
       @media (max-width: 480px) {
         li {
@@ -124,27 +127,23 @@ export class HsAdvLog extends LitElement {
     };
     return html`
       <div class="top">
-        <label class="field">
-          <span>${t("adv.log.room")}</span>
-          <select
-            class="input"
-            @change=${(e: Event) => {
-              this.roomId = (e.target as HTMLSelectElement).value;
-              void this.load();
-            }}
-          >
-            ${this.snapshot.rooms.map(
-              (room) => html`<option value=${room.id} ?selected=${room.id === this.roomId}>${room.name}</option>`,
-            )}
-          </select>
-        </label>
-        <button class="btn" ?disabled=${this.loading} @click=${this.load}>
-          <hs-icon .path=${mdiRefresh}></hs-icon>${t("adv.log.refresh")}
-        </button>
+        <ha-select
+          .label=${t("adv.log.room")}
+          .options=${this.snapshot.rooms.map((room) => ({ value: room.id, label: room.name }))}
+          .value=${this.roomId}
+          @selected=${(e: CustomEvent<{ value?: string }>) => {
+            if (!e.detail.value || e.detail.value === this.roomId) return;
+            this.roomId = e.detail.value;
+            void this.load();
+          }}
+        ></ha-select>
+        <ha-button appearance="plain" .disabled=${this.loading} @click=${this.load}>
+          <ha-svg-icon slot="start" .path=${mdiRefresh}></ha-svg-icon>${t("adv.log.refresh")}
+        </ha-button>
       </div>
       ${this.entries.length === 0
         ? html`<p class="muted">${t("adv.log.empty")}</p>`
-        : html`<ol class="card">
+        : html`<ha-card><ol>
             ${this.entries.map(
               (entry) => html`<li>
                 <span class="muted">${formatDateTime(entry.at, ctx)}</span>
@@ -161,7 +160,7 @@ export class HsAdvLog extends LitElement {
                   : nothing}
               </li>`,
             )}
-          </ol>`}
+          </ol></ha-card>`}
     `;
   }
 }

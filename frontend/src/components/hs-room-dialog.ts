@@ -1,124 +1,104 @@
-import { LitElement, css, html, nothing } from "lit";
-import { languageOf, translator } from "../i18n";
+import { css, html, nothing } from "lit";
+import { showDialog } from "../ha";
+import { languageOf, translator, type TextKey } from "../i18n";
 import { roomPayload } from "../payload";
 import { errorText, storeFor } from "../store";
-import { baseStyles } from "../styles";
-import type { Candidates, HomeAssistant, RoomData, Snapshot } from "../types";
+import type { Candidates, RoomData, Snapshot } from "../types";
 import { define } from "./define";
-import { keepMineDialog, type HsDialog } from "./hs-dialog";
-import "./hs-dialog";
+import { HsHaDialog, keepMineDialog } from "./hs-dialog";
+
+interface RoomParams {
+  snapshot: Snapshot;
+  candidates: Candidates;
+  room: RoomData | null;
+}
+
+interface RoomForm {
+  name: string;
+  trvs: string[];
+  temperature_entity?: string;
+  plan_id: string;
+  temp_set_id: string;
+}
+
+const LABELS: Record<keyof RoomForm, TextKey> = {
+  name: "adv.rooms.name",
+  trvs: "adv.rooms.trvs",
+  temperature_entity: "adv.rooms.temperature_entity",
+  plan_id: "adv.rooms.plan",
+  temp_set_id: "adv.rooms.temp_set",
+};
 
 /** Create or change a room: name, valves, shown temperature, plan, temperatures. */
-export class HsRoomDialog extends LitElement {
+export class HsRoomDialog extends HsHaDialog<RoomParams> {
   static override properties = {
-    hass: { attribute: false },
-    snapshot: { attribute: false },
-    candidates: { attribute: false },
-    room: { attribute: false },
-    name: { state: true },
-    trvs: { state: true },
-    sensor: { state: true },
-    planId: { state: true },
-    setId: { state: true },
+    snapshot: { state: true },
+    room: { state: true },
+    data: { state: true },
     error: { state: true },
     saving: { state: true },
   };
-  declare hass: HomeAssistant;
   declare snapshot: Snapshot;
-  declare candidates: Candidates;
   declare room: RoomData | null;
-  declare name: string;
-  declare trvs: string[];
-  declare sensor: string;
-  declare planId: string;
-  declare setId: string;
+  declare data: RoomForm;
   declare error: string;
   declare saving: boolean;
 
-  static override styles = [
-    baseStyles,
-    css`
-      .form {
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-      }
-      .valves {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        max-height: 320px;
-        overflow-y: auto;
-        border: 1px solid var(--divider-color, #e0e0e0);
-        border-radius: 12px;
-        padding: 6px;
-      }
-      .valve {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        min-height: 52px;
-        padding: 0 8px;
-        border-radius: 10px;
-        font-size: 17px;
-      }
-      .valve.taken {
-        opacity: 0.55;
-      }
-      .valve input {
-        width: 26px;
-        height: 26px;
-        accent-color: var(--hs-accent, #1565c0);
-        flex: none;
-      }
-      .valve small {
-        display: block;
-        font-size: 14px;
-      }
-      .hint {
-        font-size: 14px;
-      }
-      .error {
-        color: var(--error-color, #c62828);
-        font-weight: 600;
-        margin: 0;
-      }
-    `,
-  ];
+  private unsubscribe: (() => void) | null = null;
 
-  get dialog(): HsDialog | null {
-    return this.renderRoot.querySelector("hs-dialog");
+  static override styles = css`
+    ha-alert {
+      display: block;
+      margin-top: var(--ha-space-4, 16px);
+    }
+  `;
+
+  override showDialog(params: RoomParams): void {
+    this.snapshot = params.snapshot;
+    this.room = params.room;
+    this.prepare();
+    // Follow newer snapshots (revision, plans, sets) while keeping the draft.
+    this.unsubscribe?.();
+    this.unsubscribe = storeFor(this.hass).subscribe((latest) => {
+      if (latest) this.snapshot = latest;
+    });
+    super.showDialog(params);
   }
 
-  prepare(): void {
+  protected override dialogClosed(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+  }
+
+  private prepare(): void {
     const room = this.room;
-    this.name = room?.name ?? "";
-    this.trvs = [...(room?.trvs ?? [])];
-    this.sensor = room?.temperature_entity ?? "";
-    this.planId = room?.plan_id ?? "house";
-    this.setId = room?.temp_set_id ?? "house";
+    this.data = {
+      name: room?.name ?? "",
+      trvs: [...(room?.trvs ?? [])],
+      temperature_entity: room?.temperature_entity ?? undefined,
+      plan_id: room?.plan_id ?? "house",
+      temp_set_id: room?.temp_set_id ?? "house",
+    };
     this.error = "";
     this.saving = false;
   }
 
-  private toggle(entityId: string, on: boolean) {
-    this.trvs = on ? [...this.trvs, entityId] : this.trvs.filter((id) => id !== entityId);
+  private get t() {
+    return translator(languageOf(this.hass));
   }
 
-  /** True if the room was changed elsewhere since the dialog opened. */
+  /** The room as it is now on the server, if it changed since the dialog opened. */
   private changedElsewhere(): RoomData | null {
     if (!this.room) return null;
     const current = this.snapshot.rooms.find((room) => room.id === this.room!.id);
     if (!current) return null;
     const fields = ["name", "trvs", "plan_id", "temp_set_id", "temperature_entity", "area_id"] as const;
-    const same = fields.every(
-      (field) => JSON.stringify(current[field]) === JSON.stringify(this.room![field]),
-    );
+    const same = fields.every((field) => JSON.stringify(current[field]) === JSON.stringify(this.room![field]));
     return same ? null : current;
   }
 
-  private async save() {
-    const t = translator(languageOf(this.hass));
+  async save() {
+    const t = this.t;
     const current = this.changedElsewhere();
     if (current) {
       if (!(await keepMineDialog(this, t))) {
@@ -145,18 +125,18 @@ export class HsRoomDialog extends LitElement {
       trv_status: [],
     };
     const payload = roomPayload(base, {
-      name: this.name.trim(),
-      trvs: this.trvs,
-      temperature_entity: this.sensor || null,
-      plan_id: this.planId,
-      temp_set_id: this.setId,
+      name: this.data.name.trim(),
+      trvs: this.data.trvs,
+      temperature_entity: this.data.temperature_entity || null,
+      plan_id: this.data.plan_id,
+      temp_set_id: this.data.temp_set_id,
     });
     try {
       await storeFor(this.hass).call("room/save", {
         revision: this.snapshot.revision,
         room: { ...payload, id: this.room ? payload.id : null },
       });
-      this.dialog?.close();
+      this.closeDialog();
     } catch (error) {
       this.error = errorText(error, t);
     } finally {
@@ -164,132 +144,91 @@ export class HsRoomDialog extends LitElement {
     }
   }
 
+  private schema(candidates: Candidates) {
+    // Valves of other rooms can't be chosen.
+    const free = candidates.climates
+      .filter((climate) => !climate.room_id || climate.room_id === this.room?.id)
+      .map((climate) => climate.entity_id);
+    const sensors = [
+      ...candidates.temperature_entities.map((sensor) => sensor.entity_id),
+      ...candidates.climates.map((climate) => climate.entity_id),
+    ];
+    return [
+      { name: "name", required: true, selector: { text: {} } },
+      { name: "trvs", selector: { entity: { multiple: true, include_entities: free } } },
+      { name: "temperature_entity", selector: { entity: { include_entities: sensors } } },
+      {
+        name: "plan_id",
+        required: true,
+        selector: {
+          select: { mode: "dropdown", options: this.snapshot.plans.map((plan) => ({ value: plan.id, label: plan.name })) },
+        },
+      },
+      {
+        name: "temp_set_id",
+        required: true,
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: this.snapshot.temp_sets.map((set) => ({ value: set.id, label: set.name })),
+          },
+        },
+      },
+    ];
+  }
+
+  private label = (field: { name: string }): string => this.t(LABELS[field.name as keyof RoomForm]);
+
+  private helper = (field: { name: string }): string | undefined => {
+    const t = this.t;
+    if (field.name === "temperature_entity") return `${t("adv.rooms.sensor_empty")} ${t("adv.rooms.sensor_hint")}`;
+    if (field.name === "trvs" && this.params?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
+    return undefined;
+  };
+
   override render() {
-    if (!this.hass || !this.snapshot || !this.candidates) return nothing;
-    const t = translator(languageOf(this.hass));
-    const roomName = (id: string | null) => this.snapshot.rooms.find((room) => room.id === id)?.name ?? "";
+    if (!this.params || !this.hass || !this.snapshot) return nothing;
+    const t = this.t;
     return html`
-      <hs-dialog
-        wide
-        .heading=${this.room ? t("adv.rooms.edit_title") : t("adv.rooms.new_title")}
-        .closeLabel=${t("common.cancel")}
+      <ha-dialog
+        .open=${this.open}
+        header-title=${this.room ? t("adv.rooms.edit_title") : t("adv.rooms.new_title")}
+        @closed=${this.onClosed}
       >
-        <div class="form">
-          <label class="field">
-            <span>${t("adv.rooms.name")}</span>
-            <input
-              class="input"
-              maxlength="60"
-              .value=${this.name}
-              @input=${(e: Event) => (this.name = (e.target as HTMLInputElement).value)}
-            />
-          </label>
-          <div class="field">
-            <span>${t("adv.rooms.trvs")}</span>
-            ${this.candidates.climates.length === 0
-              ? html`<span class="muted">${t("adv.rooms.no_climates")}</span>`
-              : html`<div class="valves">
-                  ${this.candidates.climates.map((climate) => {
-                    const takenBy = climate.room_id && climate.room_id !== this.room?.id ? climate.room_id : null;
-                    return html`<label class="valve ${takenBy ? "taken" : ""}">
-                      <input
-                        type="checkbox"
-                        .checked=${this.trvs.includes(climate.entity_id)}
-                        ?disabled=${takenBy !== null}
-                        @change=${(e: Event) => this.toggle(climate.entity_id, (e.target as HTMLInputElement).checked)}
-                      />
-                      <span>
-                        ${climate.name}
-                        <small class="muted">
-                          ${climate.entity_id}${takenBy ? ` · ${t("adv.rooms.in_room", { room: roomName(takenBy) })}` : ""}
-                        </small>
-                      </span>
-                    </label>`;
-                  })}
-                </div>`}
-          </div>
-          <label class="field">
-            <span>${t("adv.rooms.temperature_entity")}</span>
-            <select class="input" @change=${(e: Event) => (this.sensor = (e.target as HTMLSelectElement).value)}>
-              <option value="" ?selected=${!this.sensor}>${t("adv.rooms.temperature_auto")}</option>
-              ${this.candidates.temperature_entities.map(
-                (sensor) => html`<option value=${sensor.entity_id} ?selected=${sensor.entity_id === this.sensor}>
-                  ${sensor.name}
-                </option>`,
-              )}
-              ${this.candidates.climates.map(
-                (climate) => html`<option value=${climate.entity_id} ?selected=${climate.entity_id === this.sensor}>
-                  ${climate.name}
-                </option>`,
-              )}
-            </select>
-            <span class="hint muted">${t("adv.rooms.sensor_hint")}</span>
-          </label>
-          <label class="field">
-            <span>${t("adv.rooms.plan")}</span>
-            <select class="input" @change=${(e: Event) => (this.planId = (e.target as HTMLSelectElement).value)}>
-              ${this.snapshot.plans.map(
-                (plan) => html`<option value=${plan.id} ?selected=${plan.id === this.planId}>${plan.name}</option>`,
-              )}
-            </select>
-          </label>
-          <label class="field">
-            <span>${t("adv.rooms.temp_set")}</span>
-            <select class="input" @change=${(e: Event) => (this.setId = (e.target as HTMLSelectElement).value)}>
-              ${this.snapshot.temp_sets.map(
-                (set) => html`<option value=${set.id} ?selected=${set.id === this.setId}>${set.name}</option>`,
-              )}
-            </select>
-          </label>
-          ${this.error ? html`<p class="error" role="alert">${this.error}</p>` : nothing}
-        </div>
-        <button slot="actions" class="btn" @click=${() => this.dialog?.close()}>${t("common.cancel")}</button>
-        <button
-          slot="actions"
-          class="btn primary"
-          ?disabled=${this.saving || !this.name.trim()}
-          @click=${this.save}
-        >
-          ${t("common.save")}
-        </button>
-      </hs-dialog>
+        <ha-form
+          .hass=${this.hass}
+          .data=${this.data}
+          .schema=${this.schema(this.params.candidates)}
+          .computeLabel=${this.label}
+          .computeHelper=${this.helper}
+          @value-changed=${(e: CustomEvent<{ value: RoomForm }>) => (this.data = { ...this.data, ...e.detail.value })}
+        ></ha-form>
+        ${this.error ? html`<ha-alert alert-type="error">${this.error}</ha-alert>` : nothing}
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
+            ${t("common.cancel")}
+          </ha-button>
+          <ha-button
+            slot="primaryAction"
+            .disabled=${this.saving || !this.data.name.trim()}
+            .loading=${this.saving}
+            @click=${this.save}
+          >
+            ${t("common.save")}
+          </ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
     `;
   }
 }
 
 define("hs-room-dialog", HsRoomDialog);
 
-export async function openRoomDialog(
+export function openRoomDialog(
   host: HTMLElement,
-  hass: HomeAssistant,
   snapshot: Snapshot,
   candidates: Candidates,
   room: RoomData | null,
-): Promise<void> {
-  const element = document.createElement("hs-room-dialog") as HsRoomDialog;
-  element.hass = hass;
-  element.snapshot = snapshot;
-  element.candidates = candidates;
-  element.room = room;
-  element.prepare();
-  // Follow newer snapshots (revision, plans, sets) while keeping the draft.
-  const unsubscribe = storeFor(hass).subscribe((latest) => {
-    if (latest) element.snapshot = latest;
-  });
-  (host.shadowRoot ?? host).appendChild(element);
-  await element.updateComplete;
-  const dialog = element.dialog;
-  if (!dialog) {
-    unsubscribe();
-    return;
-  }
-  dialog.addEventListener(
-    "hs-closed",
-    () => {
-      unsubscribe();
-      element.remove();
-    },
-    { once: true },
-  );
-  await dialog.show();
+): void {
+  showDialog(host, "hs-room-dialog", { snapshot, candidates, room });
 }

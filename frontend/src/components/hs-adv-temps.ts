@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { mdiDelete, mdiMinus, mdiPlus, mdiPlusCircle } from "@mdi/js";
+import { mdiDelete, mdiPlus } from "@mdi/js";
 import { formatContext, formatTemp } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { MODE_COLORS, MODE_ICONS } from "../modes";
@@ -9,7 +9,6 @@ import { baseStyles } from "../styles";
 import { TEMPERATURE_MODES, type HomeAssistant, type Mode, type Snapshot, type TempSetData } from "../types";
 import { define } from "./define";
 import { confirmDialog, keepMineDialog } from "./hs-dialog";
-import "./hs-icon";
 
 interface Draft {
   name: string;
@@ -54,73 +53,53 @@ export class HsAdvTemps extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: 18px;
+        gap: var(--ha-space-4, 16px);
+        max-width: 760px;
       }
-      .set {
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+      .card-content {
+        padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
       }
-      h3 {
-        font-size: 20px;
+      .muted {
+        color: var(--secondary-text-color);
       }
-      .mode {
-        display: grid;
-        grid-template-columns: minmax(140px, 1fr) auto;
-        align-items: center;
-        gap: 10px;
-        min-height: 60px;
-        border-bottom: 1px solid var(--divider-color, #e0e0e0);
-        padding: 4px 0;
+      h2 {
+        margin: var(--ha-space-4, 16px) 0 0;
+        font-size: var(--ha-font-size-l, 16px);
+        font-weight: var(--ha-font-weight-medium, 500);
       }
-      .mode:last-of-type {
-        border-bottom: none;
+      p {
+        margin: 0;
       }
-      .label {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 18px;
-        font-weight: 600;
+      ha-settings-row {
+        border-top: 1px solid var(--divider-color);
+        --settings-row-prefix-display: flex;
       }
-      .stepper {
-        display: grid;
-        grid-template-columns: 52px 96px 52px;
-        align-items: center;
-        gap: 6px;
+      ha-svg-icon[slot="prefix"] {
+        align-self: center;
+        color: var(--mode-color);
+        margin-inline-end: var(--ha-space-4, 16px);
       }
-      .stepper strong {
-        text-align: center;
-        font-size: 22px;
-        font-variant-numeric: tabular-nums;
-      }
-      .stepper .btn {
-        padding: 0;
-      }
-      .own {
+      .value {
         display: flex;
         align-items: center;
-        gap: 10px;
-        font-size: 16px;
-      }
-      .own input {
-        width: 24px;
-        height: 24px;
-        accent-color: var(--hs-accent, #1565c0);
-      }
-      .buttons {
-        display: flex;
+        justify-content: flex-end;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--ha-space-3, 12px);
       }
-      .buttons .btn {
-        flex: 1 1 160px;
+      ha-control-number-buttons {
+        width: 160px;
+        height: 42px;
+        --control-number-buttons-border-radius: var(--ha-border-radius-lg, 12px);
       }
-      @media (max-width: 480px) {
-        .mode {
-          grid-template-columns: 1fr;
-        }
+      .card-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--ha-space-2, 8px);
+        border-top: 1px solid var(--divider-color);
+        padding: var(--ha-space-2, 8px);
+      }
+      .new {
+        align-self: flex-start;
       }
     `,
   ];
@@ -226,18 +205,18 @@ export class HsAdvTemps extends LitElement {
     void this.run("temp_set/save", { temp_set: { name, temperatures: {} } });
   }
 
-  private stepper(id: string, mode: Mode, value: number) {
-    const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-    const t = this.t;
-    return html`<div class="stepper">
-      <button class="btn" @click=${() => this.setValue(id, mode, value - 0.5)} aria-label=${t("room.cooler")}>
-        <hs-icon .path=${mdiMinus}></hs-icon>
-      </button>
-      <strong>${formatTemp(value, ctx)}</strong>
-      <button class="btn" @click=${() => this.setValue(id, mode, value + 0.5)} aria-label=${t("room.warmer")}>
-        <hs-icon .path=${mdiPlus}></hs-icon>
-      </button>
-    </div>`;
+  private number(id: string, mode: Mode, value: number) {
+    return html`<ha-control-number-buttons
+      .value=${value}
+      .min=${5}
+      .max=${30}
+      .step=${0.5}
+      .unit=${"°C"}
+      .formatOptions=${{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
+      .locale=${this.hass.locale}
+      .label=${this.t(`mode.${mode}`)}
+      @value-changed=${(e: CustomEvent<{ value: number }>) => this.setValue(id, mode, e.detail.value)}
+    ></ha-control-number-buttons>`;
   }
 
   private renderSet(set: TempSetData) {
@@ -247,55 +226,52 @@ export class HsAdvTemps extends LitElement {
     const house = this.house();
     const isHouse = set.id === "house";
     const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-    return html`<section class="card set">
-      ${isHouse
-        ? html`<h3>${t("adv.temps.house")}</h3><span class="muted">${t("adv.temps.house_hint")}</span>`
-        : html`<label class="field">
-            <span>${t("plans.name")}</span>
-            <input
-              class="input"
-              maxlength="60"
+    return html`<ha-card .header=${isHouse ? t("adv.temps.house") : undefined}>
+      <div class="card-content">
+        ${isHouse
+          ? html`<p class="muted">${t("adv.temps.house_hint")}</p>`
+          : html`<ha-input
+              .label=${t("plans.name")}
               .value=${draft.name}
+              maxlength="60"
               @input=${(e: Event) => this.patch(set.id, (d) => ({ ...d, name: (e.target as HTMLInputElement).value }))}
-            />
-          </label>`}
+            ></ha-input>`}
+      </div>
       ${TEMPERATURE_MODES.map((mode) => {
         const own = draft.temperatures[mode];
         const inherited = house[mode] ?? 20;
-        return html`<div class="mode">
-          <span class="label">
-            <hs-icon .path=${MODE_ICONS[mode]} style="color:${MODE_COLORS[mode]}"></hs-icon>${t(`mode.${mode}`)}
-          </span>
+        return html`<ha-settings-row style="--mode-color:${MODE_COLORS[mode]}">
+          <ha-svg-icon slot="prefix" .path=${MODE_ICONS[mode]}></ha-svg-icon>
+          <span slot="heading">${t(`mode.${mode}`)}</span>
           ${isHouse
-            ? this.stepper(set.id, mode, own ?? inherited)
-            : html`<div>
-                <label class="own">
-                  <input
-                    type="checkbox"
-                    .checked=${own !== undefined}
-                    @change=${(e: Event) =>
-                      this.setValue(set.id, mode, (e.target as HTMLInputElement).checked ? inherited : undefined)}
-                  />
-                  ${own === undefined
-                    ? t("adv.temps.as_house", { temp: formatTemp(inherited, ctx) })
-                    : t("adv.temps.own")}
-                </label>
-                ${own !== undefined ? this.stepper(set.id, mode, own) : nothing}
-              </div>`}
-        </div>`;
+            ? nothing
+            : html`<span slot="description">
+                ${own === undefined ? t("adv.temps.as_house", { temp: formatTemp(inherited, ctx) }) : t("adv.temps.own")}
+              </span>`}
+          <div class="value">
+            ${isHouse || own !== undefined ? this.number(set.id, mode, own ?? inherited) : nothing}
+            ${isHouse
+              ? nothing
+              : html`<ha-switch
+                  .checked=${own !== undefined}
+                  aria-label=${t("adv.temps.own")}
+                  @change=${(e: Event) =>
+                    this.setValue(set.id, mode, (e.target as HTMLInputElement).checked ? inherited : undefined)}
+                ></ha-switch>`}
+          </div>
+        </ha-settings-row>`;
       })}
-      <span class="muted">${t("adv.temps.save_hint")}</span>
-      <div class="buttons">
-        <button class="btn primary" ?disabled=${this.busy || !this.dirty(set)} @click=${() => void this.save(set)}>
-          ${t("common.save")}
-        </button>
+      <div class="card-actions">
         ${isHouse
-          ? nothing
-          : html`<button class="btn danger" ?disabled=${this.busy} @click=${() => this.deleteSet(set)}>
-              <hs-icon .path=${mdiDelete}></hs-icon>${t("common.delete")}
-            </button>`}
+          ? html`<span></span>`
+          : html`<ha-button appearance="plain" variant="danger" .disabled=${this.busy} @click=${() => this.deleteSet(set)}>
+              <ha-svg-icon slot="start" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
+            </ha-button>`}
+        <ha-button .disabled=${this.busy || !this.dirty(set)} @click=${() => void this.save(set)}>
+          ${t("common.save")}
+        </ha-button>
       </div>
-    </section>`;
+    </ha-card>`;
   }
 
   override render() {
@@ -307,12 +283,12 @@ export class HsAdvTemps extends LitElement {
     ];
     return html`
       ${house ? this.renderSet(house) : nothing}
-      <h3>${t("adv.temps.sets")}</h3>
-      <span class="muted">${t("adv.temps.sets_hint")}</span>
+      <h2>${t("adv.temps.sets")}</h2>
+      <p class="muted">${t("adv.temps.sets_hint")} ${t("adv.temps.save_hint")}</p>
       ${others.map((set) => this.renderSet(set))}
-      <button class="btn" ?disabled=${this.busy} @click=${this.createSet}>
-        <hs-icon .path=${mdiPlusCircle}></hs-icon>${t("adv.temps.new")}
-      </button>
+      <ha-button class="new" appearance="plain" .disabled=${this.busy} @click=${this.createSet}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>${t("adv.temps.new")}
+      </ha-button>
     `;
   }
 }

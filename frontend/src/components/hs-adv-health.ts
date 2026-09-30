@@ -6,13 +6,12 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, Snapshot, TrvStatus } from "../types";
 import { define } from "./define";
-import "./hs-icon";
 
 const PHASE_COLORS: Record<TrvStatus["phase"], string> = {
-  idle: "#2e7d32",
-  writing: "#1565c0",
-  waiting: "#616161",
-  failed: "#c62828",
+  idle: "var(--success-color, #43a047)",
+  writing: "var(--info-color, #039be5)",
+  waiting: "var(--disabled-color, #bdbdbd)",
+  failed: "var(--error-color, #db4437)",
 };
 
 /** Every valve: wanted and actual setpoint, phase, last write, errors. */
@@ -37,49 +36,39 @@ export class HsAdvHealth extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: var(--ha-space-4, 16px);
+        max-width: 760px;
       }
-      .room {
-        padding: 14px 16px;
+      .top {
         display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      h3 {
-        font-size: 20px;
-      }
-      .valve {
-        border-top: 1px solid var(--divider-color, #e0e0e0);
-        padding-top: 10px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 6px 16px;
-        font-size: 16px;
-      }
-      .valve .name {
-        grid-column: 1 / -1;
-        display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
-        font-weight: 700;
-        font-size: 17px;
+        gap: var(--ha-space-4, 16px);
+      }
+      .muted {
+        color: var(--secondary-text-color);
+      }
+      p {
+        margin: 0;
+      }
+      .card-content {
+        padding: 0 var(--ha-space-4, 16px) var(--ha-space-4, 16px);
       }
       .phase {
-        color: #fff;
-        border-radius: 999px;
-        padding: 2px 10px;
-        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--ha-space-1, 4px);
+        font-size: var(--ha-font-size-s, 12px);
+        font-weight: var(--ha-font-weight-medium, 500);
       }
-      .error {
-        grid-column: 1 / -1;
-        color: var(--error-color, #c62828);
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
       }
-      dt {
-        font-size: 14px;
-      }
-      dd {
-        margin: 0;
-        font-weight: 600;
+      ha-alert {
+        display: block;
+        margin: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
       }
     `,
   ];
@@ -109,36 +98,46 @@ export class HsAdvHealth extends LitElement {
       return typeof friendly === "string" ? friendly : id;
     };
     return html`
-      <button class="btn primary" ?disabled=${this.busy} @click=${this.check}>
-        <hs-icon .path=${mdiRefresh}></hs-icon>${t("adv.health.check_now")}
-      </button>
-      ${allOk ? html`<p>${t("adv.health.all_ok")}</p>` : nothing}
+      <div class="top">
+        <ha-button .disabled=${this.busy} .loading=${this.busy} @click=${this.check}>
+          <ha-svg-icon slot="start" .path=${mdiRefresh}></ha-svg-icon>${t("adv.health.check_now")}
+        </ha-button>
+        ${allOk ? html`<span class="muted">${t("adv.health.all_ok")}</span>` : nothing}
+      </div>
       ${this.snapshot.rooms.map(
-        (room) => html`<section class="card room">
-          <h3>${room.name}</h3>
-          ${room.trv_status.length === 0 ? html`<span class="muted">${t("adv.rooms.none_trvs")}</span>` : nothing}
+        (room) => html`<ha-card .header=${room.name}>
+          ${room.trv_status.length === 0
+            ? html`<div class="card-content muted">${t("adv.rooms.none_trvs")}</div>`
+            : nothing}
           ${room.trv_status.map(
-            (trv) => html`<dl class="valve">
-              <div class="name">
-                ${name(trv.entity_id)}
-                <span class="phase" style="background:${PHASE_COLORS[trv.phase]}">
+            (trv) => html`<ha-md-list-item
+                type="button"
+                @click=${() => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: trv.entity_id }, bubbles: true, composed: true }))}
+              >
+                <span slot="headline">${name(trv.entity_id)}</span>
+                <span slot="supporting-text">
+                  ${t("adv.health.wanted")} ${formatTemp(trv.desired, ctx)} · ${t("adv.health.valve")}
+                  ${formatTemp(trv.setpoint, ctx)} · ${t("adv.health.mode")} ${trv.hvac_mode ?? "—"}
+                </span>
+                <span slot="supporting-text">
+                  ${t("adv.health.last_write")}: ${trv.last_write ? formatDateTime(trv.last_write, ctx) : "—"}
+                </span>
+                <span slot="end" class="phase">
+                  <span class="dot" style="background:${PHASE_COLORS[trv.phase]}"></span>
                   ${t(`adv.health.phase.${trv.phase}`)}
                 </span>
-              </div>
-              <div><dt class="muted">${t("adv.health.wanted")}</dt><dd>${formatTemp(trv.desired, ctx)}</dd></div>
-              <div><dt class="muted">${t("adv.health.valve")}</dt><dd>${formatTemp(trv.setpoint, ctx)}</dd></div>
-              <div><dt class="muted">${t("adv.health.mode")}</dt><dd>${trv.hvac_mode ?? "—"}</dd></div>
-              <div>
-                <dt class="muted">${t("adv.health.last_write")}</dt>
-                <dd>${trv.last_write ? formatDateTime(trv.last_write, ctx) : "—"}</dd>
-              </div>
+              </ha-md-list-item>
               ${room.issues
                 .filter((issue) => issue.entity_id === trv.entity_id)
-                .map((issue) => html`<div class="error">${t(`health.${issue.kind}`, { name: name(trv.entity_id) })}</div>`)}
-              ${trv.last_error ? html`<div class="error">${t("adv.health.error")}: ${trv.last_error}</div>` : nothing}
-            </dl>`,
+                .map(
+                  (issue) =>
+                    html`<ha-alert alert-type="warning">${t(`health.${issue.kind}`, { name: name(trv.entity_id) })}</ha-alert>`,
+                )}
+              ${trv.last_error
+                ? html`<ha-alert alert-type="error">${t("adv.health.error")}: ${trv.last_error}</ha-alert>`
+                : nothing}`,
           )}
-        </section>`,
+        </ha-card>`,
       )}
     `;
   }
