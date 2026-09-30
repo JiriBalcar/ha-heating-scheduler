@@ -9,6 +9,7 @@ import "../src/components/hs-house-card";
 import "../src/components/hs-house-dialog";
 import "../src/components/hs-plan-editor";
 import "../src/components/hs-room-card";
+import "../src/components/hs-temps-view";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
 import type { Candidates, HomeAssistant, HouseData, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
 
@@ -81,6 +82,7 @@ beforeAll(async () => {
       "hs-plan-editor",
       "hs-room-card",
       "hs-room-dialog",
+      "hs-temps-view",
     ].map((name) => customElements.whenDefined(name)),
   );
 });
@@ -320,5 +322,38 @@ describe("card", () => {
     await card.updateComplete;
     expect(card.shadowRoot.querySelectorAll("hs-house-card")).toHaveLength(1);
     expect(card.shadowRoot.querySelectorAll("hs-room-card")).toHaveLength(0);
+  });
+});
+
+describe("temperature sets", () => {
+  it("have − / + in every row; a change makes a value own, reset returns it to the house", async () => {
+    const temp_sets = [
+      { id: "house", name: "House", temperatures: { comfort: 21, eco: 19, night: 18, away: 16, frost: 7 }, used_by: [] },
+      { id: "bath", name: "Bath", temperatures: { comfort: 23 }, used_by: [] },
+    ];
+    const view = await mount("hs-temps-view", { snapshot: snapshot(1, { temp_sets }) });
+    const rows = (): Any[] => {
+      const card = [...view.shadowRoot.querySelectorAll("ha-card")].find((item: Any) => item.header === "Bath") as Any;
+      return [...card.querySelectorAll("ha-settings-row")];
+    };
+    const row = (index: number) => {
+      const item = rows()[index];
+      return {
+        text: text(item, '[slot="description"]'),
+        value: item.querySelector("ha-control-number-buttons").value,
+        reset: item.querySelector("ha-icon-button") !== null,
+      };
+    };
+    expect(row(0)).toEqual({ text: "own", value: 23, reset: true });
+    expect(row(1)).toEqual({ text: "as house", value: 19, reset: false });
+
+    const change = new CustomEvent("value-changed", { detail: { value: 19.5 } });
+    rows()[1].querySelector("ha-control-number-buttons").dispatchEvent(change);
+    await view.updateComplete;
+    expect(row(1)).toEqual({ text: "own", value: 19.5, reset: true });
+
+    rows()[0].querySelector("ha-icon-button").click();
+    await view.updateComplete;
+    expect(row(0)).toEqual({ text: "as house", value: 21, reset: false });
   });
 });

@@ -1,6 +1,5 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { mdiDelete, mdiPlus } from "@mdi/js";
-import { formatContext, formatTemp } from "../format";
+import { mdiDelete, mdiPlus, mdiRestore } from "@mdi/js";
 import { languageOf, translator, type Translate } from "../i18n";
 import { MODE_COLORS, MODE_ICONS } from "../modes";
 import { roomPayload, uniqueName } from "../payload";
@@ -89,8 +88,11 @@ export class HsTempsView extends LitElement {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        flex-wrap: wrap;
-        gap: var(--ha-space-3, 12px);
+        gap: var(--ha-space-1, 4px);
+      }
+      .value ha-icon-button {
+        /* As high as the − / + buttons, so a row with it is as high as the others. */
+        --ha-icon-button-size: 42px;
       }
       ha-control-number-buttons {
         width: 160px;
@@ -248,7 +250,6 @@ export class HsTempsView extends LitElement {
     if (!draft) return nothing;
     const house = this.house();
     const isHouse = set.id === "house";
-    const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
     return html`<ha-card .header=${isHouse ? t("temps.house") : set.name}>
       <div class="card-content">
         ${isHouse
@@ -271,19 +272,17 @@ export class HsTempsView extends LitElement {
           <span slot="heading">${t(`mode.${mode}`)}</span>
           ${isHouse
             ? nothing
-            : html`<span slot="description">
-                ${own === undefined ? t("temps.as_house", { temp: formatTemp(inherited, ctx) }) : t("temps.own")}
-              </span>`}
+            : html`<span slot="description">${own === undefined ? t("temps.as_house") : t("temps.own")}</span>`}
           <div class="value">
-            ${isHouse || own !== undefined ? this.number(set.id, mode, own ?? inherited) : nothing}
-            ${isHouse
+            ${isHouse || own === undefined
               ? nothing
-              : html`<ha-switch
-                  .checked=${own !== undefined}
-                  aria-label=${t("temps.own")}
-                  @change=${(e: Event) =>
-                    this.setValue(set.id, mode, (e.target as HTMLInputElement).checked ? inherited : undefined)}
-                ></ha-switch>`}
+              : html`<ha-icon-button
+                  .path=${mdiRestore}
+                  .label=${t("temps.use_house")}
+                  title=${t("temps.use_house")}
+                  @click=${() => this.setValue(set.id, mode, undefined)}
+                ></ha-icon-button>`}
+            ${this.number(set.id, mode, own ?? inherited)}
           </div>
         </ha-settings-row>`;
       })}
