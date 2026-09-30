@@ -54,7 +54,6 @@ export class HsAdvTemps extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 760px;
       }
       .card-content {
         padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);

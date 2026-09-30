@@ -41,7 +41,6 @@ export class HsAdvSettings extends LitElement {
     css`
       :host {
         display: block;
-        max-width: 760px;
       }
       ha-settings-row {
         border-top: 1px solid var(--divider-color);

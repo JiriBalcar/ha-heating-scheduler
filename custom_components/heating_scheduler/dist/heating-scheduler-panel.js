@@ -304,7 +304,6 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 760px;
       }
       .top {
         display: flex;
@@ -371,7 +370,6 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 760px;
       }
       .top {
         display: flex;
@@ -561,7 +559,6 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
     `}};m("hs-import-rooms-dialog",t2);var $3=[1,2,3,4,6,8,12,24];function a2(M,H){return Object.keys(M).every(C=>M[C]===H[C])}var E3=[1,2,5,10,15,30,60],N3=[10,20,30,60,120,240],i2=class extends s{constructor(){super();this.revision=-1;this.base=null;this.busy=!1}static{this.properties={hass:{attribute:!1},snapshot:{attribute:!1},draft:{state:!0},busy:{state:!0}}}static{this.styles=[Z,n`
       :host {
         display: block;
-        max-width: 760px;
       }
       ha-settings-row {
         border-top: 1px solid var(--divider-color);
@@ -617,7 +614,6 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 760px;
       }
       .card-content {
         padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
@@ -719,16 +715,13 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 1040px;
+        max-width: 760px;
         margin: 0 auto;
       }
       ha-alert {
         display: block;
       }
       .list {
-        max-width: 600px;
-        width: 100%;
-        align-self: center;
         overflow: hidden;
       }
       .icon {
@@ -1330,9 +1323,6 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
       .new {
         align-self: flex-start;
       }
-      .rooms {
-        max-width: 760px;
-      }
       ha-settings-row {
         border-top: 1px solid var(--divider-color);
       }
@@ -1347,7 +1337,10 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
         gap: var(--ha-space-2, 8px);
       }
       ha-select {
-        min-width: 180px;
+        width: 220px;
+      }
+      .own {
+        min-width: 130px;
       }
     `]}get t(){return l(d(this.hass))}roomNames(H=[]){return H.map(C=>this.snapshot.rooms.find(V=>V.id===C)?.name).filter(Boolean).join(", ")}navigate(H){this.dispatchEvent(new CustomEvent("hs-navigate",{detail:H,bubbles:!0,composed:!0}))}async run(H){this.busy=!0;try{return await H()}catch(C){return h(this,S(C,this.t)),null}finally{this.busy=!1}}sharesPlan(H){return H.plan_id==="house"?!0:(this.snapshot.plans.find(V=>V.id===H.plan_id)?.used_by??[]).length>1}async assign(H,C){await this.run(()=>v(this.hass).call("room/save",{revision:this.snapshot.revision,room:Y(H,{plan_id:C})}))}async ownPlan(H){let C=this.snapshot.plans.find(i=>i.id===H.plan_id);if(!C)return;let V=v(this.hass),L=this.snapshot.revision,e=J(H.name,this.snapshot.plans.map(i=>i.name)),r=await this.run(async()=>{let i=await V.call("plan/save",{revision:L,plan:{name:e,days:C.days}});return await V.call("room/save",{revision:i.revision,room:Y(H,{plan_id:i.plan_id})}),i.plan_id});r&&this.navigate(`/plans/${r}`)}async deletePlan(H){let C=this.t,V=H.used_by??[];await b(this,{heading:C("common.delete"),message:V.length?C("plans.delete_confirm_used",{name:H.name,rooms:this.roomNames(V)}):C("plans.delete_confirm",{name:H.name}),confirm:C("common.delete"),cancel:C("common.cancel"),danger:!0})&&await this.run(()=>v(this.hass).call("plan/delete",{revision:this.snapshot.revision,plan_id:H.id}))}async openNew(){let H=await new Promise(L=>O(this,"hs-new-plan-dialog",{name:J(this.t("plans.new"),this.snapshot.plans.map(e=>e.name)),plans:this.snapshot.plans,resolve:L})),C=this.snapshot.plans.find(L=>L.id===H?.source);if(!H||!C||!H.name.trim())return;let V=await this.run(()=>v(this.hass).call("plan/save",{revision:this.snapshot.revision,plan:{name:H.name.trim(),days:C.days}}));V&&this.navigate(`/plans/${V.plan_id}`)}render(){if(!this.snapshot||!this.hass)return a;let H=this.t;if(this.planId){let V=this.snapshot.plans.find(L=>L.id===this.planId);if(V)return t`<hs-plan-editor .hass=${this.hass} .snapshot=${this.snapshot} .plan=${V}></hs-plan-editor>`}let C=this.snapshot.plans.map(V=>({value:V.id,label:V.name}));return t`
       <div class="plans">
@@ -1387,9 +1380,14 @@ var n1=globalThis,p1=n1.ShadowRoot&&(n1.ShadyCSS===void 0||n1.ShadyCSS.nativeSha
                     .disabled=${this.busy}
                     @selected=${L=>{L.detail.value&&L.detail.value!==V.plan_id&&this.assign(V,L.detail.value)}}
                   ></ha-select>
-                  ${this.sharesPlan(V)?t`<ha-button appearance="plain" .disabled=${this.busy} @click=${()=>this.ownPlan(V)}>
+                  ${this.sharesPlan(V)?t`<ha-button
+                        class="own"
+                        appearance="plain"
+                        .disabled=${this.busy}
+                        @click=${()=>this.ownPlan(V)}
+                      >
                         ${H("plans.own_plan")}
-                      </ha-button>`:a}
+                      </ha-button>`:t`<span class="own"></span>`}
                 </div>
               </ha-settings-row>`)}
           </ha-card>`:a}

@@ -44,16 +44,13 @@ export class HsAdvancedView extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 1040px;
+        max-width: 760px;
         margin: 0 auto;
       }
       ha-alert {
         display: block;
       }
       .list {
-        max-width: 600px;
-        width: 100%;
-        align-self: center;
         overflow: hidden;
       }
       .icon {

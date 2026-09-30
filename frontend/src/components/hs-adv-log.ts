@@ -36,7 +36,6 @@ export class HsAdvLog extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--ha-space-4, 16px);
-        max-width: 760px;
       }
       .top {
         display: flex;

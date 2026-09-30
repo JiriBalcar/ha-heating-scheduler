@@ -62,9 +62,6 @@ export class HsPlansView extends LitElement {
       .new {
         align-self: flex-start;
       }
-      .rooms {
-        max-width: 760px;
-      }
       ha-settings-row {
         border-top: 1px solid var(--divider-color);
       }
@@ -79,7 +76,10 @@ export class HsPlansView extends LitElement {
         gap: var(--ha-space-2, 8px);
       }
       ha-select {
-        min-width: 180px;
+        width: 220px;
+      }
+      .own {
+        min-width: 130px;
       }
     `,
   ];
@@ -243,10 +243,15 @@ export class HsPlansView extends LitElement {
                     }}
                   ></ha-select>
                   ${this.sharesPlan(room)
-                    ? html`<ha-button appearance="plain" .disabled=${this.busy} @click=${() => this.ownPlan(room)}>
+                    ? html`<ha-button
+                        class="own"
+                        appearance="plain"
+                        .disabled=${this.busy}
+                        @click=${() => this.ownPlan(room)}
+                      >
                         ${t("plans.own_plan")}
                       </ha-button>`
-                    : nothing}
+                    : html`<span class="own"></span>`}
                 </div>
               </ha-settings-row>`,
             )}
