@@ -47,7 +47,8 @@
           "auto": "Normálně",
           "away": "Pryč",
           "vacation": "Dovolená",
-          "off": "Vypnuto"
+          "off": "Vypnuto",
+          "mixed": "Různě"
         }
       },
       "zone_mode": {
@@ -114,6 +115,9 @@
     },
     "revision_conflict": {
       "message": "Nastavení se mezitím změnilo jinde. Načtěte stránku a zkuste to znovu."
+    },
+    "mixed": {
+      "message": "Různě není režim. Vyberte Normálně, Pryč, Dovolená nebo Vypnuto."
     }
   },
   "selector": {

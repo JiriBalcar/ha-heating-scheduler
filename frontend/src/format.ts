@@ -1,6 +1,6 @@
 // Number, time and date formatting in the user's language and the house's time zone.
 import type { Lang, Translate } from "./i18n";
-import type { HomeAssistant, RoomData, Snapshot, TargetData, TargetMode } from "./types";
+import type { HomeAssistant, RoomData, Snapshot, TargetData, TargetMode, VacationData } from "./types";
 
 export interface FormatContext {
   lang: Lang;
@@ -211,6 +211,14 @@ export function reasonText(
       ? formatDateTime(target.valid_until, ctx)
       : formatUntil(target.valid_until, now, ctx);
   return `${base} ${t("room.until", { until })}`;
+}
+
+/** "Holiday planned: Sat 10 Oct 08:00 – Sun 18 Oct 12:00", for a holiday that has not started. */
+export function plannedText(vacation: VacationData, ctx: FormatContext, t: Translate): string {
+  const from = formatDateTime(vacation.start, ctx);
+  return vacation.end
+    ? t("house.planned", { from, to: formatDateTime(vacation.end, ctx) })
+    : t("house.planned_open", { from });
 }
 
 /** "until 22:00 → Night 18,0 °C", or null when nothing changes soon. */

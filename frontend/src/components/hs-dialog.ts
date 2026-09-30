@@ -7,7 +7,8 @@ import { define } from "./define";
 /**
  * A dialog that Home Assistant's dialog manager shows (see `showDialog` in ../ha). HA creates the
  * element once, sets `hass`, calls `showDialog(params)`, and calls `closeDialog()` on Back.
- * Subclasses render `<ha-dialog .open=${this.open} @closed=${this.onClosed}>`.
+ * Subclasses render `<ha-dialog .open=${this.open} @closed=${this.onClosed}>` while `args` is set,
+ * and nothing without it.
  *
  * The parameters are kept in `args`, not `params`: HA takes an element with a `params` property
  * for its newer dialog type, drops it after closing and creates the next one without `hass`.
@@ -28,6 +29,20 @@ export class HsHaDialog<P> extends LitElement {
   }
 
   showDialog(params: P): void {
+    if (this.args === undefined) {
+      this.start(params);
+      return;
+    }
+    // The last opening is still shown, or still closing. It ends here, and its caller gets what was
+    // chosen. A new ha-dialog shows the new opening: the old one's "closed" can come later, and it
+    // must not close the new opening (onClosed ignores an ha-dialog that is no longer shown).
+    this.dialogClosed();
+    this.args = undefined;
+    void this.updateComplete.then(() => this.start(params));
+  }
+
+  private start(params: P) {
+    this.dialogOpened(params);
     this.args = params;
     this.open = true;
   }
@@ -37,12 +52,16 @@ export class HsHaDialog<P> extends LitElement {
     return true;
   }
 
-  /** Runs when the dialog has closed, before `args` is cleared. */
+  /** Runs when an opening starts, before `args` is set: subclasses set their fields up here. */
+  protected dialogOpened(_params: P): void {}
+
+  /** Runs when an opening has ended (closed, or replaced by a new one), before `args` is cleared. */
   protected dialogClosed(): void {}
 
   protected onClosed(event: Event): void {
-    // Only the dialog itself, not a "closed" event of a field inside it.
-    if (event.target !== event.currentTarget) return;
+    // Only the ha-dialog on screen: not a "closed" event of a field inside it, and not the late
+    // "closed" of an ha-dialog that a new opening has replaced.
+    if (event.target !== event.currentTarget || !(event.target as Element).isConnected) return;
     this.dialogClosed();
     this.args = undefined;
     fire(this, "dialog-closed", { dialog: this.localName });
@@ -71,11 +90,8 @@ export class HsConfirmDialog extends HsHaDialog<ConfirmParams> {
     }
   `;
 
-  override showDialog(params: ConfirmParams): void {
-    // A new question replaces one that is still open.
-    this.args?.resolve(false);
+  protected override dialogOpened(): void {
     this.confirmed = false;
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

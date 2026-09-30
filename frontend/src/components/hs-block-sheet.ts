@@ -96,11 +96,10 @@ export class HsBlockSheet extends HsHaDialog<BlockParams> {
     }
   `;
 
-  override showDialog(params: BlockParams): void {
+  protected override dialogOpened(params: BlockParams): void {
     this.day = params.day;
     this.index = params.index;
     this.minute = params.minute;
-    super.showDialog(params);
   }
 
   private get t() {

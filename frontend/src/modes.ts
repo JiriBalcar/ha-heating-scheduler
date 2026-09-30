@@ -3,6 +3,7 @@ import {
   mdiBagSuitcase,
   mdiHandBackRight,
   mdiHomeExportOutline,
+  mdiHomeSwitchOutline,
   mdiHomeThermometerOutline,
   mdiLeaf,
   mdiPower,
@@ -46,6 +47,9 @@ export const HOUSE_ICONS: Record<HouseMode, string> = {
   vacation: mdiBagSuitcase,
   off: mdiPower,
 };
+
+/** The whole house while its zones are in different modes. */
+export const MIXED_ICON = mdiHomeSwitchOutline;
 
 /** Effective temperatures of a room: its set over the house temperatures. */
 export function roomTemperatures(room: RoomData, snapshot: Snapshot): Partial<Record<Mode, number>> {

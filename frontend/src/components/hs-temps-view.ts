@@ -3,10 +3,10 @@ import { mdiDelete, mdiPlus } from "@mdi/js";
 import { formatContext, formatTemp } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { MODE_COLORS, MODE_ICONS } from "../modes";
-import { uniqueName } from "../payload";
+import { roomPayload, uniqueName } from "../payload";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
-import { TEMPERATURE_MODES, type HomeAssistant, type Mode, type Snapshot, type TempSetData } from "../types";
+import { TEMPERATURE_MODES, type HomeAssistant, type Mode, type RoomData, type Snapshot, type TempSetData } from "../types";
 import { define } from "./define";
 import { confirmDialog, keepMineDialog } from "./hs-dialog";
 
@@ -24,8 +24,11 @@ function clamp(value: number): number {
   return Math.min(30, Math.max(5, Math.round(value * 2) / 2));
 }
 
-/** House temperatures and own temperature sets. */
-export class HsAdvTemps extends LitElement {
+/**
+ * The Temperatures tab, laid out like the Plans tab: the house temperatures and own sets as cards,
+ * and which set each room uses.
+ */
+export class HsTempsView extends LitElement {
   static override properties = {
     hass: { attribute: false },
     snapshot: { attribute: false },
@@ -53,18 +56,22 @@ export class HsAdvTemps extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: var(--ha-space-4, 16px);
+        gap: var(--ha-space-6, 24px);
+      }
+      .sets {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+        align-items: start;
+        gap: var(--ha-space-2, 8px);
       }
       .card-content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--ha-space-3, 12px);
         padding: 0 var(--ha-space-4, 16px) var(--ha-space-2, 8px);
       }
       .muted {
         color: var(--secondary-text-color);
-      }
-      h2 {
-        margin: var(--ha-space-4, 16px) 0 0;
-        font-size: var(--ha-font-size-l, 16px);
-        font-weight: var(--ha-font-weight-medium, 500);
       }
       p {
         margin: 0;
@@ -99,6 +106,12 @@ export class HsAdvTemps extends LitElement {
       }
       .new {
         align-self: flex-start;
+      }
+      .rooms ha-settings-row:first-of-type {
+        border-top: none;
+      }
+      ha-select {
+        width: 220px;
       }
     `,
   ];
@@ -153,6 +166,17 @@ export class HsAdvTemps extends LitElement {
     });
   }
 
+  private roomNames(ids: string[] = []): string {
+    return ids
+      .map((id) => this.snapshot.rooms.find((room) => room.id === id)?.name)
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  private async assign(room: RoomData, setId: string) {
+    await this.run("room/save", { room: roomPayload(room, { temp_set_id: setId }) });
+  }
+
   private async run(command: string, data: Record<string, unknown>): Promise<boolean> {
     this.busy = true;
     try {
@@ -190,8 +214,8 @@ export class HsAdvTemps extends LitElement {
     const ok = await confirmDialog(this, {
       heading: t("common.delete"),
       message: rooms
-        ? t("adv.temps.delete_confirm_used", { name: set.name, rooms })
-        : t("adv.temps.delete_confirm", { name: set.name }),
+        ? t("temps.delete_confirm_used", { name: set.name, rooms })
+        : t("temps.delete_confirm", { name: set.name }),
       confirm: t("common.delete"),
       cancel: t("common.cancel"),
       danger: true,
@@ -200,7 +224,7 @@ export class HsAdvTemps extends LitElement {
   }
 
   private createSet() {
-    const name = uniqueName(this.t("adv.temps.new"), this.snapshot.temp_sets.map((set) => set.name));
+    const name = uniqueName(this.t("temps.new"), this.snapshot.temp_sets.map((set) => set.name));
     void this.run("temp_set/save", { temp_set: { name, temperatures: {} } });
   }
 
@@ -225,16 +249,19 @@ export class HsAdvTemps extends LitElement {
     const house = this.house();
     const isHouse = set.id === "house";
     const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-    return html`<ha-card .header=${isHouse ? t("adv.temps.house") : undefined}>
+    return html`<ha-card .header=${isHouse ? t("temps.house") : set.name}>
       <div class="card-content">
         ${isHouse
-          ? html`<p class="muted">${t("adv.temps.house_hint")}</p>`
-          : html`<ha-input
-              .label=${t("plans.name")}
-              .value=${draft.name}
-              maxlength="60"
-              @input=${(e: Event) => this.patch(set.id, (d) => ({ ...d, name: (e.target as HTMLInputElement).value }))}
-            ></ha-input>`}
+          ? html`<p class="muted">${t("temps.house_hint")}</p>`
+          : html`<p class="muted">
+                ${set.used_by?.length ? t("temps.used_by", { rooms: this.roomNames(set.used_by) }) : t("temps.unused")}
+              </p>
+              <ha-input
+                .label=${t("plans.name")}
+                .value=${draft.name}
+                maxlength="60"
+                @input=${(e: Event) => this.patch(set.id, (d) => ({ ...d, name: (e.target as HTMLInputElement).value }))}
+              ></ha-input>`}
       </div>
       ${TEMPERATURE_MODES.map((mode) => {
         const own = draft.temperatures[mode];
@@ -245,7 +272,7 @@ export class HsAdvTemps extends LitElement {
           ${isHouse
             ? nothing
             : html`<span slot="description">
-                ${own === undefined ? t("adv.temps.as_house", { temp: formatTemp(inherited, ctx) }) : t("adv.temps.own")}
+                ${own === undefined ? t("temps.as_house", { temp: formatTemp(inherited, ctx) }) : t("temps.own")}
               </span>`}
           <div class="value">
             ${isHouse || own !== undefined ? this.number(set.id, mode, own ?? inherited) : nothing}
@@ -253,7 +280,7 @@ export class HsAdvTemps extends LitElement {
               ? nothing
               : html`<ha-switch
                   .checked=${own !== undefined}
-                  aria-label=${t("adv.temps.own")}
+                  aria-label=${t("temps.own")}
                   @change=${(e: Event) =>
                     this.setValue(set.id, mode, (e.target as HTMLInputElement).checked ? inherited : undefined)}
                 ></ha-switch>`}
@@ -280,16 +307,36 @@ export class HsAdvTemps extends LitElement {
       ...this.snapshot.temp_sets.filter((set) => set.id === "house"),
       ...this.snapshot.temp_sets.filter((set) => set.id !== "house"),
     ];
+    const setOptions = this.snapshot.temp_sets.map((set) => ({
+      value: set.id,
+      label: set.id === "house" ? t("temps.house") : set.name,
+    }));
     return html`
-      ${house ? this.renderSet(house) : nothing}
-      <h2>${t("adv.temps.sets")}</h2>
-      <p class="muted">${t("adv.temps.sets_hint")} ${t("adv.temps.save_hint")}</p>
-      ${others.map((set) => this.renderSet(set))}
-      <ha-button class="new" appearance="plain" .disabled=${this.busy} @click=${this.createSet}>
-        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>${t("adv.temps.new")}
+      <p class="muted">${t("temps.sets_hint")} ${t("temps.save_hint")}</p>
+      <div class="sets">${house ? this.renderSet(house) : nothing} ${others.map((set) => this.renderSet(set))}</div>
+      <ha-button class="new" .disabled=${this.busy} @click=${this.createSet}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>${t("temps.new")}
       </ha-button>
+      ${this.snapshot.rooms.length
+        ? html`<ha-card class="rooms" .header=${t("temps.rooms_title")}>
+            ${this.snapshot.rooms.map(
+              (room) => html`<ha-settings-row>
+                <span slot="heading">${room.name}</span>
+                <ha-select
+                  .label=${t("adv.rooms.temp_set")}
+                  .options=${setOptions}
+                  .value=${room.temp_set_id}
+                  .disabled=${this.busy}
+                  @selected=${(e: CustomEvent<{ value?: string }>) => {
+                    if (e.detail.value && e.detail.value !== room.temp_set_id) void this.assign(room, e.detail.value);
+                  }}
+                ></ha-select>
+              </ha-settings-row>`,
+            )}
+          </ha-card>`
+        : nothing}
     `;
   }
 }
 
-define("hs-adv-temps", HsAdvTemps);
+define("hs-temps-view", HsTempsView);

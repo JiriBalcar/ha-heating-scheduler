@@ -121,10 +121,20 @@ async def test_selects_for_the_house_and_each_zone(
     await settle(hass)
     assert state_of(hass, upstairs).state == "away"
     assert state_of(hass, house).state == "auto"
-    # The zones differ: the house select is unknown and lists the zones.
+    # The zones differ: the house select is "mixed", which only it offers, and lists the zones.
     state = state_of(hass, "select.heating_house_mode")
-    assert state.state == "unknown"
+    assert state.state == "mixed"
+    assert state.attributes["options"] == ["auto", "away", "vacation", "off", "mixed"]
     assert state.attributes["zones"] == {"House": "auto", "Upstairs": "away"}
+    assert state_of(hass, upstairs).attributes["options"] == ["auto", "away", "vacation", "off"]
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {"entity_id": "select.heating_house_mode", "option": "mixed"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "mixed"
     await hass.services.async_call(
         "select",
         "select_option",
@@ -132,7 +142,9 @@ async def test_selects_for_the_house_and_each_zone(
         blocking=True,
     )
     await settle(hass)
-    assert state_of(hass, "select.heating_house_mode").state == "off"
+    state = state_of(hass, "select.heating_house_mode")
+    assert state.state == "off"
+    assert "mixed" not in state.attributes["options"]
     assert state_of(hass, upstairs).state == "off"
     # Back to one zone: the zone selects are removed.
     config = engine.config

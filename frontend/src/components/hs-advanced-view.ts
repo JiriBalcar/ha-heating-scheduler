@@ -7,7 +7,6 @@ import {
   mdiHomeFloor1,
   mdiHomeOutline,
   mdiRadiator,
-  mdiThermometer,
 } from "@mdi/js";
 import { languageOf, translator, type TextKey } from "../i18n";
 import { baseStyles } from "../styles";
@@ -17,13 +16,11 @@ import "./hs-adv-health";
 import "./hs-adv-log";
 import "./hs-adv-rooms";
 import "./hs-adv-settings";
-import "./hs-adv-temps";
 import "./hs-adv-zones";
 
 const SECTIONS: { id: string; label: TextKey; description: TextKey; icon: string; color: string }[] = [
   { id: "rooms", label: "adv.rooms", description: "adv.rooms_desc", icon: mdiHomeOutline, color: "#3f51b5" },
   { id: "zones", label: "adv.zones", description: "adv.zones_desc", icon: mdiHomeFloor1, color: "#009688" },
-  { id: "temps", label: "adv.temps", description: "adv.temps_desc", icon: mdiThermometer, color: "#ff6f22" },
   { id: "settings", label: "adv.settings", description: "adv.settings_desc", icon: mdiCogOutline, color: "#607d8b" },
   { id: "health", label: "adv.health", description: "adv.health_desc", icon: mdiRadiator, color: "#4caf50" },
   { id: "log", label: "adv.log", description: "adv.log_desc", icon: mdiHistory, color: "#9c27b0" },
@@ -87,8 +84,6 @@ export class HsAdvancedView extends LitElement {
         return html`<hs-adv-rooms .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-rooms>`;
       case "zones":
         return html`<hs-adv-zones .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-zones>`;
-      case "temps":
-        return html`<hs-adv-temps .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-temps>`;
       case "settings":
         return html`<hs-adv-settings .hass=${this.hass} .snapshot=${this.snapshot}></hs-adv-settings>`;
       case "health":

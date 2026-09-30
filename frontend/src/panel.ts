@@ -1,11 +1,12 @@
-// The sidebar panel: overview, plans and advanced settings in HA's page layout with tabs.
+// The sidebar panel: overview, plans, temperatures and advanced settings in HA's page layout with tabs.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { mdiCalendarClock, mdiTuneVariant, mdiViewDashboard } from "@mdi/js";
+import { mdiCalendarClock, mdiThermometer, mdiTuneVariant, mdiViewDashboard } from "@mdi/js";
 import "./card";
 import { define } from "./components/define";
 import "./components/hs-advanced-view";
 import "./components/hs-home-view";
 import "./components/hs-plans-view";
+import "./components/hs-temps-view";
 import { HA_ELEMENTS, whenDefined } from "./ha";
 import { languageOf, translator } from "./i18n";
 import { storeFor } from "./store";
@@ -17,7 +18,7 @@ interface Route {
   path: string;
 }
 
-type Tab = "home" | "plans" | "advanced";
+type Tab = "home" | "plans" | "temperatures" | "advanced";
 
 export class HeatingSchedulerPanel extends LitElement {
   static override properties = {
@@ -118,6 +119,7 @@ export class HeatingSchedulerPanel extends LitElement {
 
   private get tab(): Tab {
     if (this.path.startsWith("/plans")) return "plans";
+    if (this.path.startsWith("/temperatures")) return "temperatures";
     if (this.path.startsWith("/advanced")) return "advanced";
     return "home";
   }
@@ -135,6 +137,8 @@ export class HeatingSchedulerPanel extends LitElement {
           .snapshot=${this.snapshot}
           .planId=${parts[1] ?? null}
         ></hs-plans-view>`;
+      case "temperatures":
+        return html`<hs-temps-view .hass=${this.hass} .snapshot=${this.snapshot}></hs-temps-view>`;
       case "advanced":
         return html`<hs-advanced-view
           .hass=${this.hass}
@@ -153,6 +157,7 @@ export class HeatingSchedulerPanel extends LitElement {
     const tabs = [
       { path: `${prefix}/overview`, name: t("nav.home"), iconPath: mdiViewDashboard },
       { path: `${prefix}/plans`, name: t("nav.plans"), iconPath: mdiCalendarClock },
+      { path: `${prefix}/temperatures`, name: t("nav.temps"), iconPath: mdiThermometer },
       { path: `${prefix}/advanced`, name: t("nav.advanced"), iconPath: mdiTuneVariant },
     ];
     // The panel's own URL shows the overview.

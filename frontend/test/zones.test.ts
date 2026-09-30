@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HouseData, RoomData, Snapshot, ZoneData } from "../src/types";
-import { commonMode, roomsOf, wholeHouse, zoneOf } from "../src/zones";
+import { commonMode, moveWithin, roomsOf, wholeHouse, zoneOf } from "../src/zones";
 
 const AUTO: HouseData = { mode: "auto", effective: "auto", vacation: null };
 const AWAY: HouseData = { mode: "away", effective: "away", vacation: null };
@@ -36,5 +36,15 @@ describe("zones", () => {
     const data = snapshot([zone("down", AUTO), zone("up", AUTO)], rooms);
     expect(roomsOf(data, data.zones[0]!).map((item) => item.id)).toEqual(["living", "kitchen", "x"]);
     expect(roomsOf(data, data.zones[1]!).map((item) => item.id)).toEqual(["bed"]);
+  });
+
+  it("moves a room within its zone and leaves the other rooms in place", () => {
+    const order = ["living", "bed", "kitchen", "bath"];
+    const down = ["living", "kitchen"];
+    expect(moveWithin(order, down, "kitchen", -1)).toEqual(["kitchen", "bed", "living", "bath"]);
+    expect(moveWithin(order, down, "living", 1)).toEqual(["kitchen", "bed", "living", "bath"]);
+    expect(moveWithin(order, down, "living", -1)).toBeNull();
+    expect(moveWithin(order, down, "kitchen", 1)).toBeNull();
+    expect(moveWithin(order, down, "bed", 1)).toBeNull();
   });
 });

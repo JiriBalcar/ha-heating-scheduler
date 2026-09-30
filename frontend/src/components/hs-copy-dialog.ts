@@ -27,11 +27,9 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
     }
   `;
 
-  override showDialog(params: CopyParams): void {
-    this.args?.resolve([]);
+  protected override dialogOpened(): void {
     this.chosen = [];
     this.result = [];
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

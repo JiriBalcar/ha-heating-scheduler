@@ -24,3 +24,18 @@ export function wholeHouse(snapshot: Snapshot): HouseData | null {
 export function roomsOf(snapshot: Snapshot, zone: ZoneData): RoomData[] {
   return snapshot.rooms.filter((room) => zoneOf(snapshot, room).id === zone.id);
 }
+
+/**
+ * `order` with `id` swapped with its neighbour in `group`, a part of `order` such as the rooms of
+ * one zone: the one before it for `delta` -1, the one after it for +1. Null at either end.
+ */
+export function moveWithin(order: string[], group: string[], id: string, delta: -1 | 1): string[] | null {
+  const index = group.indexOf(id);
+  const other = index < 0 ? undefined : group[index + delta];
+  if (other === undefined) return null;
+  const result = [...order];
+  const a = result.indexOf(id);
+  const b = result.indexOf(other);
+  [result[a], result[b]] = [result[b]!, result[a]!];
+  return result;
+}

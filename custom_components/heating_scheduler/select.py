@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -20,6 +21,9 @@ from .entity import HeatingEntity, house_device_info
 from .errors import service_error
 
 PARALLEL_UPDATES = 0
+
+# The state of the house select while the zones are in different modes. It cannot be selected.
+MIXED: Final = "mixed"
 
 
 def zone_unique_id(zone_id: str) -> str:
@@ -72,12 +76,11 @@ async def async_setup_entry(
 class HouseModeSelect(HeatingEntity, SelectEntity):
     """The mode of the whole house: selecting sets every zone.
 
-    Unknown while the zones are in different modes.
+    "mixed" while the zones are in different modes; only then is it one of the options.
     """
 
     _attr_translation_key = "house_mode"
     _attr_unique_id = "house_mode"
-    _attr_options = [mode.value for mode in HouseMode]
 
     def __init__(self, engine: HeatingEngine) -> None:
         """Create the select."""
@@ -85,10 +88,16 @@ class HouseModeSelect(HeatingEntity, SelectEntity):
         self._attr_device_info = house_device_info()
 
     @property
-    def current_option(self) -> str | None:
-        """Return the effective mode shared by all zones."""
+    def options(self) -> list[str]:
+        """Return the modes, and "mixed" while the zones are in different modes."""
+        modes = [mode.value for mode in HouseMode]
+        return modes if self._engine.house_mode() is not None else [*modes, MIXED]
+
+    @property
+    def current_option(self) -> str:
+        """Return the effective mode shared by all zones, or "mixed"."""
         mode = self._engine.house_mode()
-        return None if mode is None else mode.value
+        return MIXED if mode is None else mode.value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -101,6 +110,10 @@ class HouseModeSelect(HeatingEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Select a mode for every zone."""
+        if option == MIXED:
+            raise ServiceValidationError(
+                "mixed is not a mode", translation_domain=DOMAIN, translation_key="mixed"
+            )
         try:
             await self._engine.async_set_house_mode(HouseMode(option))
         except ValidationError as err:

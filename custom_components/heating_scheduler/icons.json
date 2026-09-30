@@ -36,12 +36,22 @@
     },
     "select": {
       "house_mode": {
-        "default": "mdi:home-thermometer",
+        "default": "mdi:home-thermometer-outline",
         "state": {
-          "auto": "mdi:home-thermometer",
+          "auto": "mdi:home-thermometer-outline",
           "away": "mdi:home-export-outline",
           "vacation": "mdi:bag-suitcase",
-          "off": "mdi:radiator-off"
+          "off": "mdi:power",
+          "mixed": "mdi:home-switch-outline"
+        }
+      },
+      "zone_mode": {
+        "default": "mdi:home-thermometer-outline",
+        "state": {
+          "auto": "mdi:home-thermometer-outline",
+          "away": "mdi:home-export-outline",
+          "vacation": "mdi:bag-suitcase",
+          "off": "mdi:power"
         }
       }
     },

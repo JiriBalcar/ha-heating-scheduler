@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 // Component tests for the findings of the code review of 2026-09-30 (F05-F07).
 import { beforeAll, describe, expect, it } from "vitest";
+import "../src/card";
+import "../src/components/hs-adv-rooms";
 import "../src/components/hs-adv-settings";
 import "../src/components/hs-block-sheet";
 import "../src/components/hs-house-card";
+import "../src/components/hs-house-dialog";
 import "../src/components/hs-plan-editor";
 import "../src/components/hs-room-card";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
@@ -68,9 +71,17 @@ beforeAll(async () => {
   // Our elements are defined once Home Assistant has defined its root element.
   customElements.define("home-assistant", class extends HTMLElement {});
   await Promise.all(
-    ["hs-adv-settings", "hs-block-sheet", "hs-house-card", "hs-plan-editor", "hs-room-card", "hs-room-dialog"].map((name) =>
-      customElements.whenDefined(name),
-    ),
+    [
+      "hs-adv-rooms",
+      "hs-adv-settings",
+      "hs-block-sheet",
+      "hs-card",
+      "hs-house-card",
+      "hs-house-dialog",
+      "hs-plan-editor",
+      "hs-room-card",
+      "hs-room-dialog",
+    ].map((name) => customElements.whenDefined(name)),
   );
 });
 
@@ -209,47 +220,105 @@ describe("room dialog (F07)", () => {
   });
 });
 
-describe("zones on the overview", () => {
-  const AUTO: HouseData = { mode: "auto", effective: "auto", vacation: null };
-  const AWAY: HouseData = { mode: "away", effective: "away", vacation: null };
-  const ZONES: ZoneData[] = [
-    { id: "down", name: "Ground floor", house: AUTO, rooms: [] },
-    { id: "up", name: "1st floor", house: AWAY, rooms: ["bed"] },
-  ];
-  const BEDROOM: RoomData = {
-    id: "bed",
-    name: "Bedroom",
-    trvs: ["climate.bed"],
-    plan_id: "house",
-    temp_set_id: "house",
-    temperature_entity: null,
-    area_id: null,
-    zone_id: "up",
-    current_temperature: 19,
-    target: { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null },
-    override: null,
-    issues: [],
-    trv_status: [],
-  };
+const AUTO: HouseData = { mode: "auto", effective: "auto", vacation: null };
+const AWAY: HouseData = { mode: "away", effective: "away", vacation: null };
+const ZONES: ZoneData[] = [
+  { id: "down", name: "Ground floor", house: AUTO, rooms: ["kitchen"] },
+  { id: "up", name: "1st floor", house: AWAY, rooms: ["bed"] },
+];
+const BEDROOM: RoomData = {
+  id: "bed",
+  name: "Bedroom",
+  trvs: ["climate.bed"],
+  plan_id: "house",
+  temp_set_id: "house",
+  temperature_entity: null,
+  area_id: null,
+  zone_id: "up",
+  current_temperature: 19,
+  target: { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null },
+  override: null,
+  issues: [],
+  trv_status: [],
+};
+const KITCHEN: RoomData = { ...BEDROOM, id: "kitchen", name: "Kitchen", zone_id: "down" };
 
-  async function show(tag: string, props: Record<string, unknown>): Promise<string> {
-    const element = document.createElement(tag) as Any;
-    Object.assign(element, { hass: fakeHass(async () => undefined), ...props });
-    document.body.appendChild(element);
-    await element.updateComplete;
-    return element.shadowRoot.querySelector('[slot="secondary"]').textContent.replace(/\s+/g, " ").trim();
+async function mount(tag: string, props: Record<string, unknown>): Promise<Any> {
+  const element = document.createElement(tag) as Any;
+  Object.assign(element, { hass: fakeHass(async () => undefined), ...props });
+  document.body.appendChild(element);
+  await element.updateComplete;
+  return element;
+}
+
+function text(root: ParentNode, selector: string): string {
+  return root.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+describe("zones on the overview", () => {
+  async function secondary(tag: string, props: Record<string, unknown>): Promise<string> {
+    return text((await mount(tag, props)).shadowRoot, '[slot="secondary"]');
   }
 
   it("shows each zone when the zones differ", async () => {
     const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
-    expect(await show("hs-house-card", { snapshot: data })).toBe("Ground floor: Normal · 1st floor: Away");
+    expect(await secondary("hs-house-card", { snapshot: data })).toBe("Ground floor: Normal · 1st floor: Away");
   });
 
   it("speaks of the zone, not the whole house", async () => {
     const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM] });
-    expect(await show("hs-house-card", { snapshot: data, zone: ZONES[1] })).toBe(
+    expect(await secondary("hs-house-card", { snapshot: data, zone: ZONES[1] })).toBe(
       "This part of the house is set to Away.",
     );
-    expect(await show("hs-room-card", { snapshot: data, room: BEDROOM })).toBe("19.0 °C · 1st floor: Away");
+    expect(await secondary("hs-room-card", { snapshot: data, room: BEDROOM })).toBe("19.0 °C · 1st floor: Away");
+  });
+});
+
+describe("house dialog", () => {
+  it("shows the state of the whole house or of a zone in big letters", async () => {
+    const temp_sets = [{ id: "house", name: "House", temperatures: { comfort: 21, away: 16 }, used_by: [] }];
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM], temp_sets });
+    const dialog = await mount("hs-house-dialog", {});
+    dialog.showDialog({ zoneId: null, snapshot: data });
+    await dialog.updateComplete;
+    expect(text(dialog.shadowRoot, ".state")).toBe("Mixed");
+    expect(text(dialog.shadowRoot, ".detail")).toBe("Ground floor: Normal · 1st floor: Away");
+    expect(dialog.shadowRoot.querySelector("ha-control-select").value).toBeUndefined();
+    // A new opening replaces the open one; it shows after one more update.
+    dialog.showDialog({ zoneId: "up", snapshot: data });
+    await dialog.updateComplete;
+    await dialog.updateComplete;
+    expect(text(dialog.shadowRoot, ".state")).toBe("Away");
+    expect(text(dialog.shadowRoot, ".detail")).toBe("The rooms are kept at 16.0 °C.");
+    expect(dialog.shadowRoot.querySelector("ha-control-select").value).toBe("away");
+  });
+});
+
+describe("rooms in Advanced", () => {
+  it("are grouped by zone", async () => {
+    const data = snapshot(1, { zones: ZONES, rooms: [BEDROOM, KITCHEN] });
+    const page = await mount("hs-adv-rooms", { snapshot: data });
+    const groups = [...page.shadowRoot.querySelectorAll("section")].map((section: Element) => ({
+      zone: text(section, "h2"),
+      rooms: [...section.querySelectorAll('[slot="headline"]')].map((item) => item.textContent?.trim()),
+    }));
+    expect(groups).toEqual([
+      { zone: "Ground floor", rooms: ["Kitchen"] },
+      { zone: "1st floor", rooms: ["Bedroom"] },
+    ]);
+  });
+});
+
+describe("card", () => {
+  it("shows only the house tile without rooms", async () => {
+    const hass = fakeHass(async () => undefined);
+    const card = document.createElement("hs-card") as Any;
+    card.setConfig({ type: "custom:heating-scheduler-card", show_rooms: false });
+    card.hass = hass;
+    document.body.appendChild(card);
+    hass.push(snapshot(1, { zones: ZONES, rooms: [BEDROOM, KITCHEN] }));
+    await card.updateComplete;
+    expect(card.shadowRoot.querySelectorAll("hs-house-card")).toHaveLength(1);
+    expect(card.shadowRoot.querySelectorAll("hs-room-card")).toHaveLength(0);
   });
 });

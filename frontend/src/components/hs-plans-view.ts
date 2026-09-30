@@ -282,11 +282,9 @@ export class HsNewPlanDialog extends HsHaDialog<NewPlanParams> {
   declare data: NewPlan;
   private result: NewPlan | null = null;
 
-  override showDialog(params: NewPlanParams): void {
-    this.args?.resolve(null);
+  protected override dialogOpened(params: NewPlanParams): void {
     this.data = { name: params.name, source: "house" };
     this.result = null;
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

@@ -47,7 +47,8 @@
           "auto": "Normal",
           "away": "Away",
           "vacation": "Holiday",
-          "off": "Off"
+          "off": "Off",
+          "mixed": "Mixed"
         }
       },
       "zone_mode": {
@@ -114,6 +115,9 @@
     },
     "revision_conflict": {
       "message": "The settings were changed elsewhere. Reload and try again."
+    },
+    "mixed": {
+      "message": "Mixed is not a mode. Choose Normal, Away, Holiday or Off."
     }
   },
   "selector": {

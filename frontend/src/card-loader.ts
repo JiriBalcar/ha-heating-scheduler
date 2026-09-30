@@ -89,7 +89,7 @@ class HeatingSchedulerCardLoader extends HTMLElement {
 
   getCardSize(): number | Promise<number> {
     if (this.inner?.getCardSize) return this.inner.getCardSize();
-    return this.config?.room ? 3 : 6;
+    return this.config?.room || this.config?.show_rooms === false ? 3 : 6;
   }
 
   getGridOptions() {

@@ -385,10 +385,8 @@ export class HsSavePlanDialog extends HsHaDialog<SavePlanParams> {
     }
   `;
 
-  override showDialog(params: SavePlanParams): void {
-    this.args?.resolve(false);
+  protected override dialogOpened(): void {
     this.confirmed = false;
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

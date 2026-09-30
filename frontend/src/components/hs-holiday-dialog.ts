@@ -33,17 +33,8 @@ function localDate(date: Date, timeZone: string): string {
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
 
-/** A date field and a time field, side by side. */
-function dateTime(prefix: "start" | "end") {
-  return {
-    name: "",
-    type: "grid",
-    schema: [
-      { name: `${prefix}_date`, required: true, selector: { date: {} } },
-      { name: `${prefix}_time`, required: true, selector: { time: { no_second: true } } },
-    ],
-  };
-}
+const DATE_SELECTOR = { date: {} };
+const TIME_SELECTOR = { time: { no_second: true } };
 
 /** Holiday: leaving (now or later), coming back, temperature. */
 export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
@@ -54,14 +45,30 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
   declare data: HolidayData;
   declare error: string;
 
+  // HA's form grid gives the time field its own label and a column as wide as the date field, so
+  // the two fields do not line up. They share one wrapping row instead, as in HA's date-time field:
+  // the date field grows, and the time field keeps its size and has no label of its own.
   static override styles = css`
     ha-alert {
       display: block;
       margin-top: var(--ha-space-4, 16px);
     }
+    .when {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: var(--ha-space-2, 8px);
+      margin: var(--ha-space-6, 24px) 0;
+    }
+    .date {
+      flex: 1 1 180px;
+    }
+    .time {
+      flex: 0 0 auto;
+    }
   `;
 
-  override showDialog(params: HolidayParams): void {
+  protected override dialogOpened(params: HolidayParams): void {
     const tz = params.snapshot.time_zone;
     this.data = {
       leave: "now",
@@ -72,7 +79,6 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
       mode: params.snapshot.settings.vacation_mode,
     };
     this.error = "";
-    super.showDialog(params);
   }
 
   private get t() {
@@ -87,11 +93,8 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
     return zonedToUtc(year, month, day, hour, minute, this.args.snapshot.time_zone);
   }
 
-  private schema() {
+  private leaveSchema() {
     const t = this.t;
-    const snapshot = this.args!.snapshot;
-    const ctx = formatContext(this.hass, languageOf(this.hass), snapshot);
-    const temperature = (mode: "frost" | "away") => formatTemp(houseTemperature(snapshot, mode), ctx);
     return [
       {
         name: "leave",
@@ -105,8 +108,15 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
           },
         },
       },
-      ...(this.data.leave === "later" ? [dateTime("start")] : []),
-      dateTime("end"),
+    ];
+  }
+
+  private modeSchema() {
+    const t = this.t;
+    const snapshot = this.args!.snapshot;
+    const ctx = formatContext(this.hass, languageOf(this.hass), snapshot);
+    const temperature = (mode: "frost" | "away") => formatTemp(houseTemperature(snapshot, mode), ctx);
+    return [
       {
         name: "mode",
         selector: {
@@ -122,26 +132,37 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
     ];
   }
 
-  private label = (field: { name: string }): string => {
-    const t = this.t;
-    switch (field.name) {
-      case "leave":
-        return t("vacation.from");
-      case "start_date":
-        return t("vacation.leave_at");
-      case "end_date":
-        return t("vacation.to");
-      case "start_time":
-      case "end_time":
-        return t("vacation.time");
-      default:
-        return t("vacation.temperature");
-    }
-  };
+  private label = (field: { name: string }): string =>
+    field.name === "leave" ? this.t("vacation.from") : this.t("vacation.temperature");
 
-  private changed(event: CustomEvent<{ value: HolidayData }>) {
-    this.data = { ...this.data, ...event.detail.value };
+  private changed(value: Partial<HolidayData>) {
+    this.data = { ...this.data, ...value };
     this.error = "";
+  }
+
+  /** The date and time of leaving ("start") or of coming back ("end"). */
+  private when(prefix: "start" | "end") {
+    const date = prefix === "start" ? "start_date" : "end_date";
+    const time = prefix === "start" ? "start_time" : "end_time";
+    return html`<div class="when">
+      <ha-selector
+        class="date"
+        .hass=${this.hass}
+        .selector=${DATE_SELECTOR}
+        .label=${prefix === "start" ? this.t("vacation.leave_at") : this.t("vacation.to")}
+        .value=${this.data[date]}
+        .required=${true}
+        @value-changed=${(e: CustomEvent<{ value: string }>) => this.changed({ [date]: e.detail.value })}
+      ></ha-selector>
+      <ha-selector
+        class="time"
+        .hass=${this.hass}
+        .selector=${TIME_SELECTOR}
+        .value=${this.data[time]}
+        .required=${true}
+        @value-changed=${(e: CustomEvent<{ value: string }>) => this.changed({ [time]: e.detail.value })}
+      ></ha-selector>
+    </div>`;
   }
 
   private async submit() {
@@ -202,9 +223,17 @@ export class HsHolidayDialog extends HsHaDialog<HolidayParams> {
         <ha-form
           .hass=${this.hass}
           .data=${this.data}
-          .schema=${this.schema()}
+          .schema=${this.leaveSchema()}
           .computeLabel=${this.label}
-          @value-changed=${this.changed}
+          @value-changed=${(e: CustomEvent<{ value: Partial<HolidayData> }>) => this.changed(e.detail.value)}
+        ></ha-form>
+        ${this.data.leave === "later" ? this.when("start") : nothing} ${this.when("end")}
+        <ha-form
+          .hass=${this.hass}
+          .data=${this.data}
+          .schema=${this.modeSchema()}
+          .computeLabel=${this.label}
+          @value-changed=${(e: CustomEvent<{ value: Partial<HolidayData> }>) => this.changed(e.detail.value)}
         ></ha-form>
         ${this.error ? html`<ha-alert alert-type="error">${this.error}</ha-alert>` : nothing}
         <ha-dialog-footer slot="footer">

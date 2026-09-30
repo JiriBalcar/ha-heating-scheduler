@@ -46,6 +46,8 @@ export interface CardConfig {
   zone?: string;
   compact?: boolean;
   show_house?: boolean;
+  /** False: only the house tile (or the zone's tile), for example instead of the house mode entity. */
+  show_rooms?: boolean;
 }
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";

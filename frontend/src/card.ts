@@ -56,8 +56,13 @@ export class HeatingSchedulerCard extends LitElement {
   }
 
   getCardSize(): number {
-    const rooms = this.config?.room ? 1 : (this.snapshot?.rooms.length ?? 2);
-    return (this.config?.show_house ? 3 : 0) + rooms * (this.config?.compact ? 3 : 5);
+    const rooms = this.config?.show_rooms === false ? 0 : this.config?.room ? 1 : (this.snapshot?.rooms.length ?? 2);
+    return (this.showHouse ? 3 : 0) + rooms * (this.config?.compact ? 3 : 5);
+  }
+
+  /** The house tile shows when the card asks for it, and always when it shows no rooms. */
+  private get showHouse(): boolean {
+    return Boolean(this.config?.show_house) || this.config?.show_rooms === false;
   }
 
   override connectedCallback(): void {
@@ -85,14 +90,17 @@ export class HeatingSchedulerCard extends LitElement {
     const snapshot = this.snapshot;
     if (!snapshot) return html`<ha-card class="status">${t("common.loading")}</ha-card>`;
     const zone = snapshot.zones.find((item) => item.id === this.config.zone) ?? null;
-    const rooms = this.config.room
-      ? snapshot.rooms.filter((room) => room.id === this.config.room)
-      : zone
-        ? roomsOf(snapshot, zone)
-        : snapshot.rooms;
+    const rooms =
+      this.config.show_rooms === false
+        ? []
+        : this.config.room
+          ? snapshot.rooms.filter((room) => room.id === this.config.room)
+          : zone
+            ? roomsOf(snapshot, zone)
+            : snapshot.rooms;
     return html`
       <div class="stack">
-        ${this.config.show_house
+        ${this.showHouse
           ? html`<hs-house-card .hass=${this.hass} .snapshot=${snapshot} .zone=${zone}></hs-house-card>`
           : nothing}
         ${repeat(
@@ -111,7 +119,7 @@ export class HeatingSchedulerCard extends LitElement {
   }
 }
 
-/** Visual editor of the card: room, compact tiles, house mode. */
+/** Visual editor of the card: zone, room, house mode, rooms, compact tiles. */
 export class HeatingSchedulerCardEditor extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -184,6 +192,7 @@ export class HeatingSchedulerCardEditor extends LitElement {
         },
       },
       { name: "show_house", selector: { boolean: {} } },
+      { name: "show_rooms", selector: { boolean: {} } },
       { name: "compact", selector: { boolean: {} } },
     ];
   }
@@ -196,11 +205,13 @@ export class HeatingSchedulerCardEditor extends LitElement {
       ...this.config,
       room: value.room === ALL_ROOMS ? undefined : (value.room as string | undefined),
       zone: value.zone === WHOLE_HOUSE ? undefined : (value.zone as string | undefined),
-      show_house: Boolean(value.show_house),
-      compact: Boolean(value.compact),
+      show_house: value.show_house ? true : undefined,
+      // Rooms are shown unless the card says otherwise.
+      show_rooms: value.show_rooms === false ? false : undefined,
+      compact: value.compact ? true : undefined,
     };
     for (const key of Object.keys(config) as (keyof CardConfig)[]) {
-      if (config[key] === undefined || config[key] === "" || config[key] === false) delete config[key];
+      if (config[key] === undefined || config[key] === "") delete config[key];
     }
     this.config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
@@ -212,6 +223,7 @@ export class HeatingSchedulerCardEditor extends LitElement {
       room: this.config.room ?? ALL_ROOMS,
       zone: this.config.zone ?? WHOLE_HOUSE,
       show_house: this.config.show_house ?? false,
+      show_rooms: this.config.show_rooms ?? true,
       compact: this.config.compact ?? false,
     };
     return html`<ha-form

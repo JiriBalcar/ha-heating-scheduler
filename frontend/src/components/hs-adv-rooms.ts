@@ -1,16 +1,26 @@
 import { LitElement, css, html, nothing } from "lit";
-import { mdiChevronDown, mdiChevronUp, mdiDelete, mdiDotsVertical, mdiHomeImportOutline, mdiPencil, mdiPlus } from "@mdi/js";
+import {
+  mdiChevronDown,
+  mdiChevronUp,
+  mdiDelete,
+  mdiDotsVertical,
+  mdiHomeFloor1,
+  mdiHomeImportOutline,
+  mdiPencil,
+  mdiPlus,
+} from "@mdi/js";
 import { showDialog } from "../ha";
 import { languageOf, translator, type Translate } from "../i18n";
 import { roomPayload, uniqueName } from "../payload";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { Candidates, HomeAssistant, RoomData, Snapshot } from "../types";
+import { moveWithin, roomsOf, zoneOf } from "../zones";
 import { define } from "./define";
 import { HsHaDialog, confirmDialog } from "./hs-dialog";
 import { openRoomDialog } from "./hs-room-dialog";
 
-/** Rooms: add (also from areas), change, reorder, delete. */
+/** Rooms: add (also from areas), change, reorder, delete. With two or more zones, grouped by zone. */
 export class HsAdvRooms extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -50,6 +60,17 @@ export class HsAdvRooms extends LitElement {
         padding: var(--ha-space-4, 16px);
         color: var(--secondary-text-color);
       }
+      /* A zone's heading, as HA's floor headings on its Areas page. */
+      h2 {
+        display: flex;
+        align-items: center;
+        gap: var(--ha-space-2, 8px);
+        margin: var(--ha-space-2, 8px) 0;
+        padding-inline-start: var(--ha-space-2, 8px);
+        color: var(--secondary-text-color);
+        font-size: var(--ha-font-size-m, 14px);
+        font-weight: var(--ha-font-weight-medium, 500);
+      }
     `,
   ];
 
@@ -72,13 +93,16 @@ export class HsAdvRooms extends LitElement {
     if (candidates) openRoomDialog(this, this.snapshot, candidates, room);
   }
 
-  private async move(room: RoomData, delta: number) {
-    const order = this.snapshot.rooms.map((item) => item.id);
-    const index = order.indexOf(room.id);
-    const target = index + delta;
-    if (target < 0 || target >= order.length) return;
-    [order[index], order[target]] = [order[target]!, order[index]!];
-    await this.call("rooms/reorder", { revision: this.snapshot.revision, order });
+  /** The rooms listed together with `room`: its zone's rooms, or all rooms with one zone. */
+  private group(room: RoomData): RoomData[] {
+    const snapshot = this.snapshot;
+    return snapshot.zones.length > 1 ? roomsOf(snapshot, zoneOf(snapshot, room)) : snapshot.rooms;
+  }
+
+  private async move(room: RoomData, delta: -1 | 1) {
+    const ids = (rooms: RoomData[]) => rooms.map((item) => item.id);
+    const order = moveWithin(ids(this.snapshot.rooms), ids(this.group(room)), room.id, delta);
+    if (order) await this.call("rooms/reorder", { revision: this.snapshot.revision, order });
   }
 
   private async deleteRoom(room: RoomData) {
@@ -176,14 +200,50 @@ export class HsAdvRooms extends LitElement {
       .join(", ");
   }
 
+  private row(room: RoomData, index: number, count: number) {
+    const t = this.t;
+    const planName = this.snapshot.plans.find((plan) => plan.id === room.plan_id)?.name ?? room.plan_id;
+    const setName = this.snapshot.temp_sets.find((set) => set.id === room.temp_set_id)?.name ?? room.temp_set_id;
+    return html`<ha-md-list-item type="button" @click=${() => this.edit(room)}>
+      <span slot="headline">${room.name}</span>
+      <span slot="supporting-text">${t("adv.rooms.trvs")}: ${this.valveNames(room)}</span>
+      <span slot="supporting-text">
+        ${t("adv.rooms.plan")}: ${planName} · ${t("adv.rooms.temp_set")}: ${setName}
+      </span>
+      <ha-dropdown
+        slot="end"
+        @click=${(e: Event) => e.stopPropagation()}
+        @wa-select=${(e: CustomEvent<{ item: { value: string } }>) => this.menu(room, e.detail.item.value)}
+      >
+        <ha-icon-button slot="trigger" .path=${mdiDotsVertical} .label=${room.name}></ha-icon-button>
+        <ha-dropdown-item value="edit">
+          <ha-svg-icon slot="icon" .path=${mdiPencil}></ha-svg-icon>${t("common.edit")}
+        </ha-dropdown-item>
+        <ha-dropdown-item value="up" .disabled=${this.busy || index === 0}>
+          <ha-svg-icon slot="icon" .path=${mdiChevronUp}></ha-svg-icon>${t("adv.rooms.move_up")}
+        </ha-dropdown-item>
+        <ha-dropdown-item value="down" .disabled=${this.busy || index === count - 1}>
+          <ha-svg-icon slot="icon" .path=${mdiChevronDown}></ha-svg-icon>${t("adv.rooms.move_down")}
+        </ha-dropdown-item>
+        <ha-dropdown-item value="delete" variant="danger" .disabled=${this.busy}>
+          <ha-svg-icon slot="icon" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
+        </ha-dropdown-item>
+      </ha-dropdown>
+    </ha-md-list-item>`;
+  }
+
+  private list(rooms: RoomData[], empty: string) {
+    return html`<ha-card>
+      ${rooms.length
+        ? rooms.map((room, index) => this.row(room, index, rooms.length))
+        : html`<p class="empty">${empty}</p>`}
+    </ha-card>`;
+  }
+
   override render() {
     if (!this.snapshot || !this.hass) return nothing;
     const t = this.t;
-    const planName = (id: string) => this.snapshot.plans.find((plan) => plan.id === id)?.name ?? id;
-    const setName = (id: string) => this.snapshot.temp_sets.find((set) => set.id === id)?.name ?? id;
-    const rooms = this.snapshot.rooms;
-    const zones = this.snapshot.zones.length;
-    const zoneName = (id: string) => this.snapshot.zones.find((zone) => zone.id === id)?.name ?? id;
+    const snapshot = this.snapshot;
     return html`
       <div class="actions">
         <ha-button .disabled=${this.busy} @click=${() => this.edit(null)}>
@@ -193,38 +253,14 @@ export class HsAdvRooms extends LitElement {
           <ha-svg-icon slot="start" .path=${mdiHomeImportOutline}></ha-svg-icon>${t("adv.rooms.import")}
         </ha-button>
       </div>
-      <ha-card>
-        ${rooms.length === 0 ? html`<p class="empty">${t("adv.rooms.empty")}</p>` : nothing}
-        ${rooms.map(
-          (room, index) => html`<ha-md-list-item type="button" @click=${() => this.edit(room)}>
-            <span slot="headline">${room.name}</span>
-            <span slot="supporting-text">${t("adv.rooms.trvs")}: ${this.valveNames(room)}</span>
-            <span slot="supporting-text">
-              ${zones > 1 ? `${t("adv.rooms.zone")}: ${zoneName(room.zone_id)} · ` : ""}${t("adv.rooms.plan")}:
-              ${planName(room.plan_id)} · ${t("adv.rooms.temp_set")}: ${setName(room.temp_set_id)}
-            </span>
-            <ha-dropdown
-              slot="end"
-              @click=${(e: Event) => e.stopPropagation()}
-              @wa-select=${(e: CustomEvent<{ item: { value: string } }>) => this.menu(room, e.detail.item.value)}
-            >
-              <ha-icon-button slot="trigger" .path=${mdiDotsVertical} .label=${room.name}></ha-icon-button>
-              <ha-dropdown-item value="edit">
-                <ha-svg-icon slot="icon" .path=${mdiPencil}></ha-svg-icon>${t("common.edit")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="up" .disabled=${this.busy || index === 0}>
-                <ha-svg-icon slot="icon" .path=${mdiChevronUp}></ha-svg-icon>${t("adv.rooms.move_up")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="down" .disabled=${this.busy || index === rooms.length - 1}>
-                <ha-svg-icon slot="icon" .path=${mdiChevronDown}></ha-svg-icon>${t("adv.rooms.move_down")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="delete" variant="danger" .disabled=${this.busy}>
-                <ha-svg-icon slot="icon" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
-              </ha-dropdown-item>
-            </ha-dropdown>
-          </ha-md-list-item>`,
-        )}
-      </ha-card>
+      ${snapshot.zones.length > 1 && snapshot.rooms.length
+        ? snapshot.zones.map(
+            (zone) => html`<section>
+              <h2><ha-svg-icon .path=${mdiHomeFloor1}></ha-svg-icon>${zone.name}</h2>
+              ${this.list(roomsOf(snapshot, zone), t("adv.zones.no_rooms"))}
+            </section>`,
+          )
+        : this.list(snapshot.rooms, t("adv.rooms.empty"))}
     `;
   }
 }
@@ -250,11 +286,9 @@ export class HsImportRoomsDialog extends HsHaDialog<ImportParams> {
     }
   `;
 
-  override showDialog(params: ImportParams): void {
-    this.args?.resolve([]);
+  protected override dialogOpened(params: ImportParams): void {
     this.chosen = params.areas.map((area) => area.area_id);
     this.result = [];
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

@@ -182,11 +182,9 @@ export class HsZoneDialog extends HsHaDialog<ZoneParams> {
   declare name: string;
   private result: string | null = null;
 
-  override showDialog(params: ZoneParams): void {
-    this.args?.resolve(null);
+  protected override dialogOpened(params: ZoneParams): void {
     this.name = params.name;
     this.result = null;
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
@@ -248,10 +246,8 @@ export class HsFloorsDialog extends HsHaDialog<FloorsParams> {
     }
   `;
 
-  override showDialog(params: FloorsParams): void {
-    this.args?.resolve(false);
+  protected override dialogOpened(): void {
     this.confirmed = false;
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {

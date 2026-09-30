@@ -55,7 +55,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     }
   `;
 
-  override showDialog(params: RoomParams): void {
+  protected override dialogOpened(params: RoomParams): void {
     this.snapshot = params.snapshot;
     this.room = params.room;
     this.prepare();
@@ -64,7 +64,6 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     this.unsubscribe = storeFor(this.hass).subscribe((latest) => {
       if (latest) this.snapshot = latest;
     });
-    super.showDialog(params);
   }
 
   protected override dialogClosed(): void {
