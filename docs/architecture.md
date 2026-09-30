@@ -198,6 +198,9 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   else its device's area). A zone with the floor's name is reused. Zones that the import
   leaves empty are removed, but one zone always stays.
 - Websocket commands under `heating_scheduler/`; see `websocket.py`.
+- Brand images: `brand/icon.png` and `brand/icon@2x.png`, the panel's sidebar glyph
+  (`mdi:radiator`) in HA's heating orange, trimmed, 256 and 512 px. HA 2026.3 and newer serves
+  them itself, and HACS accepts them instead of an entry in `home-assistant/brands`.
 - Permissions: every HA user may use every function **(decision)**.
 - Each room can have a display temperature entity (sensor or climate); without one, the
   UI shows the average `current_temperature` of the room's TRVs **(decision)**.
