@@ -1,6 +1,7 @@
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, nothing } from "lit";
 import { mdiDelete, mdiMinus, mdiPlus, mdiPlusCircle } from "@mdi/js";
-import type { Translate } from "../i18n";
+import { showDialog } from "../ha";
+import { languageOf, translator } from "../i18n";
 import { MODE_COLORS, MODE_ICONS } from "../modes";
 import {
   SNAP,
@@ -15,92 +16,104 @@ import {
   toHHMM,
   type Day,
 } from "../schedule/ops";
-import { baseStyles } from "../styles";
 import { MODES, type Mode } from "../types";
 import { define } from "./define";
-import type { HsDialog } from "./hs-dialog";
-import "./hs-dialog";
-import "./hs-icon";
+import { HsHaDialog } from "./hs-dialog";
+
+export interface BlockParams {
+  day: Day;
+  index: number;
+  minute: number | null;
+  dayName: string;
+  onChange: (day: Day) => void;
+}
 
 /** Edit one part of a day: its mode, start and end; add a change; remove it. */
-export class HsBlockSheet extends LitElement {
+export class HsBlockSheet extends HsHaDialog<BlockParams> {
   static override properties = {
-    day: { attribute: false },
-    index: { type: Number },
-    minute: { type: Number },
-    dayName: {},
-    t: { attribute: false },
+    day: { state: true },
+    index: { state: true },
+    minute: { state: true },
   };
   declare day: Day;
   declare index: number;
   declare minute: number | null;
-  declare dayName: string;
-  declare t: Translate;
 
-  static override styles = [
-    baseStyles,
-    css`
-      .section {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-      .section > span {
-        font-weight: 700;
-      }
-      .modes {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 8px;
-      }
-      .mode {
-        min-height: 60px;
-        justify-content: flex-start;
-      }
-      .mode[aria-pressed="true"] {
-        color: #fff;
-        border-color: transparent;
-      }
-      .time {
-        display: grid;
-        grid-template-columns: 56px 1fr 56px;
-        align-items: center;
-        gap: 10px;
-      }
-      .time strong {
-        text-align: center;
-        font-size: 28px;
-        font-variant-numeric: tabular-nums;
-      }
-      .time .btn {
-        padding: 0;
-        --hs-icon-size: 28px;
-      }
-      .times {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-      }
-      .actions {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-    `,
-  ];
+  static override styles = css`
+    .label {
+      margin: 0 0 var(--ha-space-2, 8px);
+      color: var(--secondary-text-color);
+    }
+    .modes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--ha-space-2, 8px);
+      margin-bottom: var(--ha-space-6, 24px);
+      --control-button-border-radius: var(--ha-border-radius-lg, 12px);
+    }
+    .modes ha-control-button {
+      width: 100%;
+      height: 56px;
+      --control-button-icon-color: var(--mode-color);
+      --control-button-focus-color: var(--mode-color);
+      --control-button-padding: var(--ha-space-1, 4px);
+      font-size: var(--ha-font-size-s, 12px);
+    }
+    .modes ha-control-button.selected {
+      --control-button-background-color: var(--mode-color);
+      --control-button-background-opacity: 1;
+      --control-button-icon-color: #fff;
+      color: #fff;
+    }
+    .option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .times {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--ha-space-4, 16px);
+      margin-bottom: var(--ha-space-6, 24px);
+    }
+    .stepper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 42px;
+      border-radius: var(--ha-border-radius-lg, 12px);
+      background: rgba(var(--rgb-disabled-color, 189, 189, 189), 0.2);
+      font-weight: var(--ha-font-weight-medium, 500);
+      font-variant-numeric: tabular-nums;
+      --ha-icon-button-size: 42px;
+      --mdc-icon-size: 16px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--ha-space-2, 8px);
+    }
+  `;
 
-  get dialog(): HsDialog | null {
-    return this.renderRoot.querySelector("hs-dialog");
+  override showDialog(params: BlockParams): void {
+    this.day = params.day;
+    this.index = params.index;
+    this.minute = params.minute;
+    super.showDialog(params);
+  }
+
+  private get t() {
+    return translator(languageOf(this.hass));
   }
 
   private change(day: Day, index = this.index) {
     this.day = day;
     this.index = Math.max(0, Math.min(index, day.length - 1));
-    this.dispatchEvent(new CustomEvent<Day>("day-change", { detail: day }));
+    this.params?.onChange(day);
   }
 
-  private setMode(mode: Mode) {
+  setMode(mode: Mode) {
     const start = this.day[this.index]!.start;
     const day = setMode(this.day, this.index, mode);
     // After a merge, keep editing the block that now contains this time.
@@ -125,11 +138,23 @@ export class HsBlockSheet extends LitElement {
 
   private removePart() {
     this.change(removeSegment(this.day, this.index), Math.max(0, this.index - 1));
-    this.dialog?.close();
+    this.closeDialog();
+  }
+
+  private stepper(label: string, time: number, move: (delta: number) => void) {
+    const t = this.t;
+    return html`<div>
+      <p class="label">${label}</p>
+      <div class="stepper">
+        <ha-icon-button .path=${mdiMinus} .label=${t("editor.earlier")} @click=${() => move(-SNAP)}></ha-icon-button>
+        <span>${toHHMM(time)}</span>
+        <ha-icon-button .path=${mdiPlus} .label=${t("editor.later")} @click=${() => move(SNAP)}></ha-icon-button>
+      </div>
+    </div>`;
   }
 
   override render() {
-    if (!this.day || !this.t) return nothing;
+    if (!this.params || !this.day) return nothing;
     const t = this.t;
     const segment = segments(this.day)[this.index];
     if (!segment) return nothing;
@@ -137,74 +162,52 @@ export class HsBlockSheet extends LitElement {
     const isFirst = segment.index === 0;
     const isLast = segment.index === this.day.length - 1;
     return html`
-      <hs-dialog
-        .heading=${`${this.dayName} ${toHHMM(segment.start)} – ${toHHMM(segment.end)}`}
-        .closeLabel=${t("common.close")}
+      <ha-dialog
+        .open=${this.open}
+        header-title=${`${this.params.dayName} ${toHHMM(segment.start)} – ${toHHMM(segment.end)}`}
+        @closed=${this.onClosed}
       >
-        <div class="section">
-          <span>${t("editor.mode")}</span>
-          <div class="modes">
-            ${MODES.map(
-              (mode) => html`<button
-                class="btn mode"
-                aria-pressed=${segment.mode === mode ? "true" : "false"}
-                style=${segment.mode === mode ? `background:${MODE_COLORS[mode]}` : ""}
-                @click=${() => this.setMode(mode)}
-              >
-                <hs-icon .path=${MODE_ICONS[mode]} style="color:${segment.mode === mode ? "#fff" : MODE_COLORS[mode]}"></hs-icon>
+        <p class="label">${t("editor.mode")}</p>
+        <div class="modes">
+          ${MODES.map(
+            (mode) => html`<ha-control-button
+              class=${segment.mode === mode ? "selected" : ""}
+              style="--mode-color:${MODE_COLORS[mode]}"
+              .label=${t(`mode.${mode}`)}
+              aria-pressed=${segment.mode === mode ? "true" : "false"}
+              @click=${() => this.setMode(mode)}
+            >
+              <span class="option">
+                <ha-svg-icon .path=${MODE_ICONS[mode]}></ha-svg-icon>
                 ${t(`mode.${mode}`)}
-              </button>`,
-            )}
-          </div>
+              </span>
+            </ha-control-button>`,
+          )}
         </div>
         ${isFirst && isLast
           ? nothing
-          : html`<div class="times section">
-              ${isFirst
-                ? nothing
-                : html`<div class="section">
-                    <span>${t("editor.starts")}</span>
-                    <div class="time">
-                      <button class="btn" @click=${() => this.moveStart(-SNAP)} aria-label=${t("editor.earlier")}>
-                        <hs-icon .path=${mdiMinus}></hs-icon>
-                      </button>
-                      <strong>${toHHMM(segment.start)}</strong>
-                      <button class="btn" @click=${() => this.moveStart(SNAP)} aria-label=${t("editor.later")}>
-                        <hs-icon .path=${mdiPlus}></hs-icon>
-                      </button>
-                    </div>
-                  </div>`}
-              ${isLast
-                ? nothing
-                : html`<div class="section">
-                    <span>${t("editor.ends")}</span>
-                    <div class="time">
-                      <button class="btn" @click=${() => this.moveEnd(-SNAP)} aria-label=${t("editor.earlier")}>
-                        <hs-icon .path=${mdiMinus}></hs-icon>
-                      </button>
-                      <strong>${toHHMM(segment.end)}</strong>
-                      <button class="btn" @click=${() => this.moveEnd(SNAP)} aria-label=${t("editor.later")}>
-                        <hs-icon .path=${mdiPlus}></hs-icon>
-                      </button>
-                    </div>
-                  </div>`}
+          : html`<div class="times">
+              ${isFirst ? nothing : this.stepper(t("editor.starts"), segment.start, (d) => this.moveStart(d))}
+              ${isLast ? nothing : this.stepper(t("editor.ends"), segment.end, (d) => this.moveEnd(d))}
             </div>`}
         <div class="actions">
           ${at !== null
-            ? html`<button class="btn wide" @click=${() => this.addChange(at)}>
-                <hs-icon .path=${mdiPlusCircle}></hs-icon>${t("editor.add_change", { time: toHHMM(at) })}
-              </button>`
+            ? html`<ha-button appearance="outlined" @click=${() => this.addChange(at)}>
+                <ha-svg-icon slot="start" .path=${mdiPlusCircle}></ha-svg-icon>
+                ${t("editor.add_change", { time: toHHMM(at) })}
+              </ha-button>`
             : nothing}
           ${this.day.length > 1
-            ? html`<button class="btn wide danger" @click=${this.removePart}>
-                <hs-icon .path=${mdiDelete}></hs-icon>${t("editor.remove")}
-              </button>`
+            ? html`<ha-button appearance="plain" variant="danger" @click=${this.removePart}>
+                <ha-svg-icon slot="start" .path=${mdiDelete}></ha-svg-icon>
+                ${t("editor.remove")}
+              </ha-button>`
             : nothing}
         </div>
-        <button slot="actions" class="btn primary" @click=${() => this.dialog?.close()}>
-          ${t("common.close")}
-        </button>
-      </hs-dialog>
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="primaryAction" @click=${() => this.closeDialog()}>${t("common.close")}</ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
     `;
   }
 }
@@ -212,28 +215,6 @@ export class HsBlockSheet extends LitElement {
 define("hs-block-sheet", HsBlockSheet);
 
 /** Open the sheet; `onChange` receives every edit. */
-export async function openBlockSheet(
-  host: HTMLElement,
-  options: {
-    day: Day;
-    index: number;
-    minute: number | null;
-    dayName: string;
-    t: Translate;
-    onChange: (day: Day) => void;
-  },
-): Promise<void> {
-  const element = document.createElement("hs-block-sheet") as HsBlockSheet;
-  element.day = options.day;
-  element.index = options.index;
-  element.minute = options.minute;
-  element.dayName = options.dayName;
-  element.t = options.t;
-  element.addEventListener("day-change", (event) => options.onChange((event as CustomEvent<Day>).detail));
-  (host.shadowRoot ?? host).appendChild(element);
-  await element.updateComplete;
-  const dialog = element.dialog;
-  if (!dialog) return;
-  dialog.addEventListener("hs-closed", () => element.remove(), { once: true });
-  await dialog.show();
+export function openBlockSheet(host: HTMLElement, params: BlockParams): void {
+  showDialog(host, "hs-block-sheet", params);
 }

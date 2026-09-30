@@ -3,7 +3,6 @@ import { MODE_COLORS, MODE_ICONS } from "../modes";
 import { DAY_MINUTES, SNAP, segments, toHHMM, type Day } from "../schedule/ops";
 import { baseStyles } from "../styles";
 import { define } from "./define";
-import "./hs-icon";
 
 export interface BoundaryMoveDetail {
   index: number;
@@ -58,14 +57,14 @@ export class HsDayBar extends LitElement {
       .bar {
         position: relative;
         height: var(--bar-height);
-        border-radius: 10px;
+        border-radius: var(--bar-radius, var(--ha-border-radius-md, 8px));
         overflow: visible;
         background: var(--divider-color, #ccc);
       }
       .clip {
         position: absolute;
         inset: 0;
-        border-radius: 10px;
+        border-radius: var(--bar-radius, var(--ha-border-radius-md, 8px));
         overflow: hidden;
       }
       .seg {
@@ -77,12 +76,12 @@ export class HsDayBar extends LitElement {
         justify-content: center;
         gap: 4px;
         color: #fff;
-        font-size: 14px;
-        font-weight: 700;
+        font-size: var(--ha-font-size-s, 12px);
+        font-weight: var(--ha-font-weight-medium, 500);
         overflow: hidden;
         white-space: nowrap;
-        border-right: 2px solid rgba(255, 255, 255, 0.85);
-        --hs-icon-size: 20px;
+        border-right: 2px solid var(--card-background-color, #fff);
+        --mdc-icon-size: 16px;
       }
       .seg:last-child {
         border-right: none;
@@ -107,27 +106,27 @@ export class HsDayBar extends LitElement {
         z-index: 1;
       }
       .grip {
-        width: 12px;
+        width: 10px;
         height: calc(100% - 12px);
-        border-radius: 6px;
+        border-radius: var(--ha-border-radius-pill, 9999px);
         background: #fff;
-        border: 2px solid rgba(0, 0, 0, 0.55);
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        box-shadow: var(--ha-box-shadow-s, 0 1px 3px rgba(0, 0, 0, 0.3));
       }
       .handle:focus-visible .grip,
       .handle.active .grip {
-        outline: 3px solid var(--primary-color, #1565c0);
+        outline: 2px solid var(--primary-color);
       }
       .tip {
         position: absolute;
         bottom: calc(100% + 14px);
         transform: translateX(-50%);
-        padding: 6px 12px;
-        border-radius: 10px;
-        background: #202124;
-        color: #fff;
-        font-size: 22px;
-        font-weight: 700;
+        padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
+        border-radius: var(--ha-border-radius-sm, 4px);
+        background: var(--ha-tooltip-background-color, #616161);
+        color: var(--ha-tooltip-text-color, #fff);
+        font-size: var(--ha-font-size-m, 14px);
+        font-weight: var(--ha-font-weight-medium, 500);
         pointer-events: none;
         white-space: nowrap;
         z-index: 2;
@@ -209,7 +208,7 @@ export class HsDayBar extends LitElement {
               class="seg"
               style="left:${percent(segment.start)}%;width:${width}%;background:${MODE_COLORS[segment.mode]}"
             >
-              ${this.labels && width >= 7 ? html`<hs-icon .path=${MODE_ICONS[segment.mode]}></hs-icon>` : nothing}
+              ${this.labels && width >= 7 ? html`<ha-svg-icon .path=${MODE_ICONS[segment.mode]}></ha-svg-icon>` : nothing}
               ${this.labels && width >= 17 ? toHHMM(segment.start) : nothing}
             </div>`;
           })}

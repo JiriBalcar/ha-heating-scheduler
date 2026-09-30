@@ -5,7 +5,6 @@ import "../src/components/hs-adv-settings";
 import "../src/components/hs-block-sheet";
 import "../src/components/hs-plan-editor";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
-import { translator } from "../src/i18n";
 import type { Candidates, HomeAssistant, PlanData, Snapshot } from "../src/types";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -76,16 +75,19 @@ beforeAll(async () => {
 describe("hs-block-sheet (F06)", () => {
   async function sheetWith(index: number): Promise<Any> {
     const sheet = document.createElement("hs-block-sheet") as Any;
-    sheet.day = [
-      { start: 0, mode: "night" },
-      { start: 360, mode: "comfort" },
-      { start: 720, mode: "eco" },
-    ];
-    sheet.index = index;
-    sheet.minute = null;
-    sheet.dayName = "Monday";
-    sheet.t = translator("en");
+    sheet.hass = { language: "en", locale: { language: "en" } };
     document.body.appendChild(sheet);
+    sheet.showDialog({
+      day: [
+        { start: 0, mode: "night" },
+        { start: 360, mode: "comfort" },
+        { start: 720, mode: "eco" },
+      ],
+      index,
+      minute: null,
+      dayName: "Monday",
+      onChange: () => undefined,
+    });
     await sheet.updateComplete;
     return sheet;
   }

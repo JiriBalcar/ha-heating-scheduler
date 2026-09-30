@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
-import { mdiDelete, mdiPencil, mdiPlusCircle } from "@mdi/js";
+import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
+import { showDialog } from "../ha";
 import { languageOf, translator, type Translate } from "../i18n";
 import { roomPayload, uniqueName } from "../payload";
 import { fromPlan } from "../schedule/ops";
@@ -7,9 +8,7 @@ import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
 import type { HomeAssistant, PlanData, RoomData, Snapshot } from "../types";
 import { define } from "./define";
-import { confirmDialog, type HsDialog } from "./hs-dialog";
-import "./hs-dialog";
-import "./hs-icon";
+import { HsHaDialog, confirmDialog } from "./hs-dialog";
 import "./hs-plan-editor";
 import "./hs-week-view";
 
@@ -19,21 +18,15 @@ export class HsPlansView extends LitElement {
     hass: { attribute: false },
     snapshot: { attribute: false },
     planId: { attribute: false },
-    newName: { state: true },
-    newSource: { state: true },
     busy: { state: true },
   };
   declare hass: HomeAssistant;
   declare snapshot: Snapshot;
   declare planId: string | null;
-  declare newName: string;
-  declare newSource: string;
   declare busy: boolean;
 
   constructor() {
     super();
-    this.newName = "";
-    this.newSource = "house";
     this.busy = false;
   }
 
@@ -43,71 +36,50 @@ export class HsPlansView extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: 20px;
-      }
-      section {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      h2 {
-        font-size: 21px;
-      }
-      .assign {
-        padding: 8px 16px;
-      }
-      .assign-row {
-        display: grid;
-        grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--divider-color, #e0e0e0);
-        font-size: 18px;
-      }
-      .assign-row:last-child {
-        border-bottom: none;
-      }
-      @media (max-width: 560px) {
-        .assign-row {
-          grid-template-columns: 1fr;
-        }
+        gap: var(--ha-space-6, 24px);
       }
       .plans {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+        align-items: start;
+        gap: var(--ha-space-2, 8px);
       }
-      .plan {
-        padding: 16px;
+      .card-content {
+        padding: 0 var(--ha-space-4, 16px) var(--ha-space-4, 16px);
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--ha-space-3, 12px);
       }
-      .plan h3 {
-        font-size: 20px;
+      .muted {
+        color: var(--secondary-text-color);
       }
-      .badge {
-        font-size: 14px;
-        font-weight: 600;
-        padding: 2px 10px;
-        border-radius: 999px;
-        border: 1px solid var(--divider-color, #c4c4c4);
-        margin-left: 8px;
-        vertical-align: middle;
-      }
-      .buttons {
+      .card-actions {
         display: flex;
-        gap: 10px;
+        gap: var(--ha-space-2, 8px);
+        border-top: 1px solid var(--divider-color);
+        padding: var(--ha-space-2, 8px);
+      }
+      .new {
+        align-self: flex-start;
+      }
+      .rooms {
+        max-width: 760px;
+      }
+      ha-settings-row {
+        border-top: 1px solid var(--divider-color);
+      }
+      ha-settings-row:first-of-type {
+        border-top: none;
+      }
+      .assign {
+        display: flex;
         flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--ha-space-2, 8px);
       }
-      .buttons .btn {
-        flex: 1 1 140px;
-      }
-      .form {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
+      ha-select {
+        min-width: 180px;
       }
     `,
   ];
@@ -193,26 +165,22 @@ export class HsPlansView extends LitElement {
     );
   }
 
-  private newDialog(): HsDialog | null {
-    return this.renderRoot.querySelector("#new");
-  }
-
-  private openNew() {
-    this.newName = uniqueName(this.t("plans.new"), this.snapshot.plans.map((plan) => plan.name));
-    this.newSource = "house";
-    void this.newDialog()?.show();
-  }
-
-  private async create() {
-    const source = this.snapshot.plans.find((plan) => plan.id === this.newSource);
-    if (!source || !this.newName.trim()) return;
+  private async openNew() {
+    const choice = await new Promise<NewPlan | null>((resolve) =>
+      showDialog(this, "hs-new-plan-dialog", {
+        name: uniqueName(this.t("plans.new"), this.snapshot.plans.map((plan) => plan.name)),
+        plans: this.snapshot.plans,
+        resolve,
+      }),
+    );
+    const source = this.snapshot.plans.find((plan) => plan.id === choice?.source);
+    if (!choice || !source || !choice.name.trim()) return;
     const created = await this.run(() =>
       storeFor(this.hass).call<{ plan_id: string }>("plan/save", {
         revision: this.snapshot.revision,
-        plan: { name: this.newName.trim(), days: source.days },
+        plan: { name: choice.name.trim(), days: source.days },
       }),
     );
-    this.newDialog()?.close();
     if (created) this.navigate(`/plans/${created.plan_id}`);
   }
 
@@ -225,91 +193,148 @@ export class HsPlansView extends LitElement {
         return html`<hs-plan-editor .hass=${this.hass} .snapshot=${this.snapshot} .plan=${plan}></hs-plan-editor>`;
       }
     }
+    const planOptions = this.snapshot.plans.map((plan) => ({ value: plan.id, label: plan.name }));
     return html`
-      <section>
-        <h2>${t("nav.plans")}</h2>
-        <div class="plans">
-          ${this.snapshot.plans.map(
-            (plan) => html`<article class="card plan">
-              <h3>
-                ${plan.name}${plan.id === "house" ? html`<span class="badge">${t("plans.house_badge")}</span>` : nothing}
-              </h3>
+      <div class="plans">
+        ${this.snapshot.plans.map(
+          (plan) => html`<ha-card .header=${plan.name}>
+            <div class="card-content">
               <span class="muted">
-                ${plan.used_by?.length ? t("plans.used_by", { rooms: this.roomNames(plan.used_by) }) : t("plans.unused")}
+                ${plan.id === "house" ? `${t("plans.house_badge")} · ` : ""}${plan.used_by?.length
+                  ? t("plans.used_by", { rooms: this.roomNames(plan.used_by) })
+                  : t("plans.unused")}
               </span>
               <hs-week-view compact readonly .days=${fromPlan(plan)} .t=${t}></hs-week-view>
-              <div class="buttons">
-                <button class="btn" @click=${() => this.navigate(`/plans/${plan.id}`)}>
-                  <hs-icon .path=${mdiPencil}></hs-icon>${t("plans.edit")}
-                </button>
-                ${plan.id === "house"
-                  ? nothing
-                  : html`<button class="btn danger" ?disabled=${this.busy} @click=${() => this.deletePlan(plan)}>
-                      <hs-icon .path=${mdiDelete}></hs-icon>${t("common.delete")}
-                    </button>`}
-              </div>
-            </article>`,
-          )}
-        </div>
-        <button class="btn primary" @click=${this.openNew}>
-          <hs-icon .path=${mdiPlusCircle}></hs-icon>${t("plans.new")}
-        </button>
-      </section>
-      ${this.snapshot.rooms.length
-        ? html`<section>
-            <h2>${t("plans.rooms_title")}</h2>
-            <div class="card assign">
-              ${this.snapshot.rooms.map(
-                (room) => html`<div class="assign-row">
-                  <strong>${room.name}</strong>
-                  <select
-                    class="input"
-                    aria-label=${`${room.name}: ${t("adv.rooms.plan")}`}
-                    ?disabled=${this.busy}
-                    @change=${(e: Event) => this.assign(room, (e.target as HTMLSelectElement).value)}
-                  >
-                    ${this.snapshot.plans.map(
-                      (plan) =>
-                        html`<option value=${plan.id} ?selected=${plan.id === room.plan_id}>${plan.name}</option>`,
-                    )}
-                  </select>
-                  ${this.sharesPlan(room)
-                    ? html`<button class="btn small" ?disabled=${this.busy} @click=${() => this.ownPlan(room)}>
-                        ${t("plans.own_plan")}
-                      </button>`
-                    : html`<span></span>`}
-                </div>`,
-              )}
             </div>
-          </section>`
+            <div class="card-actions">
+              <ha-button appearance="plain" @click=${() => this.navigate(`/plans/${plan.id}`)}>
+                <ha-svg-icon slot="start" .path=${mdiPencil}></ha-svg-icon>${t("plans.edit")}
+              </ha-button>
+              ${plan.id === "house"
+                ? nothing
+                : html`<ha-button
+                    appearance="plain"
+                    variant="danger"
+                    .disabled=${this.busy}
+                    @click=${() => this.deletePlan(plan)}
+                  >
+                    <ha-svg-icon slot="start" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
+                  </ha-button>`}
+            </div>
+          </ha-card>`,
+        )}
+      </div>
+      <ha-button class="new" @click=${this.openNew}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>${t("plans.new")}
+      </ha-button>
+      ${this.snapshot.rooms.length
+        ? html`<ha-card class="rooms" .header=${t("plans.rooms_title")}>
+            ${this.snapshot.rooms.map(
+              (room) => html`<ha-settings-row>
+                <span slot="heading">${room.name}</span>
+                <div class="assign">
+                  <ha-select
+                    .label=${t("adv.rooms.plan")}
+                    .options=${planOptions}
+                    .value=${room.plan_id}
+                    .disabled=${this.busy}
+                    @selected=${(e: CustomEvent<{ value?: string }>) => {
+                      if (e.detail.value && e.detail.value !== room.plan_id) void this.assign(room, e.detail.value);
+                    }}
+                  ></ha-select>
+                  ${this.sharesPlan(room)
+                    ? html`<ha-button appearance="plain" .disabled=${this.busy} @click=${() => this.ownPlan(room)}>
+                        ${t("plans.own_plan")}
+                      </ha-button>`
+                    : nothing}
+                </div>
+              </ha-settings-row>`,
+            )}
+          </ha-card>`
         : nothing}
-      <hs-dialog id="new" .heading=${t("plans.new")} .closeLabel=${t("common.cancel")}>
-        <div class="form">
-          <label class="field">
-            <span>${t("plans.name")}</span>
-            <input
-              class="input"
-              maxlength="60"
-              .value=${this.newName}
-              @input=${(e: Event) => (this.newName = (e.target as HTMLInputElement).value)}
-            />
-          </label>
-          <label class="field">
-            <span>${t("plans.start_from")}</span>
-            <select class="input" @change=${(e: Event) => (this.newSource = (e.target as HTMLSelectElement).value)}>
-              ${this.snapshot.plans.map(
-                (plan) => html`<option value=${plan.id} ?selected=${plan.id === this.newSource}>${plan.name}</option>`,
-              )}
-            </select>
-          </label>
-        </div>
-        <button slot="actions" class="btn" @click=${() => this.newDialog()?.close()}>${t("common.cancel")}</button>
-        <button slot="actions" class="btn primary" ?disabled=${this.busy || !this.newName.trim()} @click=${this.create}>
-          ${t("plans.create")}
-        </button>
-      </hs-dialog>
     `;
   }
 }
 
 define("hs-plans-view", HsPlansView);
+
+interface NewPlan {
+  name: string;
+  source: string;
+}
+
+interface NewPlanParams {
+  name: string;
+  plans: PlanData[];
+  resolve: (choice: NewPlan | null) => void;
+}
+
+/** Name a new plan and pick the plan it starts from. */
+export class HsNewPlanDialog extends HsHaDialog<NewPlanParams> {
+  static override properties = {
+    data: { state: true },
+  };
+  declare data: NewPlan;
+  private result: NewPlan | null = null;
+
+  override showDialog(params: NewPlanParams): void {
+    this.params?.resolve(null);
+    this.data = { name: params.name, source: "house" };
+    this.result = null;
+    super.showDialog(params);
+  }
+
+  protected override dialogClosed(): void {
+    this.params?.resolve(this.result);
+  }
+
+  private get t() {
+    return translator(languageOf(this.hass));
+  }
+
+  private create() {
+    if (!this.data.name.trim()) return;
+    this.result = this.data;
+    this.closeDialog();
+  }
+
+  override render() {
+    if (!this.params) return nothing;
+    const t = this.t;
+    const schema = [
+      { name: "name", required: true, selector: { text: {} } },
+      {
+        name: "source",
+        required: true,
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: this.params.plans.map((plan) => ({ value: plan.id, label: plan.name })),
+          },
+        },
+      },
+    ];
+    const labels: Record<string, string> = { name: t("plans.name"), source: t("plans.start_from") };
+    return html`
+      <ha-dialog .open=${this.open} header-title=${t("plans.new")} @closed=${this.onClosed}>
+        <ha-form
+          .hass=${this.hass}
+          .data=${this.data}
+          .schema=${schema}
+          .computeLabel=${(field: { name: string }) => labels[field.name] ?? field.name}
+          @value-changed=${(e: CustomEvent<{ value: NewPlan }>) => (this.data = { ...this.data, ...e.detail.value })}
+        ></ha-form>
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
+            ${t("common.cancel")}
+          </ha-button>
+          <ha-button slot="primaryAction" .disabled=${!this.data.name.trim()} @click=${this.create}>
+            ${t("plans.create")}
+          </ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
+    `;
+  }
+}
+
+define("hs-new-plan-dialog", HsNewPlanDialog);

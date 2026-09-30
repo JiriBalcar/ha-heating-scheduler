@@ -1,140 +1,121 @@
-import { LitElement, css, html, nothing } from "lit";
-import { mdiContentCopy } from "@mdi/js";
-import type { Translate } from "../i18n";
+import { css, html, nothing } from "lit";
+import { showDialog } from "../ha";
+import { languageOf, translator, type TextKey } from "../i18n";
 import { ALL_DAYS, WEEKEND, WORKDAYS } from "../schedule/ops";
-import { baseStyles } from "../styles";
 import { define } from "./define";
-import type { HsDialog } from "./hs-dialog";
-import "./hs-dialog";
-import "./hs-icon";
+import { HsHaDialog } from "./hs-dialog";
 
-/** Choose the days a day is copied to. Resolves the chosen day indexes. */
-export class HsCopyDialog extends LitElement {
+interface CopyParams {
+  source: number;
+  resolve: (days: number[]) => void;
+}
+
+/** Choose the days a day is copied to. */
+export class HsCopyDialog extends HsHaDialog<CopyParams> {
   static override properties = {
-    source: { type: Number },
-    t: { attribute: false },
     chosen: { state: true },
   };
-  declare source: number;
-  declare t: Translate;
-  declare chosen: Set<number>;
-  result: number[] = [];
+  declare chosen: number[];
+  private result: number[] = [];
 
-  constructor() {
-    super();
-    this.chosen = new Set();
+  static override styles = css`
+    .quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--ha-space-2, 8px);
+      margin-bottom: var(--ha-space-4, 16px);
+    }
+  `;
+
+  override showDialog(params: CopyParams): void {
+    this.params?.resolve([]);
+    this.chosen = [];
+    this.result = [];
+    super.showDialog(params);
   }
 
-  static override styles = [
-    baseStyles,
-    css`
-      .quick {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-      .days {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      label {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        min-height: 52px;
-        font-size: 19px;
-        padding: 0 6px;
-        border-radius: 10px;
-        cursor: pointer;
-      }
-      label.disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-      input {
-        width: 28px;
-        height: 28px;
-        accent-color: var(--hs-accent, #1565c0);
-      }
-    `,
-  ];
+  protected override dialogClosed(): void {
+    this.params?.resolve(this.result);
+  }
 
-  get dialog(): HsDialog | null {
-    return this.renderRoot.querySelector("hs-dialog");
+  private get t() {
+    return translator(languageOf(this.hass));
   }
 
   private pick(days: number[]) {
-    this.chosen = new Set(days.filter((day) => day !== this.source));
+    const source = this.params?.source;
+    this.chosen = days.filter((day) => day !== source);
   }
 
-  private toggle(day: number, on: boolean) {
-    const next = new Set(this.chosen);
-    if (on) next.add(day);
-    else next.delete(day);
-    this.chosen = next;
+  private changed(event: CustomEvent<{ value: { days?: string[] } }>) {
+    this.chosen = (event.detail.value.days ?? []).map(Number);
   }
 
   private copy() {
     this.result = [...this.chosen].sort();
-    this.dialog?.close();
+    this.closeDialog();
   }
 
   override render() {
-    if (!this.t) return nothing;
+    if (!this.params) return nothing;
     const t = this.t;
+    const source = this.params.source;
+    const schema = [
+      {
+        name: "days",
+        selector: {
+          select: {
+            multiple: true,
+            mode: "list",
+            options: ALL_DAYS.map((day) => ({
+              value: String(day),
+              label: t(`day.${day}` as TextKey),
+              disabled: day === source,
+            })),
+          },
+        },
+      },
+    ];
     return html`
-      <hs-dialog
-        .heading=${t("editor.copy_title", { day: t(`day.${this.source}` as never) })}
-        .closeLabel=${t("common.cancel")}
+      <ha-dialog
+        .open=${this.open}
+        header-title=${t("editor.copy_title", { day: t(`day.${source}` as TextKey) })}
+        @closed=${this.onClosed}
       >
         <div class="quick">
-          <button class="btn small" @click=${() => this.pick(WORKDAYS)}>${t("editor.workdays")}</button>
-          <button class="btn small" @click=${() => this.pick(WEEKEND)}>${t("editor.weekend")}</button>
-          <button class="btn small" @click=${() => this.pick(ALL_DAYS)}>${t("editor.all_days")}</button>
+          <ha-button appearance="outlined" size="small" @click=${() => this.pick(WORKDAYS)}>
+            ${t("editor.workdays")}
+          </ha-button>
+          <ha-button appearance="outlined" size="small" @click=${() => this.pick(WEEKEND)}>
+            ${t("editor.weekend")}
+          </ha-button>
+          <ha-button appearance="outlined" size="small" @click=${() => this.pick(ALL_DAYS)}>
+            ${t("editor.all_days")}
+          </ha-button>
         </div>
-        <div class="days">
-          ${ALL_DAYS.map(
-            (day) => html`<label class=${day === this.source ? "disabled" : ""}>
-              <input
-                type="checkbox"
-                .checked=${day === this.source || this.chosen.has(day)}
-                ?disabled=${day === this.source}
-                @change=${(e: Event) => this.toggle(day, (e.target as HTMLInputElement).checked)}
-              />
-              ${t(`day.${day}` as never)}
-            </label>`,
-          )}
-        </div>
-        <button slot="actions" class="btn" @click=${() => this.dialog?.close()}>${t("common.cancel")}</button>
-        <button slot="actions" class="btn primary" ?disabled=${this.chosen.size === 0} @click=${this.copy}>
-          <hs-icon .path=${mdiContentCopy}></hs-icon>${t("editor.copy")}
-        </button>
-      </hs-dialog>
+        <ha-form
+          .hass=${this.hass}
+          .data=${{ days: this.chosen.map(String) }}
+          .schema=${schema}
+          .computeLabel=${() => ""}
+          @value-changed=${this.changed}
+        ></ha-form>
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
+            ${t("common.cancel")}
+          </ha-button>
+          <ha-button slot="primaryAction" .disabled=${this.chosen.length === 0} @click=${this.copy}>
+            ${t("editor.copy")}
+          </ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
     `;
   }
 }
 
 define("hs-copy-dialog", HsCopyDialog);
 
-export async function chooseCopyTargets(host: HTMLElement, source: number, t: Translate): Promise<number[]> {
-  const element = document.createElement("hs-copy-dialog") as HsCopyDialog;
-  element.source = source;
-  element.t = t;
-  (host.shadowRoot ?? host).appendChild(element);
-  await element.updateComplete;
-  const dialog = element.dialog;
-  if (!dialog) return [];
-  return new Promise((resolve) => {
-    dialog.addEventListener(
-      "hs-closed",
-      () => {
-        element.remove();
-        resolve(element.result);
-      },
-      { once: true },
-    );
-    void dialog.show();
-  });
+/** Ask for the days to copy `source` to. Resolves the chosen days, or [] when cancelled. */
+export function chooseCopyTargets(host: HTMLElement, source: number): Promise<number[]> {
+  return new Promise((resolve) => showDialog(host, "hs-copy-dialog", { source, resolve }));
 }

@@ -41,61 +41,59 @@ export class HsWeekView extends LitElement {
       .rows {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--ha-space-1, 4px);
       }
       .day {
         display: grid;
-        grid-template-columns: 44px 1fr;
+        grid-template-columns: 36px 1fr;
         align-items: center;
-        gap: 8px;
+        gap: var(--ha-space-2, 8px);
         width: 100%;
-        min-height: 48px;
-        padding: 4px 6px;
+        min-height: 40px;
+        padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
         border: 2px solid transparent;
-        border-radius: 12px;
+        border-radius: var(--ha-border-radius-md, 8px);
         background: transparent;
         text-align: left;
         cursor: pointer;
       }
       .day[aria-pressed="true"] {
-        border-color: var(--primary-color, #1565c0);
-        background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
+        border-color: var(--primary-color);
+        background: rgba(var(--rgb-primary-color, 0, 154, 199), 0.08);
       }
       :host([readonly]) .day {
         cursor: default;
       }
       .label {
-        font-size: 17px;
-        font-weight: 700;
+        font-size: var(--ha-font-size-s, 12px);
+        font-weight: var(--ha-font-weight-medium, 500);
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--ha-space-1, 4px);
       }
       .dot {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        background: var(--warning-color, #e65100);
+        background: var(--warning-color);
       }
       hs-day-bar {
-        --bar-height: 32px;
+        --bar-height: 24px;
       }
       :host([compact]) .day {
-        min-height: 26px;
-        padding: 1px 4px;
+        min-height: 20px;
+        padding: 1px var(--ha-space-2, 8px);
       }
       :host([compact]) hs-day-bar {
-        --bar-height: 16px;
-      }
-      :host([compact]) .label {
-        font-size: 13px;
+        --bar-height: 12px;
+        --bar-radius: var(--ha-border-radius-sm, 4px);
       }
       .axis {
         display: grid;
-        grid-template-columns: 44px 1fr;
-        gap: 8px;
-        padding: 0 8px;
-        font-size: 13px;
+        grid-template-columns: 36px 1fr;
+        gap: var(--ha-space-2, 8px);
+        padding: 0 var(--ha-space-2, 8px);
+        font-size: var(--ha-font-size-xs, 10px);
       }
       .ticks {
         position: relative;

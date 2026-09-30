@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { mdiArrowLeft, mdiChevronRight, mdiContentCopy } from "@mdi/js";
+import { showDialog } from "../ha";
 import { zonedParts } from "../format";
-import { languageOf, translator, type Translate } from "../i18n";
+import { languageOf, translator, type TextKey, type Translate } from "../i18n";
 import { MODE_COLORS, MODE_ICONS } from "../modes";
 import {
   copyDay,
@@ -22,9 +23,7 @@ import type { BoundaryMoveDetail, SegmentTapDetail } from "./hs-day-bar";
 import "./hs-day-bar";
 import { openBlockSheet } from "./hs-block-sheet";
 import { chooseCopyTargets } from "./hs-copy-dialog";
-import { confirmDialog, keepMineDialog, type HsDialog } from "./hs-dialog";
-import "./hs-dialog";
-import "./hs-icon";
+import { HsHaDialog, confirmDialog, keepMineDialog } from "./hs-dialog";
 import "./hs-week-view";
 
 /** Edit one plan: week overview, one day in detail, save with a preview. */
@@ -65,37 +64,36 @@ export class HsPlanEditor extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: var(--ha-space-4, 16px);
+        max-width: 760px;
+        margin: 0 auto;
       }
-      .head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 12px;
+      .back {
+        align-self: flex-start;
       }
-      .name {
-        flex: 1 1 220px;
-      }
-      .used {
-        font-size: 17px;
-      }
-      section.card {
-        padding: 16px;
+      .card-content {
+        padding: var(--ha-space-4, 16px);
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: var(--ha-space-3, 12px);
       }
-      h3 {
-        font-size: 21px;
+      .muted {
+        color: var(--secondary-text-color);
+      }
+      h2 {
+        margin: 0;
+        font-size: var(--ha-font-size-l, 16px);
+        font-weight: var(--ha-font-weight-medium, 500);
       }
       .big {
-        --bar-height: 64px;
-        margin-top: 44px;
+        --bar-height: 48px;
+        margin-top: 40px;
       }
       .axis {
         position: relative;
-        height: 20px;
-        font-size: 14px;
+        height: 16px;
+        font-size: var(--ha-font-size-xs, 10px);
+        color: var(--secondary-text-color);
       }
       .axis span {
         position: absolute;
@@ -108,48 +106,30 @@ export class HsPlanEditor extends LitElement {
         transform: translateX(-100%);
       }
       .parts {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
+        margin: 0 calc(-1 * var(--ha-space-4, 16px));
       }
-      .part {
-        width: 100%;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 8px 12px;
-        border: 2px solid var(--divider-color, #c4c4c4);
-        border-radius: 14px;
-        background: transparent;
-        cursor: pointer;
-        font-size: 19px;
-        text-align: left;
+      .parts ha-md-list-item ha-svg-icon[slot="start"] {
+        color: var(--mode-color);
       }
-      .part .time {
-        flex: 1;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
+      .card-actions {
+        border-top: 1px solid var(--divider-color);
+        padding: var(--ha-space-2, 8px);
       }
       .footer {
         position: sticky;
         bottom: 0;
         display: flex;
-        gap: 12px;
-        padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
-        background: var(--primary-background-color, #fafafa);
-        border-top: 1px solid var(--divider-color, #e0e0e0);
+        justify-content: flex-end;
+        gap: var(--ha-space-2, 8px);
+        padding: var(--ha-space-3, 12px) 0;
+        background: var(--primary-background-color);
+        border-top: 1px solid var(--divider-color);
         z-index: 3;
       }
-      .footer .btn {
-        flex: 1;
-      }
       .unsaved {
-        font-weight: 600;
-        color: var(--warning-color, #e65100);
+        margin-inline-end: auto;
+        align-self: center;
+        color: var(--warning-color);
       }
     `,
   ];
@@ -190,18 +170,17 @@ export class HsPlanEditor extends LitElement {
 
   private openSheet(index: number, minute: number | null) {
     const dayIndex = this.selected;
-    void openBlockSheet(this, {
+    openBlockSheet(this, {
       day: this.days[dayIndex]!,
       index,
       minute,
-      dayName: this.t(`day.${dayIndex}` as never),
-      t: this.t,
+      dayName: this.t(`day.${dayIndex}` as TextKey),
       onChange: (day) => this.setDay(dayIndex, day),
     });
   }
 
   private async copyDay() {
-    const targets = await chooseCopyTargets(this, this.selected, this.t);
+    const targets = await chooseCopyTargets(this, this.selected);
     if (targets.length) this.days = copyDay(this.days, this.selected, targets);
   }
 
@@ -220,10 +199,6 @@ export class HsPlanEditor extends LitElement {
       .join(", ");
   }
 
-  private preview(): HsDialog | null {
-    return this.renderRoot.querySelector("#preview");
-  }
-
   /** True if the plan was changed elsewhere since it was loaded into the editor. */
   private changedElsewhere(): boolean {
     const current = fromPlan(this.plan);
@@ -233,9 +208,22 @@ export class HsPlanEditor extends LitElement {
     );
   }
 
-  private async save() {
-    const dialog = this.preview();
-    dialog?.close();
+  /** Show the week with the changed days, then save. */
+  private async confirmSave() {
+    const used = this.plan.used_by ?? [];
+    const t = this.t;
+    const ok = await new Promise<boolean>((resolve) =>
+      showDialog(this, "hs-save-plan-dialog", {
+        days: this.days,
+        changed: this.changedDays(),
+        used: used.length ? t("editor.preview_used", { rooms: this.roomNames(used) }) : t("editor.preview_unused"),
+        resolve,
+      }),
+    );
+    if (ok) await this.save();
+  }
+
+  async save() {
     if (this.changedElsewhere() && !(await keepMineDialog(this, this.t))) {
       this.load();
       return;
@@ -256,7 +244,6 @@ export class HsPlanEditor extends LitElement {
       toast(this, errorText(error, this.t));
     } finally {
       this.saving = false;
-      dialog?.close();
     }
   }
 
@@ -300,89 +287,137 @@ export class HsPlanEditor extends LitElement {
     const used = this.plan.used_by ?? [];
     const dirty = this.dirty;
     return html`
-      <div class="head">
-        <button class="btn" @click=${this.leave}>
-          <hs-icon .path=${mdiArrowLeft}></hs-icon>${t("plans.all_plans")}
-        </button>
-        <label class="field name">
-          <span class="sr-only">${t("plans.name")}</span>
-          <input
-            class="input"
+      <ha-button class="back" appearance="plain" @click=${this.leave}>
+        <ha-svg-icon slot="start" .path=${mdiArrowLeft}></ha-svg-icon>${t("plans.all_plans")}
+      </ha-button>
+      <ha-card>
+        <div class="card-content">
+          <ha-input
+            .label=${t("plans.name")}
             .value=${this.name}
             maxlength="60"
-            aria-label=${t("plans.name")}
             @input=${(e: Event) => (this.name = (e.target as HTMLInputElement).value)}
-          />
-        </label>
-      </div>
-      <div class="used muted">
-        ${used.length ? t("plans.used_by", { rooms: this.roomNames(used) }) : t("plans.unused")}
-      </div>
-      <section class="card">
-        <span class="muted">${t("editor.tap_day")}</span>
-        <hs-week-view
-          .days=${this.days}
-          .t=${t}
-          .selected=${this.selected}
-          .changed=${this.changedDays()}
-          @day-select=${(e: CustomEvent<number>) => (this.selected = e.detail)}
-        ></hs-week-view>
-      </section>
-      <section class="card" aria-live="polite">
-        <h3>${t(`day.${this.selected}` as never)}</h3>
-        <span class="muted">${t("editor.drag_hint")}</span>
-        <hs-day-bar
-          class="big"
-          interactive
-          labels
-          .day=${day}
-          .handleLabel=${(_index: number, time: string) => `${t("editor.starts")} ${time}`}
-          @boundary-move=${this.onMove}
-          @segment-tap=${(e: CustomEvent<SegmentTapDetail>) => this.openSheet(e.detail.index, e.detail.minute)}
-        ></hs-day-bar>
-        <div class="axis muted" aria-hidden="true">
-          ${[0, 6, 12, 18, 24].map((hour) => html`<span style="left:${(hour / 24) * 100}%">${hour}:00</span>`)}
+          ></ha-input>
+          <span class="muted">
+            ${used.length ? t("plans.used_by", { rooms: this.roomNames(used) }) : t("plans.unused")}
+          </span>
         </div>
-        <span class="muted">${t("editor.parts")}</span>
-        <ul class="parts">
-          ${segments(day).map(
-            (segment) => html`<li>
-              <button class="part" @click=${() => this.openSheet(segment.index, null)}>
-                <span class="time">${toHHMM(segment.start)} – ${toHHMM(segment.end)}</span>
-                <span class="chip" style="background:${MODE_COLORS[segment.mode]}">
-                  <hs-icon .path=${MODE_ICONS[segment.mode]}></hs-icon>${t(`mode.${segment.mode}`)}
-                </span>
-                <hs-icon .path=${mdiChevronRight}></hs-icon>
-              </button>
-            </li>`,
-          )}
-        </ul>
-        <button class="btn" @click=${this.copyDay}>
-          <hs-icon .path=${mdiContentCopy}></hs-icon>${t("editor.copy_day")}
-        </button>
-      </section>
+      </ha-card>
+      <ha-card>
+        <div class="card-content">
+          <span class="muted">${t("editor.tap_day")}</span>
+          <hs-week-view
+            .days=${this.days}
+            .t=${t}
+            .selected=${this.selected}
+            .changed=${this.changedDays()}
+            @day-select=${(e: CustomEvent<number>) => (this.selected = e.detail)}
+          ></hs-week-view>
+        </div>
+      </ha-card>
+      <ha-card aria-live="polite">
+        <div class="card-content">
+          <h2>${t(`day.${this.selected}` as TextKey)}</h2>
+          <span class="muted">${t("editor.drag_hint")}</span>
+          <hs-day-bar
+            class="big"
+            interactive
+            labels
+            .day=${day}
+            .handleLabel=${(_index: number, time: string) => `${t("editor.starts")} ${time}`}
+            @boundary-move=${this.onMove}
+            @segment-tap=${(e: CustomEvent<SegmentTapDetail>) => this.openSheet(e.detail.index, e.detail.minute)}
+          ></hs-day-bar>
+          <div class="axis" aria-hidden="true">
+            ${[0, 6, 12, 18, 24].map((hour) => html`<span style="left:${(hour / 24) * 100}%">${hour}:00</span>`)}
+          </div>
+          <div class="parts" role="list" aria-label=${t("editor.parts")}>
+            ${segments(day).map(
+              (segment) => html`<ha-md-list-item
+                type="button"
+                role="listitem"
+                style="--mode-color:${MODE_COLORS[segment.mode]}"
+                @click=${() => this.openSheet(segment.index, null)}
+              >
+                <ha-svg-icon slot="start" .path=${MODE_ICONS[segment.mode]}></ha-svg-icon>
+                <span slot="headline">${toHHMM(segment.start)} – ${toHHMM(segment.end)}</span>
+                <span slot="supporting-text">${t(`mode.${segment.mode}`)}</span>
+                <ha-svg-icon slot="end" .path=${mdiChevronRight}></ha-svg-icon>
+              </ha-md-list-item>`,
+            )}
+          </div>
+        </div>
+        <div class="card-actions">
+          <ha-button appearance="plain" @click=${this.copyDay}>
+            <ha-svg-icon slot="start" .path=${mdiContentCopy}></ha-svg-icon>${t("editor.copy_day")}
+          </ha-button>
+        </div>
+      </ha-card>
       <div class="footer">
-        <button class="btn" ?disabled=${!dirty || this.saving} @click=${this.cancel}>${t("common.cancel")}</button>
-        <button class="btn primary" ?disabled=${!dirty || this.saving} @click=${() => this.preview()?.show()}>
+        ${dirty ? html`<span class="unsaved">${t("editor.unsaved")}</span>` : nothing}
+        <ha-button appearance="plain" .disabled=${!dirty || this.saving} @click=${this.cancel}>
+          ${t("common.cancel")}
+        </ha-button>
+        <ha-button .disabled=${!dirty || this.saving} .loading=${this.saving} @click=${this.confirmSave}>
           ${t("common.save")}
-        </button>
+        </ha-button>
       </div>
-      <hs-dialog id="preview" wide .heading=${t("editor.preview_title")} .closeLabel=${t("common.back")}>
-        <p class="muted">${t("editor.preview_changed")}</p>
-        <hs-week-view readonly .days=${this.days} .t=${t} .changed=${this.changedDays()}></hs-week-view>
-        <p>
-          ${used.length
-            ? t("editor.preview_used", { rooms: this.roomNames(used) })
-            : t("editor.preview_unused")}
-        </p>
-        <button slot="actions" class="btn" @click=${() => this.preview()?.close()}>${t("common.back")}</button>
-        <button slot="actions" class="btn primary" ?disabled=${this.saving} @click=${this.save}>
-          ${t("common.save")}
-        </button>
-      </hs-dialog>
-      ${dirty ? html`<span class="unsaved sr-only">${t("editor.unsaved")}</span>` : nothing}
     `;
   }
 }
 
 define("hs-plan-editor", HsPlanEditor);
+
+interface SavePlanParams {
+  days: Day[];
+  changed: Set<number>;
+  used: string;
+  resolve: (save: boolean) => void;
+}
+
+/** The week before saving, with the changed days marked. */
+export class HsSavePlanDialog extends HsHaDialog<SavePlanParams> {
+  private confirmed = false;
+
+  static override styles = css`
+    p {
+      color: var(--secondary-text-color);
+    }
+  `;
+
+  override showDialog(params: SavePlanParams): void {
+    this.params?.resolve(false);
+    this.confirmed = false;
+    super.showDialog(params);
+  }
+
+  protected override dialogClosed(): void {
+    this.params?.resolve(this.confirmed);
+  }
+
+  private answer(save: boolean) {
+    this.confirmed = save;
+    this.closeDialog();
+  }
+
+  override render() {
+    const p = this.params;
+    if (!p) return nothing;
+    const t = translator(languageOf(this.hass));
+    return html`
+      <ha-dialog .open=${this.open} header-title=${t("editor.preview_title")} @closed=${this.onClosed}>
+        <p>${t("editor.preview_changed")}</p>
+        <hs-week-view readonly .days=${p.days} .t=${t} .changed=${p.changed}></hs-week-view>
+        <p>${p.used}</p>
+        <ha-dialog-footer slot="footer">
+          <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.answer(false)}>
+            ${t("common.back")}
+          </ha-button>
+          <ha-button slot="primaryAction" @click=${() => this.answer(true)}>${t("common.save")}</ha-button>
+        </ha-dialog-footer>
+      </ha-dialog>
+    `;
+  }
+}
+
+define("hs-save-plan-dialog", HsSavePlanDialog);
