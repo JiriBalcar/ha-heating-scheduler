@@ -2,6 +2,10 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { mdiCalendarClock, mdiThermometer, mdiTuneVariant, mdiViewDashboard } from "@mdi/js";
 import "./card";
+// HA loads the card loader only when the page loads. A page opened before the integration was
+// installed (the phone app can keep one open for days) has no dashboard card until it reloads.
+// The panel defines the card too, so opening the panel once brings the cards back.
+import "./card-loader";
 import { define } from "./components/define";
 import "./components/hs-advanced-view";
 import "./components/hs-home-view";
