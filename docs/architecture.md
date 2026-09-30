@@ -16,7 +16,7 @@ differ. Decisions agreed on 2026-09-29 are marked **(decision)**.
 ```
 custom_components/heating_scheduler/
 ├── core/              pure Python, no homeassistant imports (a test enforces this)
-│   ├── model.py       modes, plans, temperature sets, rooms, house state, overrides
+│   ├── model.py       modes, plans, temperature sets, zones, rooms, house state, overrides
 │   ├── timeline.py    local wall time → UTC instants, DST gap/fold rules
 │   ├── resolve.py     resolve(), next_plan_change(), temperature merge
 │   ├── overrides.py   expiry rules incl. max-duration cap
@@ -50,9 +50,14 @@ tests/core/  tests/ha/
   each day bar is self-contained.
 - **House state**: a selected mode (`auto`, `away`, `off`) plus an optional vacation
   (start, optional end, frost or away). The effective house mode is `vacation` while the
-  vacation covers the instant. When a vacation ends, the house returns to the selected
+  vacation covers the instant. When a vacation ends, the zone returns to the selected
   mode, which is the mode that was active when the vacation started **(decision)**.
   Selecting another mode during an active vacation ends the vacation.
+- **Zones (decision, 2026-09-30)**: each zone has its own house state, so a part of the
+  house (for example a floor) has its own mode and holiday. Every room is in one zone
+  (`zone_id`). There is always at least one zone: a new installation has one zone for the
+  whole house, and the last zone cannot be deleted. Deleting a zone moves its rooms to the
+  first remaining zone. Zones have an order, which the UI and the selects follow.
 
 ## resolve()
 
@@ -60,6 +65,8 @@ tests/core/  tests/ha/
 resolve(now, house, plan, temperatures, override, tz) -> RoomTarget(
     mode, temperature, reason, valid_until, next)
 ```
+
+`house` is the house state of the room's zone.
 
 Precedence **(decision)**: house mode `off` / `vacation` / `away` → manual change
 (override) → the room's plan. A manual change never beats a house mode; knob changes in
@@ -82,8 +89,10 @@ those modes are undone.
 - Reconcile is a synchronous computation. Triggers coalesce into one run per event-loop
   iteration: HA started, next-event timer, any config / house / override change, safety
   tick (default 5 min), TRV available again, time zone change.
-- Housekeeping first: drop expired overrides, clear a finished vacation.
-- A change of the effective house mode clears all overrides **(decision)**.
+- Housekeeping first: drop expired overrides, clear the finished vacation of each zone.
+- A change of a zone's effective mode clears the overrides of that zone's rooms
+  **(decision)**. The state store keeps the last effective mode of each zone, so a change
+  while HA was stopped also clears them.
 - One `async_track_point_in_utc_time` timer at the earliest next event of all rooms.
 
 ## Units
@@ -137,11 +146,14 @@ those modes are undone.
 
 | Store key | Content | Save |
 |---|---|---|
-| `heating_scheduler.config` | rooms, plans, temperature sets, house, settings | immediately |
-| `heating_scheduler.state` | overrides | 2 s delay, flushed on stop |
+| `heating_scheduler.config` | zones with their house state, rooms, plans, temperature sets, settings | immediately |
+| `heating_scheduler.state` | overrides, last effective mode of each zone | 2 s delay, flushed on stop |
 | `heating_scheduler.log` | last 100 events per room | 60 s delay |
 
 The configuration has a revision; websocket writes must send the revision they edited.
+
+Both stores are version 2.1. The migration from 1.x turns the house state into one zone,
+named „Dům“ or "House" by the HA language, and puts every room in it.
 
 ## Home Assistant surface
 
@@ -152,9 +164,18 @@ The configuration has a revision; websocket writes must send the revision they e
   and the mode sensor show a new room temperature at once.
 - Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
-- House: `select` (house mode), five `number` entities (house temperatures).
+- House: `select` (house mode), five `number` entities (house temperatures). The house mode
+  select sets every zone. While the zones differ, its state is unknown and the attribute
+  `zones` holds the mode of each zone.
+- Zones: with two or more zones, one `select` per zone (unique id `zone_<id>_mode`). The
+  selects are added and removed when zones are added and removed.
 - Services: `set_override`, `clear_override` (target: room thermostat), `set_house_mode`,
-  `set_vacation`, `cancel_vacation`, `reconcile_now`.
+  `set_vacation`, `cancel_vacation`, `reconcile_now`. The house services take an optional
+  `zone` (name in any case, or id); without it they apply to every zone.
+- Create zones from floors (`zones/from_floors`) uses HA's floor registry. A room's area is
+  its own `area_id`, or else the area of its first valve that has one (the entity's area,
+  else its device's area). A zone with the floor's name is reused. Zones that the import
+  leaves empty are removed, but one zone always stays.
 - Websocket commands under `heating_scheduler/`; see `websocket.py`.
 - Permissions: every HA user may use every function **(decision)**.
 - Each room can have a display temperature entity (sensor or climate); without one, the
@@ -188,6 +209,13 @@ The configuration has a revision; websocket writes must send the revision they e
 - Dialogs follow HA's dialog protocol (`showDialog` / `closeDialog` / `dialog-closed`) and
   are opened through HA's dialog manager, so Back closes them. Messages use HA's toast
   (`hass-notification`); a valve opens HA's entity dialog (`hass-more-info`).
+- Dialogs keep their arguments in `args`, never in `params`. HA's dialog manager takes an
+  element with a `params` property for its newer dialog type: it drops the element after
+  closing and creates the next one without `hass`. A test guards this.
+- **Zones in the UI (decision, 2026-09-30).** With one zone, the overview has one house
+  tile and the rooms. With two or more zones, it has a Whole house tile, then each zone's
+  tile followed by its rooms. The Whole house tile sets every zone; while the zones differ,
+  it lists the mode of each zone and selects nothing.
 - **Sizes (decision, 2026-09-30, deviates from the spec).** Exact HA sizes: 42 px controls
   and 14 px text, as in HA's tile card. The spec asks for 48 px touch targets; the user
   accepted HA sizes because the Companion app's page zoom enlarges everything (115 % gives
@@ -207,6 +235,7 @@ The configuration has a revision; websocket writes must send the revision they e
   on a mock platform, so Home Assistant keeps the service context on them for 5 seconds,
   like on Zigbee2MQTT entities. They can confirm late, round values, lose commands and go
   offline.
-- `frontend/test/`: vitest for formatting, time zones, translations and plan operations.
+- `frontend/test/`: vitest for formatting, time zones, translations, plan operations, zones,
+  components and dialogs.
 - `dev/`: a local Home Assistant with simulated TRVZB valves (1–8 s confirmation delay) and
   room sensors, for manual checks in a browser.

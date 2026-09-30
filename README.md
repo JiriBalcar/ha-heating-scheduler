@@ -13,7 +13,8 @@ for phones and tablets, and a Lovelace card.
 
 - Weekly plans with modes: Warm, Saving, Night, Away, Frost guard, Off.
 - Rooms share plans and temperature sets, so you set them once.
-- House modes: Normal, Away, Holiday (planned in advance), Off.
+- House modes: Normal, Away, Holiday (planned in advance), Off. For the whole house, or
+  per zone: for example, the first floor is away and the ground floor heats as usual.
 - Manual changes on the valve knob or in the app last until the next change of the plan.
 - The integration **reconciles** instead of firing actions at fixed times: after a restart,
   a missed timer or a valve that was offline for hours, every valve gets the right value.
@@ -55,6 +56,9 @@ Home Assistant.
 5. **Plans**: change the house plan, or give some rooms their own plan.
 6. **Advanced → Temperatures**: the house temperatures, and own sets for rooms that need
    other values (for example a warmer bathroom).
+7. Optional: **Advanced → Zones** divides the house into zones with their own mode and
+   holiday, for example floors. **Create zones from floors** puts each room in a zone named
+   after its Home Assistant floor: the floor of the room's area, or else of its valve's area.
 
 **First start:** turn on **Advanced → Settings → Test mode**. The integration then computes
 and logs everything but sends nothing to the valves. Check **Advanced → Log**, then turn
@@ -86,7 +90,7 @@ Změna platí do další změny v plánu. Dlaždice má pak fialovou ikonu ruky 
 **Otočil jsem kolečkem na hlavici.** To je totéž jako **+** nebo **−**. Ostatní hlavice
 v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí samo.
 
-**Odcházím nebo odjíždím.** Nahoře je řádek **Celý dům**:
+**Odcházím nebo odjíždím.** Nahoře je dlaždice **Celý dům**:
 
 - **Pryč**: krátká nepřítomnost. Všechny místnosti budou na teplotě Pryč.
   Po návratu klepněte na **Jsem doma — Normálně**.
@@ -95,8 +99,13 @@ v místnosti se nastaví stejně. Po další změně v plánu se vše vrátí sa
 - **Vypnuto**: topení je vypnuté (léto).
 - **Normálně**: topí se podle plánu.
 
+**Každé patro zvlášť.** Když je dům rozdělený na zóny (například patra), má každá zóna svou
+dlaždici nad svými místnostmi. Režim zóny platí jen pro její místnosti: **1. patro** může
+být **Pryč** a přízemí topí dál podle plánu. Dlaždice **Celý dům** přepne všechny zóny
+najednou. Když mají zóny různé režimy, vypíše režim každé zóny.
+
 Během režimů Pryč, Dovolená a Vypnuto nejde teplota v místnosti měnit. Nejdřív přepněte dům
-na **Normálně**.
+(nebo jeho zónu) na **Normálně**.
 
 **Oranžový vykřičník** na ikoně místnosti: některá hlavice neodpovídá nebo nepřijala
 teplotu. Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
@@ -118,6 +127,9 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 - **Whole house**: **Away** for short absences (press **I'm home — Normal** when back),
   **Holiday** with a return date (heating comes back by itself), **Off** for summer,
   **Normal** to follow the plans. In Away, Holiday and Off, room temperatures are fixed.
+- **Zones** (for example floors): each zone has its own tile above its rooms, and its mode
+  applies only to its rooms. **Whole house** switches every zone; while the zones differ,
+  it lists the mode of each.
 - An **orange exclamation mark** on a room's icon means a valve has a problem; tap the icon
   for an explanation.
 - **Plans**: tap **Change plan** and a day, drag the white handles or tap a part, then
@@ -128,7 +140,8 @@ stránky), například na 125 %. Zvětší se celá aplikace.
 
 For every room the integration computes the target with a pure function:
 
-1. House mode **Off**, **Holiday** or **Away** wins.
+1. The mode of the room's zone wins: **Off**, **Holiday** or **Away**. Without zones, the
+   whole house is one zone.
 2. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
    the next change of the plan, and at most the longest manual change (default 4 h).
 3. Otherwise the room's **plan** decides, with the room's temperatures.
@@ -140,8 +153,8 @@ the valve; lost commands are sent again (after 30, 60 and 120 seconds). DST chan
 handled: a plan time that does not exist is used at the end of the gap, a time that occurs
 twice is used once.
 
-A change of the house mode ends all manual changes. When a holiday ends, the house returns to
-the mode it had when the holiday started.
+A change of a zone's mode ends the manual changes in that zone. When a holiday ends, the zone
+returns to the mode it had when the holiday started.
 
 ## Entities
 
@@ -153,7 +166,8 @@ Entity ids depend on the Home Assistant language; English names are shown.
 | `sensor.<room>_heating_mode` | room | Current mode; attributes: target temperature, reason, until, next mode, manual change. |
 | `button.<room>_back_to_plan` | room | Ends a manual change. |
 | `binary_sensor.<room>_heating_problem` | room | On when a valve is offline, a write failed or a wrong value persists. |
-| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off. |
+| `select.heating_house_mode` | house | Normal (`auto`), Away, Holiday (`vacation`), Off for every zone. Unknown while the zones have different modes; the attribute `zones` shows the mode of each. |
+| `select.heating_mode_<zone>` | zone | The mode of one zone. Only when there are two or more zones. |
 | `number.heating_temperature_*` | house | House temperatures of Warm, Saving, Night, Away, Frost guard. |
 
 Tip: hide the valves themselves from voice assistants and use the room thermostats.
@@ -164,10 +178,13 @@ Tip: hide the valves themselves from voice assistants and use the room thermosta
 |---|---|
 | `heating_scheduler.set_override` | target: room thermostat; `temperature`; optional `duration` or `until` |
 | `heating_scheduler.clear_override` | target: room thermostat |
-| `heating_scheduler.set_house_mode` | `mode`: `auto`, `away`, `vacation`, `off` |
-| `heating_scheduler.set_vacation` | optional `start`, `end`, `mode` (`frost` or `away`) |
-| `heating_scheduler.cancel_vacation` | — |
+| `heating_scheduler.set_house_mode` | `mode`: `auto`, `away`, `vacation`, `off`; optional `zone` |
+| `heating_scheduler.set_vacation` | optional `start`, `end`, `mode` (`frost` or `away`), `zone` |
+| `heating_scheduler.cancel_vacation` | optional `zone` |
 | `heating_scheduler.reconcile_now` | — |
+
+`zone` is the name of a zone (in any case) or its id. Without it, the action applies to every
+zone.
 
 Example: warm the bathroom for an hour.
 
@@ -180,6 +197,15 @@ data:
   duration: "01:00:00"
 ```
 
+Example: a holiday on the first floor only, from now until 17 October, 18:00.
+
+```yaml
+action: heating_scheduler.set_vacation
+data:
+  zone: "1. patro"
+  end: "2026-10-17 18:00:00"
+```
+
 ## Lovelace card
 
 The card is loaded automatically. Add **Heating Scheduler** from the card picker, or:
@@ -187,9 +213,12 @@ The card is loaded automatically. Add **Heating Scheduler** from the card picker
 ```yaml
 type: custom:heating-scheduler-card
 room: room_1a2b3c4d   # optional; without it the card shows all rooms
-show_house: true       # optional: the house mode strip
+zone: zone_1a2b3c4d   # optional: the zone's tile and its rooms
+show_house: true       # optional: the house mode tile
 compact: false         # optional: − / + next to the room name
 ```
+
+The card editor lists the rooms and zones by name.
 
 ## Development
 
