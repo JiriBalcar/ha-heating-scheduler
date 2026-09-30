@@ -180,6 +180,7 @@ async def test_panel_registered_and_removed(
     assert panel.config["_panel_custom"]["name"] == "heating-scheduler-panel"
     assert panel.config["_panel_custom"]["module_url"].startswith("/heating_scheduler_static/")
     assert panel.require_admin is False
+    assert panel.sidebar_icon == "heating-scheduler:dial"
     extra = hass.data["frontend_extra_module_url"]
     assert any(
         url.startswith("/heating_scheduler_static/heating-scheduler-card.js") for url in extra.urls

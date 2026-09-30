@@ -19,6 +19,8 @@ PANEL_COMPONENT: Final = "heating-scheduler-panel"
 STATIC_URL: Final = f"/{DOMAIN}_static"
 PANEL_FILE: Final = "heating-scheduler-panel.js"
 CARD_FILE: Final = "heating-scheduler-card.js"
+# The brand dial in one colour; the card loader registers it (frontend/src/icons.ts).
+PANEL_ICON: Final = "heating-scheduler:dial"
 
 # TRV writes.
 VERIFY_TIMEOUTS: Final[tuple[timedelta, ...]] = (

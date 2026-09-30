@@ -198,9 +198,16 @@ named „Dům“ or "House" by the HA language, and puts every room in it.
   else its device's area). A zone with the floor's name is reused. Zones that the import
   leaves empty are removed, but one zone always stays.
 - Websocket commands under `heating_scheduler/`; see `websocket.py`.
-- Brand images: `brand/icon.png` and `brand/icon@2x.png`, the panel's sidebar glyph
-  (`mdi:radiator`) in HA's heating orange, trimmed, 256 and 512 px. HA 2026.3 and newer serves
-  them itself, and HACS accepts them instead of an entry in `home-assistant/brands`.
+- **Icon (decision, 2026-09-30, chosen by the user from designs on a canvas).** A thermostat dial
+  (HA's thermostat arc and knob) around HA's flame, in the heating orange. `brand/icon.png` and
+  `brand/icon@2x.png` (256 and 512 px, centred): HA 2026.3 and newer serves them itself, and HACS
+  accepts them instead of an entry in `home-assistant/brands`. The sidebar shows the same dial in
+  one colour, `heating-scheduler:dial`: HA's `<ha-icon>` looks up other prefixes than `mdi` in
+  `window.customIcons`, which the card loader fills on every page before HA draws the sidebar
+  (`icons.ts`; HACS does the same for its icon). The dial's track is `secondaryPath`, which HA
+  draws at half opacity. Next to the knob the arc ends straight inside the knob's ring, so the ring
+  hides the ends the way the colour icon's white knob does. A page opened before the integration
+  was installed shows no sidebar icon until it reloads, like the card.
 - Permissions: every HA user may use every function **(decision)**.
 - Each room can have a display temperature entity (sensor or climate); without one, the
   UI shows the average `current_temperature` of the room's TRVs **(decision)**.

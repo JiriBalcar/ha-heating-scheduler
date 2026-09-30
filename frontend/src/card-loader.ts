@@ -5,7 +5,11 @@
 // update. The main bundle's URL comes from HA's live panel list instead, so the card and the panel
 // always run the same code, and this file stays small and rarely changes.
 import { define } from "./components/define";
+import { registerIcons } from "./icons";
 import type { CardConfig, HomeAssistant } from "./types";
+
+// First: the sidebar icon of the panel comes from here.
+registerIcons();
 
 const PANEL = "heating-scheduler";
 const BUNDLE = "heating-scheduler-panel.js";
