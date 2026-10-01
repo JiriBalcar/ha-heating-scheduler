@@ -20,3 +20,10 @@ dev/config/custom_components/heating_scheduler
 # Written by dev/seed.py: HACS's checks allow one manifest.json in the repository.
 dev/config/custom_components/fake_trv/manifest.json
 dev/credentials.local.md
+
+# Local tool files: Claude Code's worktrees, personal settings and dev server config, JetBrains
+# IDE settings
+.claude/worktrees/
+.claude/settings.local.json
+.claude/launch.json
+.idea/
