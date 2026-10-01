@@ -263,8 +263,11 @@ data:
 ## Lovelace card
 
 The card switches the mode of the whole house or of one zone (Normal, Away, Holiday, Frost
-guard, Off; a zone's tile only the modes the zone offers), as a tile of Home Assistant's own size. It is loaded automatically. Add **Heating Scheduler** from the
-card picker, or:
+guard, Off; a zone's tile only the modes the zone offers), as a tile of Home Assistant's own size.
+The integration adds it to the dashboard resources (**Settings → Dashboards → ⋮ → Resources**)
+and keeps its address current. If your dashboard resources are kept in YAML, add
+`/heating_scheduler_static/heating-scheduler-card.js` there as a resource of type `module`; the
+log says so. Add **Heating Scheduler** from the card picker, or:
 
 ```yaml
 type: custom:heating-scheduler-card
@@ -299,8 +302,9 @@ features:
 ```
 
 A dashboard shows "Custom element doesn't exist: heating-scheduler-card" when the page was opened
-before the integration was installed. Reload the page (in the Home Assistant app: close the app
-completely and open it again), or open **Heating Scheduler** in the sidebar once.
+before the integration was installed, or when the card's resource is missing (see above). Reload
+the page (in the Home Assistant app: close the app completely and open it again), or open
+**Heating Scheduler** in the sidebar once.
 
 ## Development
 

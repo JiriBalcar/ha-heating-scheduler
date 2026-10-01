@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { expect, it } from "vitest";
-import "../src/card-loader";
+import "../src/sidebar-icons";
 
-it("the card loader gives HA the sidebar dial as a custom icon", async () => {
+it("the sidebar icon module gives HA the dial as a custom icon", async () => {
   const icons = window.customIcons?.["heating-scheduler"];
   expect(icons).toBeDefined();
   const dial = await icons!.getIcon("dial");

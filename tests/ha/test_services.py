@@ -182,13 +182,15 @@ async def test_panel_registered_and_removed(
     assert panel.require_admin is False
     assert panel.sidebar_icon == "heating-scheduler:dial"
     assert panel.sidebar_title == "Heating Scheduler"
+    # Every page loads the sidebar icon; the card is a dashboard resource (test_card_resource).
     extra = hass.data["frontend_extra_module_url"]
     assert any(
-        url.startswith("/heating_scheduler_static/heating-scheduler-card.js") for url in extra.urls
+        url.startswith("/heating_scheduler_static/heating-scheduler-icons.js") for url in extra.urls
     )
+    assert not any("heating-scheduler-card" in url for url in extra.urls)
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert PANEL_URL_PATH not in hass.data["frontend_panels"]
-    assert not any("heating-scheduler-card" in url for url in extra.urls)
+    assert not any("heating-scheduler-icons" in url for url in extra.urls)
 
 
 async def test_broken_stored_config_fails_setup(

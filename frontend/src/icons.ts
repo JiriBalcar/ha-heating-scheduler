@@ -1,7 +1,8 @@
 // The integration's own icons, for the sidebar and HA's icon picker: "heating-scheduler:dial" is the
 // brand icon (a thermostat dial around a flame) in one colour. HA's <ha-icon> looks up prefixes other
 // than mdi in window.customIcons, and draws `secondaryPath` at half opacity, like the dial's track.
-// The card loader registers them on every page before HA draws the sidebar (HACS does the same).
+// The sidebar icon module (sidebar-icons.ts) registers them on every page before HA draws the
+// sidebar (HACS does the same).
 
 export const ICON_PREFIX = "heating-scheduler";
 

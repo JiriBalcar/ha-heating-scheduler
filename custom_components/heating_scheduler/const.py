@@ -19,7 +19,8 @@ PANEL_COMPONENT: Final = "heating-scheduler-panel"
 STATIC_URL: Final = f"/{DOMAIN}_static"
 PANEL_FILE: Final = "heating-scheduler-panel.js"
 CARD_FILE: Final = "heating-scheduler-card.js"
-# The brand dial in one colour; the card loader registers it (frontend/src/icons.ts).
+ICONS_FILE: Final = "heating-scheduler-icons.js"
+# The brand dial in one colour; the sidebar icon module registers it (frontend/src/icons.ts).
 PANEL_ICON: Final = "heating-scheduler:dial"
 # The project's name, in every language (user's decision, 2026-09-30).
 PANEL_TITLE: Final = "Heating Scheduler"

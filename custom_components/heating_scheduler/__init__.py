@@ -14,7 +14,11 @@ from .const import DOMAIN, SIGNAL_ROOMS_CHANGED
 from .core.validation import ValidationError
 from .engine import HeatingEngine
 from .entity import async_sync_devices
-from .frontend import async_register_frontend, async_unregister_frontend
+from .frontend import (
+    async_register_frontend,
+    async_remove_card_resource,
+    async_unregister_frontend,
+)
 from .services import async_setup_services
 from .storage import HeatingStorage
 from .websocket import async_setup_websocket
@@ -77,5 +81,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: HeatingConfigEntry) -> None:
-    """Delete stored data when the integration is removed."""
+    """Delete stored data and the card's dashboard resource when the integration is removed."""
     await HeatingStorage(hass).async_remove()
+    await async_remove_card_resource(hass)

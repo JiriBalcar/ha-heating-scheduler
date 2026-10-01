@@ -1,22 +1,18 @@
-// The Lovelace card as HA loads it on start: a small wrapper that shows <hs-card> from the main
-// bundle (the one the sidebar panel uses).
+// The Lovelace card as dashboards load it, from the dashboard resource that the integration keeps:
+// a small wrapper that shows <hs-card> from the main bundle (the one the sidebar panel uses).
 //
-// HA's service worker can serve an old page, and so an old URL of this file, for a while after an
-// update. The main bundle's URL comes from HA's live panel list instead, so the card and the panel
-// always run the same code, and this file stays small and rarely changes.
+// A cached copy of this file can be old for a while after an update. The main bundle's URL comes
+// from HA's live panel list instead, so the card and the panel always run the same code, and this
+// file stays small and rarely changes.
 import { define } from "./components/define";
 import { checkCardConfig, gridOptions } from "./card-config";
-import { registerIcons } from "./icons";
 import type { CardConfig, HomeAssistant } from "./types";
-
-// First: the sidebar icon of the panel comes from here.
-registerIcons();
 
 const PANEL = "heating-scheduler";
 const BUNDLE = "heating-scheduler-panel.js";
 const TEXTS = {
-  cs: { name: "Heating Scheduler", description: "Režim domu nebo zóny: Normálně, Pryč, Dovolená, Vypnuto." },
-  en: { name: "Heating Scheduler", description: "The mode of the house or a zone: Normal, Away, Holiday, Off." },
+  cs: { name: "Heating Scheduler", description: "Režim domu nebo zóny: Normálně, Pryč, Dovolená, Proti mrazu, Vypnuto." },
+  en: { name: "Heating Scheduler", description: "The mode of the house or a zone: Normal, Away, Holiday, Frost guard, Off." },
 };
 
 interface InnerCard extends HTMLElement {

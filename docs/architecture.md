@@ -235,22 +235,36 @@ mode.
 
 ## Frontend
 
-- TypeScript + Lit 3 (no decorators), built with esbuild into `dist/` as two bundles:
-  `heating-scheduler-panel.js` (panel, card, all components) and `heating-scheduler-card.js`
-  (a small card loader). The bundles are committed; CI checks that they match the source.
+- TypeScript + Lit 3 (no decorators), built with esbuild into `dist/` as three bundles:
+  `heating-scheduler-panel.js` (panel, card, all components), `heating-scheduler-card.js` (a
+  small card loader) and `heating-scheduler-icons.js` (the sidebar icon). The bundles are
+  committed; CI checks that they match the source.
 - The panel is registered with `panel_custom` (`require_admin: false`, `handle_safe_area:
-  true`); the card loader is loaded with `add_extra_js_url`. URLs carry a hash of the bundles
-  for cache busting.
-- **Card loader (decision, 2026-09-30).** HA's service worker serves an old copy of the page,
-  and so an old card URL, for a while after an update. The loader therefore imports the main
-  bundle by the URL in HA's live panel list, and the card and the panel always run the same
-  code. The loader itself is small and rarely changes. HA loads extra modules (and Lovelace
-  resources) only when the page loads, so a page opened before the integration was installed has
-  no card until it reloads. The panel bundle therefore defines the card too: opening the panel
-  once brings the cards back.
-- **Element registration.** HA's app installs a scoped custom element registry polyfill; the
-  card loader can run before it. Our elements are defined only after HA has defined its root
-  element (`components/define.ts`); an earlier definition breaks all our elements.
+  true`); the sidebar icon module is loaded on every page with `add_extra_js_url`; the card
+  loader is a dashboard resource. URLs carry a hash of the bundles for cache busting.
+- **Card as a dashboard resource (decision, 2026-10-01, user).** HA documents cards only as
+  dashboard resources; it documents no way for an integration to ship a card. An extra module
+  (`add_extra_js_url`) starts in parallel with HA's app and can run before the app's element
+  registry is in place (home-assistant/frontend#53890, open). With the card loaded that way, the
+  Android app showed "Custom element doesn't exist" on every start, although our elements wait
+  for HA's root element (see Element registration). Dashboards load their resources after the
+  app has started. On setup, the integration keeps exactly one resource for the card at the
+  current URL in Lovelace's resource collection (`hass.data[LOVELACE_DATA].resources`, as HACS
+  does; not a public API): it creates it, updates an old URL and removes duplicates. A reload
+  keeps it; removing the integration deletes it. Resources kept in YAML cannot be written: a
+  warning names the URL to add. The sidebar icon must load on every page, so it stays an extra
+  module; it defines no element, so the start order cannot break it.
+- **Card loader (decision, 2026-09-30).** HA's service worker serves old copies of pages and
+  files for a while after an update, so the card loader can be old. The loader therefore
+  imports the main bundle by the URL in HA's live panel list, and the card and the panel always
+  run the same code. The loader itself is small and rarely changes. HA loads dashboard
+  resources (and extra modules) only when the page loads, so a page opened before the
+  integration was installed has no card until it reloads. The panel bundle therefore defines the
+  card too: opening the panel once brings the cards back.
+- **Element registration.** HA's app installs a scoped custom element registry polyfill; an
+  extra module can run before it (the card loader was one until 2026-10-01). Our elements are
+  defined only after HA has defined its root element (`components/define.ts`); an earlier
+  definition breaks all our elements.
 - **HA look and components (decision, 2026-09-30).** The UI uses HA's own elements wherever
   HA has one: page layout with tabs (`hass-tabs-subpage`), `ha-card`, tile parts
   (`ha-tile-*`), `ha-control-select`, `ha-control-number-buttons`, `ha-control-button`,
