@@ -1,6 +1,8 @@
-"""Write a sample Heating Scheduler configuration for the dev instance (development only).
+"""Prepare the dev instance (development only): the fake valves and a sample configuration.
 
-Run before the first start: `uv run python dev/seed.py`. It does nothing if data exists.
+Run before the first start: `uv run python dev/seed.py`. It writes the manifest of the fake TRV
+integration, which is not in the repository: HACS's checks allow one manifest.json in a
+repository. The sample configuration is written only if none exists.
 """
 
 from __future__ import annotations
@@ -29,9 +31,28 @@ from custom_components.heating_scheduler.core.schedule_ops import (  # noqa: E40
 from custom_components.heating_scheduler.core.serde import config_to_dict  # noqa: E402
 
 STORAGE = ROOT / "dev" / "config" / ".storage"
+FAKE_TRV = ROOT / "dev" / "config" / "custom_components" / "fake_trv"
+FAKE_TRV_MANIFEST = {
+    "domain": "fake_trv",
+    "name": "Fake TRV (development only)",
+    "codeowners": [],
+    "dependencies": [],
+    "documentation": "https://example.invalid",
+    "iot_class": "local_push",
+    "requirements": [],
+    "version": "0.1.0",
+}
+
+
+def write_fake_trv_manifest() -> None:
+    """Write the fake TRV integration's manifest.json."""
+    target = FAKE_TRV / "manifest.json"
+    target.write_text(json.dumps(FAKE_TRV_MANIFEST, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {target}")
 
 
 def main() -> None:
+    write_fake_trv_manifest()
     target = STORAGE / "heating_scheduler.config"
     if target.exists():
         print(f"{target} exists, nothing to do")

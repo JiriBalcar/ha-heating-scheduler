@@ -326,10 +326,12 @@ cd frontend && npm ci && npm run check
 
 `npm run check` type-checks, runs the frontend tests and builds the bundles into
 `custom_components/heating_scheduler/dist/` (committed, so HACS needs no build step):
-`heating-scheduler-panel.js` holds the panel and the card, and `heating-scheduler-card.js`
-is the small loader that Home Assistant loads on start.
+`heating-scheduler-panel.js` holds the panel and the card, `heating-scheduler-card.js` is the
+small card loader (a dashboard resource), and `heating-scheduler-icons.js` the sidebar icon.
 
-A local instance with simulated valves lives in `dev/`:
+A local instance with simulated valves lives in `dev/`. `dev/seed.py` writes the simulated
+valves' `manifest.json` (HACS's checks allow one manifest in the repository) and a sample
+configuration:
 
 ```bash
 uv run python dev/seed.py
