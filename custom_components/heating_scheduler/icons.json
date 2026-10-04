@@ -28,7 +28,8 @@
           "frost": "mdi:snowflake",
           "off": "mdi:radiator-off",
           "manual": "mdi:hand-back-right",
-          "boost": "mdi:fire"
+          "boost": "mdi:fire",
+          "window": "mdi:window-open-variant"
         }
       }
     },

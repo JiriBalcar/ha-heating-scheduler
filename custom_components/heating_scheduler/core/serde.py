@@ -167,7 +167,18 @@ def room_to_dict(room: Room) -> JsonDict:
         "temperature_entity": room.temperature_entity,
         "area_id": room.area_id,
         "zone_id": room.zone_id,
+        "window_sensors": list(room.window_sensors),
+        "valve_window_sensors": list(room.valve_window_sensors),
+        "window_drop": room.window_drop,
     }
+
+
+def _entity_ids(data: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    """Parse an optional list of entity ids (window sensors were added after 2.2)."""
+    items = _opt(data, key, list) or []
+    if not all(isinstance(item, str) for item in items):
+        raise _invalid(f"{key} must be entity ids")
+    return tuple(items)
 
 
 def room_from_dict(data: Mapping[str, Any]) -> Room:
@@ -184,6 +195,9 @@ def room_from_dict(data: Mapping[str, Any]) -> Room:
         temperature_entity=_opt(data, "temperature_entity", str),
         area_id=_opt(data, "area_id", str),
         zone_id=_get(data, "zone_id", str),
+        window_sensors=_entity_ids(data, "window_sensors"),
+        valve_window_sensors=_entity_ids(data, "valve_window_sensors"),
+        window_drop=bool(_opt(data, "window_drop", bool)),
     )
 
 
@@ -268,7 +282,14 @@ def settings_to_dict(settings: Settings) -> JsonDict:
         "vacation_mode": settings.vacation_mode.value,
         "dry_run": settings.dry_run,
         "boost_minutes": _minutes(settings.boost),
+        "window_delay_seconds": int(settings.window_delay.total_seconds()),
+        "window_limit_minutes": _minutes(settings.window_limit),
     }
+
+
+def _opt_int(data: Mapping[str, Any], key: str, default: int) -> int:
+    value = _opt(data, key, int)
+    return default if value is None else int(value)
 
 
 def settings_from_dict(data: Mapping[str, Any]) -> Settings:
@@ -281,6 +302,9 @@ def settings_from_dict(data: Mapping[str, Any]) -> Settings:
         dry_run=_get(data, "dry_run", bool),
         # Added after 2.1; older stores use the default.
         boost=timedelta(minutes=_opt(data, "boost_minutes", int) or 60),
+        # Added after 2.2; older stores use the defaults.
+        window_delay=timedelta(seconds=_opt_int(data, "window_delay_seconds", 30)),
+        window_limit=timedelta(minutes=_opt_int(data, "window_limit_minutes", 60)),
     )
 
 

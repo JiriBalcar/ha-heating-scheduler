@@ -1,12 +1,13 @@
 """Resolve the target of a room at an instant.
 
 Precedence (highest wins):
-1. House mode OFF, VACATION or AWAY
-2. A boost: every room at its valves' maximum for a while. A boost starts only when every
+1. House mode OFF, VACATION, AWAY or FROST
+2. An open window: heating off, at Frost guard after the limit in the settings
+3. A boost: every room at its valves' maximum for a while. A boost starts only when every
    zone is Normal, and choosing another mode ends it; a planned holiday that starts during a
    boost still wins.
-3. Active manual change (override) of the room
-4. The room's plan
+4. Active manual change (override) of the room
+5. The room's plan
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from .model import (
     HouseMode,
     HouseState,
     Mode,
+    OpenWindow,
     Override,
     Plan,
     Reason,
@@ -63,6 +65,7 @@ def _target_at(
     temperatures: Mapping[Mode, float],
     override: Override | None,
     boost: RoomBoost | None = None,
+    window: OpenWindow | None = None,
 ) -> Target:
     house_mode = house.effective_mode(at)
     if house_mode is HouseMode.OFF:
@@ -75,6 +78,9 @@ def _target_at(
         return Target(TargetMode.AWAY, temperatures[Mode.AWAY], Source.HOUSE_AWAY)
     if house_mode is HouseMode.FROST:
         return Target(TargetMode.FROST, temperatures[Mode.FROST], Source.HOUSE_FROST)
+    if window is not None and window.since <= at:
+        temperature = temperatures[Mode.FROST] if window.limit <= at else None
+        return Target(TargetMode.WINDOW, temperature, Source.WINDOW)
     if boost is not None and at < boost.until:
         return Target(TargetMode.BOOST, boost.temperature, Source.BOOST)
     if override is not None and at < override.until:
@@ -90,6 +96,7 @@ def _candidates(
     timeline: PlanTimeline,
     override: Override | None,
     boost: RoomBoost | None = None,
+    window: OpenWindow | None = None,
 ) -> list[datetime]:
     """Return every instant in (now, now + HORIZON] where the target can change."""
     end = now + HORIZON
@@ -98,6 +105,8 @@ def _candidates(
         instants.add(override.until)
     if boost is not None:
         instants.add(boost.until)
+    if window is not None:
+        instants.update((window.since, window.limit))
     if house.vacation is not None:
         instants.add(house.vacation.start)
         if house.vacation.end is not None:
@@ -113,19 +122,21 @@ def resolve(
     override: Override | None,
     tz: tzinfo,
     boost: RoomBoost | None = None,
+    window: OpenWindow | None = None,
 ) -> RoomTarget:
     """Return the target of a room at `now`, when it changes, and what comes next.
 
     `temperatures` must hold every mode with a temperature (see `effective_temperatures`).
-    `valid_until` is None when nothing changes within `HORIZON`.
+    `valid_until` is None when nothing changes within `HORIZON`. An open `window` counts as
+    open from its `since` on; when it closes is not known, so it stays open in the forecast.
     """
     ensure_aware(now, "now")
     timeline = PlanTimeline(plan, tz, now)
-    current = _target_at(now, house, timeline, temperatures, override, boost)
+    current = _target_at(now, house, timeline, temperatures, override, boost, window)
     valid_until: datetime | None = None
     following: Target | None = None
-    for candidate in _candidates(now, house, timeline, override, boost):
-        target = _target_at(candidate, house, timeline, temperatures, override, boost)
+    for candidate in _candidates(now, house, timeline, override, boost, window):
+        target = _target_at(candidate, house, timeline, temperatures, override, boost, window)
         if target != current:
             valid_until = candidate
             following = target

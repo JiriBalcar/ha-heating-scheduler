@@ -30,6 +30,7 @@ MODE_NAMES: dict[str, dict[TargetMode, str]] = {
         TargetMode.OFF: "Vypnuto",
         TargetMode.MANUAL: "Ručně",
         TargetMode.BOOST: "Naplno",
+        TargetMode.WINDOW: "Otevřené okno",
     },
     "en": {
         TargetMode.COMFORT: "Warm",
@@ -40,6 +41,7 @@ MODE_NAMES: dict[str, dict[TargetMode, str]] = {
         TargetMode.OFF: "Off",
         TargetMode.MANUAL: "By hand",
         TargetMode.BOOST: "Boost",
+        TargetMode.WINDOW: "Window open",
     },
 }
 
@@ -60,6 +62,7 @@ _TEMPLATES: dict[str, dict[Source, tuple[str, str]]] = {
         Source.HOUSE_FROST: ("Dům: Proti mrazu", "Dům: Proti mrazu do {until}"),
         Source.HOUSE_OFF: ("Topení vypnuto", "Topení vypnuto do {until}"),
         Source.BOOST: ("Zatápí se naplno", "Zatápí se naplno do {until}"),
+        Source.WINDOW: ("Otevřené okno", "Otevřené okno: vypnuto do {until}"),
     },
     "en": {
         Source.PLAN: ("Schedule: {mode}", "Schedule: {mode} until {until}"),
@@ -69,6 +72,7 @@ _TEMPLATES: dict[str, dict[Source, tuple[str, str]]] = {
         Source.HOUSE_FROST: ("House: Frost guard", "House: Frost guard until {until}"),
         Source.HOUSE_OFF: ("Heating off", "Heating off until {until}"),
         Source.BOOST: ("Boost", "Boost until {until}"),
+        Source.WINDOW: ("Window open", "Window open: off until {until}"),
     },
 }
 

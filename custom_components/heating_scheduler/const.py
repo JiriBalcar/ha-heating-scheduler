@@ -37,6 +37,9 @@ WRITE_CONCURRENCY: Final = 2
 PENDING_GRACE: Final = timedelta(seconds=30)
 # Knob turns are collected this long before the value goes to the other TRVs of the room.
 KNOB_SETTLE: Final = timedelta(seconds=3)
+# A valve that detects an open window by itself may change its setpoint too, just before or
+# after it reports the window. Setpoint changes this close to such a report are not manual.
+VALVE_WINDOW_GRACE: Final = timedelta(seconds=10)
 
 # Stores.
 STATE_SAVE_DELAY: Final = 2

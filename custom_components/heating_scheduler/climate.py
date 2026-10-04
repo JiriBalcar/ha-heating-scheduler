@@ -184,7 +184,8 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return `status`: the room's state in words, as the panel's room tile shows it
-        ("Warm until 22:00 → Night 18.0 °C"), for a tile card's `state_content`."""
+        ("Warm until 22:00 → Night 18.0 °C"), for a tile card's `state_content`; and
+        `window_open`: a window of the room counts as open (heating off)."""
         room = self.room
         target = self.target
         if room is None or target is None:
@@ -193,6 +194,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         issues = engine.health.get(room.id, [])
         zone = engine.config.zone_of(room).name if len(engine.config.zones) > 1 else None
         return {
+            "window_open": room.id in engine.windows,
             "status": render_status(
                 target,
                 dt_util.utcnow(),
@@ -202,7 +204,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
                 issue=issues[0].kind.value if issues else None,
                 no_trvs=not room.trvs,
                 unit=self.hass.config.units.temperature_unit,
-            )
+            ),
         }
 
     # ----- actions -----

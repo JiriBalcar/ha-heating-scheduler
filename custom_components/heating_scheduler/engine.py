@@ -39,6 +39,7 @@ from .const import (
     SIGNAL_ROOMS_CHANGED,
     SIGNAL_UPDATE,
     SIGNAL_ZONES_CHANGED,
+    VALVE_WINDOW_GRACE,
     WRITE_CONCURRENCY,
 )
 from .core.config_ops import put_zone_house
@@ -49,6 +50,7 @@ from .core.model import (
     HouseMode,
     HouseState,
     Mode,
+    OpenWindow,
     Override,
     OverrideOrigin,
     Room,
@@ -63,6 +65,7 @@ from .core.resolve import next_plan_change, resolve, room_inputs
 from .core.schedule_ops import default_config
 from .core.text import DEFAULT_NAMES, language
 from .core.validation import SETTINGS_LIMITS, ValidationError, check_temperature, validate_config
+from .core.window import DropDetector, WindowSignals, is_open_state, window_open_at
 from .health import Issue
 from .log import EventLog, LogEntry, LogKind
 from .storage import HeatingStorage
@@ -91,6 +94,12 @@ class HeatingEngine:
         self.state = RuntimeState()
         self.targets: dict[str, RoomTarget] = {}
         self.health: dict[str, list[Issue]] = {}
+        # Rooms whose window counts as open now.
+        self.windows: dict[str, OpenWindow] = {}
+        # Window entity -> (room id, True for a valve's own detection).
+        self._window_entities: dict[str, tuple[str, bool]] = {}
+        self._drops: dict[str, DropDetector] = {}
+        self._valve_window_changed: dict[str, datetime] = {}
         self.workers: dict[str, TrvWorker] = {}
         self.log = EventLog(self._schedule_log_save)
         self.semaphore = asyncio.Semaphore(WRITE_CONCURRENCY)
@@ -270,6 +279,7 @@ class HeatingEngine:
         now = dt_util.utcnow()
         tz = dt_util.get_default_time_zone()
         self._housekeeping(now)
+        self._update_windows(now)
         targets: dict[str, RoomTarget] = {}
         for room in self.config.rooms.values():
             try:
@@ -293,7 +303,100 @@ class HeatingEngine:
         plan, temperatures = room_inputs(room, self.config.plans, self.config.temp_sets)
         house = self.config.zone_of(room).house
         override = self.state.overrides.get(room.id)
-        return resolve(now, house, plan, temperatures, override, tz, self._room_boost(room, now))
+        boost = self._room_boost(room, now)
+        window = self._window(room, now)
+        return resolve(now, house, plan, temperatures, override, tz, boost, window)
+
+    # ----- open windows -----
+
+    def _window(self, room: Room, now: datetime) -> OpenWindow | None:
+        """Return the open window of a room, also one that counts as open only after the delay
+        of its contact sensor; None while every signal of the room says closed."""
+        drop = self._drops.get(room.id)
+        signals = WindowSignals(
+            contact=self._open_since(room.window_sensors),
+            valve=self._open_since(room.valve_window_sensors),
+            drop=None if drop is None else drop.since(now),
+        )
+        settings = self.config.settings
+        since = window_open_at(signals, settings.window_delay)
+        return None if since is None else OpenWindow(since, since + settings.window_limit)
+
+    def _open_since(self, entity_ids: Iterable[str]) -> datetime | None:
+        """Return since when the earliest of the open entities is open, or None."""
+        changes = [
+            state.last_changed
+            for entity_id in entity_ids
+            if (state := self.hass.states.get(entity_id)) is not None and is_open_state(state.state)
+        ]
+        return min(changes, default=None)
+
+    def window_open(self, room: Room, now: datetime) -> bool:
+        """Return True if a room's window counts as open at `now`."""
+        window = self._window(room, now)
+        return window is not None and window.since <= now
+
+    def _update_windows(self, now: datetime) -> None:
+        """Remember which rooms have an open window, and log when it opens and closes."""
+        windows: dict[str, OpenWindow] = {}
+        for room in self.config.rooms.values():
+            window = self._window(room, now)
+            if window is not None and window.since <= now:
+                windows[room.id] = window
+        for room_id in windows.keys() - self.windows.keys():
+            self.log.add(room_id, LogEntry(now, LogKind.WINDOW_OPEN))
+        for room_id in self.windows.keys() - windows.keys():
+            if room_id in self.config.rooms:
+                self.log.add(room_id, LogEntry(now, LogKind.WINDOW_CLOSED))
+        self.windows = windows
+
+    def _feed_drop(self, room: Room, now: datetime) -> None:
+        """Give the room's temperature to its drop detector; reconcile if the window changed."""
+        detector = self._drops.get(room.id)
+        if detector is None:
+            return
+        temperature = self.room_temperature(room)
+        if temperature is None:
+            return
+        before = detector.since(now)
+        detector.add(now, temperature)
+        if detector.since(now) != before:
+            self.request_reconcile()
+
+    @callback
+    def _on_window_event(
+        self, room_id: str, valve: bool, event: Event[EventStateChangedData]
+    ) -> None:
+        """A window sensor changed: reconcile. A valve that detects an open window by itself
+        may have changed its setpoint just before: that is not a manual change."""
+        old_state = event.data["old_state"]
+        new_state = event.data["new_state"]
+        opened = is_open_state(None if new_state is None else new_state.state)
+        if opened == is_open_state(None if old_state is None else old_state.state):
+            return
+        now = dt_util.utcnow()
+        if valve:
+            self._valve_window_changed[room_id] = now
+            override = self.state.overrides.get(room_id)
+            if (
+                opened
+                and override is not None
+                and override.origin is OverrideOrigin.DEVICE
+                and now - override.created <= VALVE_WINDOW_GRACE
+            ):
+                self._set_override(room_id, None)
+                self.log.add(
+                    room_id,
+                    LogEntry(
+                        now,
+                        LogKind.OVERRIDE_CLEARED,
+                        value=override.temperature,
+                        detail="valve window",
+                    ),
+                )
+                if room_id in self._holds:
+                    self._release_hold(room_id)
+        self.request_reconcile()
 
     def _boost_end(self, room: Room, now: datetime, *, own: bool = True) -> datetime | None:
         """Return when the last boost that covers a room ends: the whole house's, its zone's,
@@ -415,6 +518,7 @@ class HeatingEngine:
         """Arm one timer at the earliest instant where any target can change."""
         candidates = [t.valid_until for t in self.targets.values() if t.valid_until is not None]
         candidates += [item.until for item in self.state.overrides.values()]
+        candidates += [end for drop in self._drops.values() if (end := drop.ends()) is not None]
         for zone in self.config.zones.values():
             vacation = zone.house.vacation
             if vacation is not None:
@@ -478,11 +582,21 @@ class HeatingEngine:
         if self._state_unsub is not None:
             self._state_unsub()
             self._state_unsub = None
-        tracked = set(self.workers)
+        rooms = self.config.rooms.values()
+        self._drops = {
+            room.id: self._drops.get(room.id) or DropDetector()
+            for room in rooms
+            if room.window_drop
+        }
+        self._window_entities = {
+            entity_id: (room.id, valve)
+            for room in rooms
+            for valve, sensors in ((False, room.window_sensors), (True, room.valve_window_sensors))
+            for entity_id in sensors
+        }
+        tracked = set(self.workers) | set(self._window_entities)
         tracked.update(
-            room.temperature_entity
-            for room in self.config.rooms.values()
-            if room.temperature_entity is not None
+            room.temperature_entity for room in rooms if room.temperature_entity is not None
         )
         if tracked:
             self._state_unsub = async_track_state_change_event(
@@ -494,12 +608,18 @@ class HeatingEngine:
         entity_id = event.data["entity_id"]
         old_state = event.data["old_state"]
         new_state = event.data["new_state"]
+        if (window := self._window_entities.get(entity_id)) is not None:
+            self._on_window_event(*window, event)
+            return
         worker = self.workers.get(entity_id)
+        now = dt_util.utcnow()
         if worker is None:
             # A display temperature entity: only the shown room temperature changed.
+            for room in self.config.rooms.values():
+                if room.temperature_entity == entity_id:
+                    self._feed_drop(room, now)
             self._notify_soon()
             return
-        now = dt_util.utcnow()
         old_value = worker.setpoint(old_state) if is_available(old_state) else None
         new_value = worker.setpoint(new_state) if is_available(new_state) else None
         change = classify_setpoint_change(
@@ -513,6 +633,8 @@ class HeatingEngine:
         worker.on_state_change(old_state, new_state)
         if _current(old_state) != _current(new_state):
             # The room temperature shown in the UI may use this TRV.
+            if (trv_room := self.config.rooms.get(worker.room_id)) is not None:
+                self._feed_drop(trv_room, now)
             self._notify_soon()
         if not self._started:
             return
@@ -539,8 +661,17 @@ class HeatingEngine:
         house = self.config.zone_of(room).house
         house_mode = house.effective_mode(now)
         boosting = self._boost_end(room, now) is not None
-        if house_mode is not HouseMode.AUTO or boosting:
-            # A boost or the zone's house mode wins: undo the change.
+        valve_window = self._valve_window_changed.get(room.id)
+        window = self.window_open(room, now) or (
+            valve_window is not None and now - valve_window <= VALVE_WINDOW_GRACE
+        )
+        if house_mode is not HouseMode.AUTO or window or boosting:
+            # The zone's house mode, an open window or a boost wins: undo the change. A valve
+            # that reacts to its own open-window detection is set back the same way.
+            if house_mode is not HouseMode.AUTO:
+                detail = f"house mode {house_mode.value}"
+            else:
+                detail = "window" if window else "boost"
             self.log.add(
                 room.id,
                 LogEntry(
@@ -548,7 +679,7 @@ class HeatingEngine:
                     LogKind.MANUAL_IGNORED,
                     entity_id=worker.entity_id,
                     value=value,
-                    detail="boost" if boosting else f"house mode {house_mode.value}",
+                    detail=detail,
                 ),
             )
             worker.reevaluate()
@@ -627,6 +758,7 @@ class HeatingEngine:
             self.state = replace(self.state, overrides=overrides)
             self._save_state()
             for room_id in removed:
+                self._valve_window_changed.pop(room_id, None)
                 self.log.remove_room(room_id)
                 cancel = self._holds.pop(room_id, None)
                 if cancel is not None:
@@ -680,6 +812,8 @@ class HeatingEngine:
             )
         if self._boost_end(room, now, own=False) is not None:
             raise ValidationError("boost_active", "a boost of the house or the zone is running")
+        if self.window_open(room, now):
+            raise ValidationError("window_open", "a window of the room is open")
         if temperature is not None:
             check_temperature(temperature)
         tz = dt_util.get_default_time_zone()

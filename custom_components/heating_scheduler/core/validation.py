@@ -30,6 +30,10 @@ from .model import (
 MAX_NAME_LENGTH = 60
 MAX_SLOTS_PER_DAY = 48
 MAX_TRVS_PER_ROOM = 10
+MAX_WINDOW_SENSORS = 10
+# Contact sensors may also be helpers; a valve's own detection can be a sensor with words.
+WINDOW_SENSOR_DOMAINS = ("binary_sensor", "input_boolean")
+VALVE_WINDOW_DOMAINS = ("binary_sensor", "sensor")
 
 _ID_PATTERN = re.compile(r"^[a-z0-9_]{1,40}$")
 _ENTITY_ID_PATTERN = re.compile(r"^(?P<domain>[a-z0-9_]+)\.[a-z0-9_]+$")
@@ -39,6 +43,8 @@ SETTINGS_LIMITS: Mapping[str, tuple[timedelta, timedelta]] = {
     "safety_interval": (timedelta(minutes=1), timedelta(minutes=60)),
     "mismatch_alert": (timedelta(minutes=5), timedelta(hours=24)),
     "boost": (timedelta(minutes=15), timedelta(hours=4)),
+    "window_delay": (timedelta(0), timedelta(minutes=10)),
+    "window_limit": (timedelta(minutes=15), timedelta(hours=24)),
 }
 
 
@@ -129,6 +135,17 @@ def validate_room(room: Room) -> None:
         check_entity_id(entity_id, ("climate",))
     if room.temperature_entity is not None:
         check_entity_id(room.temperature_entity, ("sensor", "climate", "input_number", "number"))
+    for sensors, domains in (
+        (room.window_sensors, WINDOW_SENSOR_DOMAINS),
+        (room.valve_window_sensors, VALVE_WINDOW_DOMAINS),
+    ):
+        if len(sensors) > MAX_WINDOW_SENSORS:
+            raise ValidationError("too_many_window_sensors", "too many window sensors in a room")
+        for entity_id in sensors:
+            check_entity_id(entity_id, domains)
+    windows = room.window_sensors + room.valve_window_sensors
+    if len(set(windows)) != len(windows):
+        raise ValidationError("duplicate_window_sensor", "a window sensor is listed twice")
 
 
 def validate_settings(settings: Settings) -> None:

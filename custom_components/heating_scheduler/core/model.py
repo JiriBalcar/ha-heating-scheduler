@@ -57,6 +57,7 @@ class TargetMode(StrEnum):
     OFF = "off"
     MANUAL = "manual"
     BOOST = "boost"
+    WINDOW = "window"
 
 
 class HouseMode(StrEnum):
@@ -90,6 +91,7 @@ class Source(StrEnum):
     HOUSE_FROST = "house_frost"
     HOUSE_OFF = "house_off"
     BOOST = "boost"
+    WINDOW = "window"
 
 
 class OverrideOrigin(StrEnum):
@@ -130,7 +132,11 @@ class TempSet:
 
 @dataclass(frozen=True, slots=True)
 class Room:
-    """A room: its TRVs and which plan and temperature set it uses."""
+    """A room: its TRVs and which plan and temperature set it uses.
+
+    Open windows: `window_sensors` are contact sensors, `valve_window_sensors` report the
+    valves' own open-window detection, `window_drop` detects a fast temperature drop.
+    """
 
     id: str
     name: str
@@ -140,6 +146,9 @@ class Room:
     temperature_entity: str | None = None
     area_id: str | None = None
     zone_id: str = HOUSE_ID
+    window_sensors: tuple[str, ...] = ()
+    valve_window_sensors: tuple[str, ...] = ()
+    window_drop: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,6 +241,14 @@ class RoomBoost:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenWindow:
+    """An open window in a room: heating off since `since`, at Frost guard from `limit`."""
+
+    since: datetime
+    limit: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Global settings."""
 
@@ -241,6 +258,9 @@ class Settings:
     vacation_mode: Mode = Mode.FROST
     dry_run: bool = False
     boost: timedelta = timedelta(hours=1)
+    # A contact sensor counts after `window_delay`; after `window_limit` open, Frost guard.
+    window_delay: timedelta = timedelta(seconds=30)
+    window_limit: timedelta = timedelta(hours=1)
 
 
 def _default_zones() -> dict[str, Zone]:
