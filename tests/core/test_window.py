@@ -34,6 +34,7 @@ from custom_components.heating_scheduler.core.validation import (
 )
 from custom_components.heating_scheduler.core.window import (
     DropDetector,
+    DropRules,
     WindowSignals,
     is_open_state,
     window_open_at,
@@ -112,6 +113,28 @@ def test_drop_detector_closes_after_the_hold() -> None:
     assert detector.since(NOON + timedelta(minutes=31)) is None
 
 
+def test_drop_detector_follows_its_rules() -> None:
+    rules = DropRules(degrees=0.5, period=timedelta(minutes=2), rise=1.0, hold=timedelta(hours=1))
+    detector = DropDetector(rules)
+    detector.add(NOON, 21.0)
+    detector.add(NOON + timedelta(minutes=3), 20.4)  # the first sample is too old
+    assert detector.since(NOON + timedelta(minutes=3)) is None
+    opened = NOON + timedelta(minutes=4)
+    detector.add(opened, 19.9)
+    assert detector.since(opened) == opened
+    detector.add(opened + timedelta(minutes=40), 20.8)  # less than 1.0 above the lowest
+    assert detector.since(opened + timedelta(minutes=40)) == opened
+    assert detector.ends() == opened + timedelta(hours=1)
+    settings = Settings(
+        window_drop_degrees=0.5,
+        window_drop_period=timedelta(minutes=2),
+        window_drop_rise=1.0,
+        window_drop_hold=timedelta(hours=1),
+    )
+    assert DropRules.of(settings) == rules
+    assert DropRules.of(Settings()) == DropRules()
+
+
 def test_open_window_turns_heating_off_until_the_limit_then_frost_guard() -> None:
     target = resolve(NOON, HouseState(), STANDARD, TEMPS, None, PRAGUE, window=window())
     assert target.mode is TargetMode.WINDOW
@@ -156,7 +179,14 @@ def test_room_and_settings_round_trip_and_old_stores() -> None:
     old = {key: value for key, value in room_to_dict(room).items() if "window" not in key}
     assert room_from_dict(old) == Room("living", "Living room", ("climate.trv",))
 
-    settings = Settings(window_delay=timedelta(seconds=90), window_limit=timedelta(hours=2))
+    settings = Settings(
+        window_delay=timedelta(seconds=90),
+        window_limit=timedelta(hours=2),
+        window_drop_degrees=1.5,
+        window_drop_period=timedelta(minutes=10),
+        window_drop_rise=0.5,
+        window_drop_hold=timedelta(minutes=45),
+    )
     assert settings_from_dict(settings_to_dict(settings)) == settings
     stored = {k: v for k, v in settings_to_dict(Settings()).items() if "window" not in k}
     assert settings_from_dict(stored) == Settings()
@@ -185,3 +215,13 @@ def test_validation_of_window_sensors_and_settings() -> None:
     assert err.value.code == "setting_range"
     with pytest.raises(ValidationError):
         validate_settings(Settings(window_delay=timedelta(minutes=11)))
+    for bad in (
+        Settings(window_drop_degrees=0.0),
+        Settings(window_drop_degrees=float("nan")),
+        Settings(window_drop_rise=5.0),
+        Settings(window_drop_period=timedelta(hours=2)),
+        Settings(window_drop_hold=timedelta(minutes=1)),
+    ):
+        with pytest.raises(ValidationError) as err:
+            validate_settings(bad)
+        assert err.value.code == "setting_range"

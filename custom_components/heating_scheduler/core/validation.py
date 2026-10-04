@@ -45,6 +45,13 @@ SETTINGS_LIMITS: Mapping[str, tuple[timedelta, timedelta]] = {
     "boost": (timedelta(minutes=15), timedelta(hours=4)),
     "window_delay": (timedelta(0), timedelta(minutes=10)),
     "window_limit": (timedelta(minutes=15), timedelta(hours=24)),
+    "window_drop_period": (timedelta(minutes=1), timedelta(minutes=60)),
+    "window_drop_hold": (timedelta(minutes=5), timedelta(hours=4)),
+}
+# Temperature differences in °C.
+DEGREE_LIMITS: Mapping[str, tuple[float, float]] = {
+    "window_drop_degrees": (0.2, 5.0),
+    "window_drop_rise": (0.1, 3.0),
 }
 
 
@@ -153,6 +160,10 @@ def validate_settings(settings: Settings) -> None:
     for name, (low, high) in SETTINGS_LIMITS.items():
         value: timedelta = getattr(settings, name)
         if not low <= value <= high:
+            raise ValidationError("setting_range", f"{name} is out of range", setting=name)
+    for name, (low_degrees, high_degrees) in DEGREE_LIMITS.items():
+        degrees: float = getattr(settings, name)
+        if not math.isfinite(degrees) or not low_degrees <= degrees <= high_degrees:
             raise ValidationError("setting_range", f"{name} is out of range", setting=name)
     if settings.vacation_mode not in VACATION_MODES:
         raise ValidationError("vacation_mode", "vacation uses frost or away")

@@ -168,6 +168,10 @@ export interface SettingsData {
   boost_minutes: number;
   window_delay_seconds: number;
   window_limit_minutes: number;
+  window_drop_degrees: number;
+  window_drop_minutes: number;
+  window_drop_rise: number;
+  window_drop_hold_minutes: number;
 }
 
 /** The house mode and holiday of a zone. */

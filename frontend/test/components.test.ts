@@ -70,6 +70,10 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
       boost_minutes: 60,
       window_delay_seconds: 30,
       window_limit_minutes: 60,
+      window_drop_degrees: 1,
+      window_drop_minutes: 5,
+      window_drop_rise: 0.3,
+      window_drop_hold_minutes: 30,
     },
     boost_until: null,
     plans: [PLAN],
@@ -197,6 +201,29 @@ describe("saving keeps edits made while waiting (F05)", () => {
     expect(sent[0].settings.max_override_minutes).toBe(240);
     expect(sent[0].settings.dry_run).toBe(true);
     expect(settings.dirty).toBe(true);
+  });
+
+  it("settings offer the open-window rules", async () => {
+    const sent: Any[] = [];
+    const hass = fakeHass(async (message) => {
+      sent.push(message);
+      return { revision: 2 };
+    });
+    const settings = document.createElement("hs-adv-settings") as Any;
+    settings.hass = hass;
+    settings.snapshot = snapshot(1);
+    document.body.appendChild(settings);
+    await settings.updateComplete;
+    const selects = [...settings.shadowRoot.querySelectorAll("ha-select")] as Any[];
+    const labels = selects.map((select) => select.options.map((option: Any) => option.label));
+    expect(labels).toContainEqual(["0.5 °C", "0.8 °C", "1.0 °C", "1.5 °C", "2.0 °C", "3.0 °C"]);
+    expect(labels).toContainEqual(["At once", "15 s", "30 s", "1 min", "2 min", "5 min", "10 min"]);
+    settings.set("window_drop_degrees", 1.5);
+    settings.set("window_drop_hold_minutes", 45);
+    await settings.save();
+    expect(sent[0].settings.window_drop_degrees).toBe(1.5);
+    expect(sent[0].settings.window_drop_hold_minutes).toBe(45);
+    expect(sent[0].settings.window_drop_minutes).toBe(5);
   });
 });
 

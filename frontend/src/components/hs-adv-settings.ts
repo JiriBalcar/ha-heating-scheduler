@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { formatDuration } from "../format";
+import { formatContext, formatDuration, formatNumber } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
 import { baseStyles } from "../styles";
@@ -18,6 +18,10 @@ const MISMATCH_MINUTES = [10, 20, 30, 60, 120, 240];
 const BOOST_MINUTES = [30, 60, 90, 120, 180, 240];
 const WINDOW_DELAY_SECONDS = [0, 15, 30, 60, 120, 300, 600];
 const WINDOW_LIMIT_MINUTES = [15, 30, 60, 120, 240, 480, 1440];
+const DROP_DEGREES = [0.5, 0.8, 1, 1.5, 2, 3];
+const DROP_MINUTES = [2, 3, 5, 10, 15, 30];
+const DROP_RISE = [0.2, 0.3, 0.5, 1];
+const DROP_HOLD_MINUTES = [10, 15, 30, 45, 60, 120];
 
 /** "At once", "30 s", "2 min". */
 function secondsLabel(seconds: number, t: Translate): string {
@@ -146,7 +150,7 @@ export class HsAdvSettings extends LitElement {
     heading: string,
     values: number[],
     current: number,
-    unit: "hours" | "minutes" | "duration" | "seconds",
+    unit: "hours" | "minutes" | "duration" | "seconds" | "degrees",
     onChange: (value: number) => void,
     description?: string,
   ) {
@@ -159,7 +163,9 @@ export class HsAdvSettings extends LitElement {
           ? formatDuration(value)
           : unit === "seconds"
             ? secondsLabel(value, t)
-            : t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
+            : unit === "degrees"
+              ? `${formatNumber(value, formatContext(this.hass, languageOf(this.hass)))} °C`
+              : t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
     }));
     return html`<ha-settings-row>
       <span slot="heading">${heading}</span>
@@ -207,6 +213,27 @@ export class HsAdvSettings extends LitElement {
         )}
         ${this.choice(t("adv.settings.window_limit"), WINDOW_LIMIT_MINUTES, draft.window_limit_minutes, "duration", (m) =>
           this.set("window_limit_minutes", m),
+        )}
+        ${this.choice(
+          t("adv.settings.window_drop_degrees"),
+          DROP_DEGREES,
+          draft.window_drop_degrees,
+          "degrees",
+          (d) => this.set("window_drop_degrees", d),
+          t("adv.settings.window_drop_hint"),
+        )}
+        ${this.choice(t("adv.settings.window_drop_minutes"), DROP_MINUTES, draft.window_drop_minutes, "minutes", (m) =>
+          this.set("window_drop_minutes", m),
+        )}
+        ${this.choice(t("adv.settings.window_drop_rise"), DROP_RISE, draft.window_drop_rise, "degrees", (d) =>
+          this.set("window_drop_rise", d),
+        )}
+        ${this.choice(
+          t("adv.settings.window_drop_hold"),
+          DROP_HOLD_MINUTES,
+          draft.window_drop_hold_minutes,
+          "duration",
+          (m) => this.set("window_drop_hold_minutes", m),
         )}
         <ha-settings-row>
           <span slot="heading">${t("adv.settings.vacation_mode")}</span>

@@ -65,7 +65,7 @@ from .core.resolve import next_plan_change, resolve, room_inputs
 from .core.schedule_ops import default_config
 from .core.text import DEFAULT_NAMES, language
 from .core.validation import SETTINGS_LIMITS, ValidationError, check_temperature, validate_config
-from .core.window import DropDetector, WindowSignals, is_open_state, window_open_at
+from .core.window import DropDetector, DropRules, WindowSignals, is_open_state, window_open_at
 from .health import Issue
 from .log import EventLog, LogEntry, LogKind
 from .storage import HeatingStorage
@@ -577,17 +577,25 @@ class HeatingEngine:
                 self.workers[entity_id] = TrvWorker(self, entity_id, room_id)
         self._rebuild_tracking()
 
+    def _sync_drops(self) -> None:
+        """Keep one drop detector per room that detects a temperature drop. New rules in the
+        settings start the detectors over."""
+        rules = DropRules.of(self.config.settings)
+        self._drops = {
+            room.id: drop
+            if (drop := self._drops.get(room.id)) is not None and drop.rules == rules
+            else DropDetector(rules)
+            for room in self.config.rooms.values()
+            if room.window_drop
+        }
+
     def _rebuild_tracking(self) -> None:
         """Follow the TRVs and the rooms' display temperature entities."""
         if self._state_unsub is not None:
             self._state_unsub()
             self._state_unsub = None
         rooms = self.config.rooms.values()
-        self._drops = {
-            room.id: self._drops.get(room.id) or DropDetector()
-            for room in rooms
-            if room.window_drop
-        }
+        self._sync_drops()
         self._window_entities = {
             entity_id: (room.id, valve)
             for room in rooms
@@ -774,6 +782,7 @@ class HeatingEngine:
         elif old.rooms != self.config.rooms:
             self._rebuild_tracking()
         self._apply_tick_interval()
+        self._sync_drops()
         if old.rooms != self.config.rooms:
             async_dispatcher_send(self.hass, SIGNAL_ROOMS_CHANGED)
         zone_names = {zone.id: zone.name for zone in self.config.zones.values()}

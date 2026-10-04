@@ -101,8 +101,11 @@ tests/core/  tests/ha/
   the app or a service are refused (`window_open`), a boost can start and heats after the window
   closes. The open-since instant is the `last_changed` of the sensors, so it is not stored: after
   a restart the delay and the limit count again. The drop detector (`DropDetector`) counts open
-  when the room temperature (the shown temperature) falls by 1 °C within 5 min, and closed when it
-  rises 0.3 °C above its lowest value since then, or after 30 min; its samples live in memory
+  when the room temperature (the shown temperature) falls by `window_drop_degrees` (default 1 °C,
+  0.2 to 5) within `window_drop_period` (default 5 min, 1 to 60 min), and closed when it rises
+  `window_drop_rise` (default 0.3 °C, 0.1 to 3) above its lowest value since then, or after
+  `window_drop_hold` (default 30 min, 5 min to 4 h). The rules are settings for the whole house
+  (user's request, 2026-10-04); new rules start the detectors over. Its samples live in memory
   only. A valve with its own detection may also change its setpoint, just before or after it
   reports the window: a manual change within 10 s of such a report is undone and not kept as an
   override (`VALVE_WINDOW_GRACE`). The candidates for the valves' detection are the binary sensors

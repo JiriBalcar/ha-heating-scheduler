@@ -1,4 +1,5 @@
 import { css, html, nothing } from "lit";
+import { formatContext, formatTemp } from "../format";
 import { showDialog } from "../ha";
 import { languageOf, translator, type TextKey } from "../i18n";
 import { roomPayload } from "../payload";
@@ -40,7 +41,6 @@ const LABELS: Record<keyof RoomForm, TextKey> = {
 const HELPERS: Partial<Record<keyof RoomForm, TextKey>> = {
   window_sensors: "adv.rooms.window_sensors_hint",
   valve_window_sensors: "adv.rooms.valve_window_sensors_hint",
-  window_drop: "adv.rooms.window_drop_hint",
 };
 
 // Window contact sensors: binary sensors of windows and doors, or helpers.
@@ -250,6 +250,14 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     const t = this.t;
     if (field.name === "temperature_entity") return `${t("adv.rooms.sensor_empty")} ${t("adv.rooms.sensor_hint")}`;
     if (field.name === "trvs" && this.args?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
+    if (field.name === "window_drop") {
+      const settings = this.snapshot.settings;
+      const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
+      return t("adv.rooms.window_drop_hint", {
+        degrees: formatTemp(settings.window_drop_degrees, ctx),
+        minutes: settings.window_drop_minutes,
+      });
+    }
     const hint = HELPERS[field.name as keyof RoomForm];
     return hint ? t(hint) : undefined;
   };

@@ -261,6 +261,13 @@ class Settings:
     # A contact sensor counts after `window_delay`; after `window_limit` open, Frost guard.
     window_delay: timedelta = timedelta(seconds=30)
     window_limit: timedelta = timedelta(hours=1)
+    # Temperature drop: open when the room falls `window_drop_degrees` within
+    # `window_drop_period`; closed when it rises `window_drop_rise` above its lowest value, or
+    # after `window_drop_hold`.
+    window_drop_degrees: float = 1.0
+    window_drop_period: timedelta = timedelta(minutes=5)
+    window_drop_rise: float = 0.3
+    window_drop_hold: timedelta = timedelta(minutes=30)
 
 
 def _default_zones() -> dict[str, Zone]:

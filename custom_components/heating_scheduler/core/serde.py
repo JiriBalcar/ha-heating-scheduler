@@ -284,12 +284,20 @@ def settings_to_dict(settings: Settings) -> JsonDict:
         "boost_minutes": _minutes(settings.boost),
         "window_delay_seconds": int(settings.window_delay.total_seconds()),
         "window_limit_minutes": _minutes(settings.window_limit),
+        "window_drop_degrees": settings.window_drop_degrees,
+        "window_drop_minutes": _minutes(settings.window_drop_period),
+        "window_drop_rise": settings.window_drop_rise,
+        "window_drop_hold_minutes": _minutes(settings.window_drop_hold),
     }
 
 
 def _opt_int(data: Mapping[str, Any], key: str, default: int) -> int:
     value = _opt(data, key, int)
     return default if value is None else int(value)
+
+
+def _opt_number(data: Mapping[str, Any], key: str, default: float) -> float:
+    return default if data.get(key) is None else _number(data, key)
 
 
 def settings_from_dict(data: Mapping[str, Any]) -> Settings:
@@ -305,6 +313,10 @@ def settings_from_dict(data: Mapping[str, Any]) -> Settings:
         # Added after 2.2; older stores use the defaults.
         window_delay=timedelta(seconds=_opt_int(data, "window_delay_seconds", 30)),
         window_limit=timedelta(minutes=_opt_int(data, "window_limit_minutes", 60)),
+        window_drop_degrees=_opt_number(data, "window_drop_degrees", 1.0),
+        window_drop_period=timedelta(minutes=_opt_int(data, "window_drop_minutes", 5)),
+        window_drop_rise=_opt_number(data, "window_drop_rise", 0.3),
+        window_drop_hold=timedelta(minutes=_opt_int(data, "window_drop_hold_minutes", 30)),
     )
 
 

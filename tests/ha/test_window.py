@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
@@ -12,6 +13,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
+from custom_components.heating_scheduler.core.config_ops import put_settings
 from custom_components.heating_scheduler.core.model import Config, HouseMode, Source, TargetMode
 from custom_components.heating_scheduler.core.validation import ValidationError
 from custom_components.heating_scheduler.log import LogKind
@@ -225,6 +227,30 @@ async def test_fast_temperature_drop_counts_as_an_open_window(
     await advance(hass, freezer, 30 * 60)
     assert engine.targets["living"].source is Source.PLAN
     assert first.mode == "heat" and first.setpoint == 21.0
+
+
+async def test_drop_rules_come_from_the_settings(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    unit = {"device_class": "temperature", "unit_of_measurement": "°C"}
+    hass.states.async_set(ROOM_TEMPERATURE, "21.0", unit)
+    store(hass_storage, with_living(temperature_entity=ROOM_TEMPERATURE, window_drop=True))
+    engine = engine_of(await setup_entry(hass))
+    settings = replace(
+        engine.config.settings, window_drop_degrees=0.5, window_drop_hold=timedelta(minutes=10)
+    )
+    await engine.async_apply_config(put_settings(engine.config, settings), None)
+    await settle(hass)
+    hass.states.async_set(ROOM_TEMPERATURE, "21.1", unit)
+    await advance(hass, freezer, 60)
+    hass.states.async_set(ROOM_TEMPERATURE, "20.6", unit)
+    await settle(hass)
+    assert engine.targets["living"].source is Source.WINDOW
+    await advance(hass, freezer, 10 * 60)
+    assert engine.targets["living"].source is Source.PLAN
 
 
 async def ws_client(

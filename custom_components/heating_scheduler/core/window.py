@@ -14,17 +14,11 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from .model import Settings
+
 # States of window entities that mean open. A binary sensor is "on" when open; valves report
 # their own detection also as a sensor with words (e.g. Danfoss Ally: "open", "external_open").
 OPEN_STATES = frozenset({"on", "open", "opened", "true", "detected", "external_open"})
-
-# Temperature drop: the room counts as open when its temperature falls by DROP_DEGREES within
-# DROP_PERIOD. It counts as closed again when the temperature rises DROP_RISE above the lowest
-# value since then, or after DROP_HOLD.
-DROP_DEGREES = 1.0
-DROP_PERIOD = timedelta(minutes=5)
-DROP_RISE = 0.3
-DROP_HOLD = timedelta(minutes=30)
 
 
 def is_open_state(state: str | None) -> bool:
@@ -58,21 +52,38 @@ def window_open_at(signals: WindowSignals, delay: timedelta) -> datetime | None:
     return min(instants, default=None)
 
 
+@dataclass(frozen=True, slots=True)
+class DropRules:
+    """The room counts as open when its temperature falls by `degrees` within `period`. It
+    counts as closed again when the temperature rises `rise` above the lowest value since then,
+    or after `hold`."""
+
+    degrees: float = 1.0
+    period: timedelta = timedelta(minutes=5)
+    rise: float = 0.3
+    hold: timedelta = timedelta(minutes=30)
+
+    @classmethod
+    def of(cls, settings: Settings) -> DropRules:
+        """Return the rules in the settings."""
+        return cls(
+            settings.window_drop_degrees,
+            settings.window_drop_period,
+            settings.window_drop_rise,
+            settings.window_drop_hold,
+        )
+
+
 class DropDetector:
     """Detects an open window from a fast drop of the room temperature."""
 
-    def __init__(
-        self,
-        degrees: float = DROP_DEGREES,
-        period: timedelta = DROP_PERIOD,
-        rise: float = DROP_RISE,
-        hold: timedelta = DROP_HOLD,
-    ) -> None:
+    def __init__(self, rules: DropRules | None = None) -> None:
         """Create a detector with no samples."""
-        self._degrees = degrees
-        self._period = period
-        self._rise = rise
-        self._hold = hold
+        self.rules = rules = rules or DropRules()
+        self._degrees = rules.degrees
+        self._period = rules.period
+        self._rise = rules.rise
+        self._hold = rules.hold
         self._samples: deque[tuple[datetime, float]] = deque()
         self._since: datetime | None = None
         self._lowest = 0.0
