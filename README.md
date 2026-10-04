@@ -19,6 +19,9 @@ for phones and tablets, and a Lovelace card.
 - **Boost**: one tap heats every room, one zone or one room at its valves' maximum for a set
   time (default 1 h), for example when you come back from a holiday.
 - Manual changes on the valve knob or in the app last until the next change of the plan.
+- **Open window**: while a room's window is open, its valves are off. The integration knows
+  from window contact sensors, from valves that detect an open window by themselves, or from a
+  fast drop of the room temperature. A window left open for long (default 1 h) gets Frost guard.
 - The integration **reconciles** instead of firing actions at fixed times: after a restart,
   a missed timer or a valve that was offline for hours, every valve gets the right value.
 - Writes are verified and retried; our own confirmations are never taken for manual changes.
@@ -56,6 +59,11 @@ Home Assistant.
 3. **Advanced → Rooms → Add rooms from areas** creates one room per Home Assistant area that
    has valves. You can also add rooms by hand and pick their valves.
 4. Optional: choose a **Temperature shown** sensor per room. It is used only for display.
+   Optional: choose the room's **Window sensors**, the **Open window detected by the valves**
+   entities (for valves that report their own detection), or turn on **Detect an open window when
+   the room temperature drops fast** (1 °C within 5 minutes, for rooms without sensors).
+   **Advanced → Settings** has how long a contact sensor must be open (default 30 s) and when an
+   open window gets Frost guard (default 1 h).
 5. **Plans**: change the house plan, or give some rooms their own plan.
 6. **Temperatures**: the house temperatures, and own sets for rooms that need
    other values (for example a warmer bathroom).
@@ -77,6 +85,9 @@ test mode off.
   (`external_temperature_input`). This integration does not touch it.
 - Keep the valve's frost protection temperature below the **Frost guard** temperature.
 - Enable Zigbee2MQTT **availability** so that offline valves are reported.
+- The TRVZB's own open-window detection (`open_window`) is only a switch that turns it on;
+  Zigbee2MQTT does not report a detected window. For these valves, use window sensors or the
+  temperature drop.
 
 ## Návod pro každý den (česky)
 
@@ -124,6 +135,10 @@ v **Rozšířené → Nastavení**. Jen jednu místnost zatopíte naplno předvo
 termostatu, jen jedno patro jeho vypínačem **Zatopit naplno** (například v dlaždici na
 nástěnce).
 
+**Otevřené okno.** Když je v místnosti otevřené okno, hlavice se vypnou a dlaždice má modrou
+ikonu okna a text **Otevřené okno**. Po zavření okna se topení samo vrátí. Je-li okno otevřené
+dlouho (obvykle 1 hodinu), místnost se drží proti mrazu.
+
 **Problém s hlavicí**: na ikoně místnosti je oranžový vykřičník, pod názvem místnosti je
 napsané, co se děje (například „Hlavice neodpovídá“), a nahoře se ukáže upozornění.
 Klepněte na ikonu, uvidíte vysvětlení. Nejčastěji jde o vybité baterie.
@@ -161,6 +176,9 @@ stránky), například na 125 %. Zvětší se celá aplikace.
   switches Away, Holiday, Frost guard and Off to Normal. During a boost, room temperatures are fixed.
   **Stop** ends it early. One room boosts with its thermostat's preset **Boost**, one zone
   with its **Boost** switch (for example in a tile on a dashboard).
+- **Open window**: the room's valves are off, and the tile shows a blue window icon and
+  **Window open**. When the window is closed, the heating comes back by itself. A window open
+  for long (default 1 h) gets Frost guard. While a window is open, room temperatures are fixed.
 - A **valve problem** shows as an orange exclamation mark on the room's icon, in words under
   the room's name ("A valve does not respond"), and in an alert above the tiles; tap the icon
   for an explanation.
@@ -174,11 +192,14 @@ For every room the integration computes the target with a pure function:
 
 1. The mode of the room's zone wins: **Off**, **Frost guard**, **Holiday** or **Away**.
    Without zones, the whole house is one zone.
-2. Otherwise a **boost** wins: every room at the highest temperature its valves allow, until
+2. Otherwise an **open window** wins: the valves are off, and at Frost guard after the limit
+   (default 1 h). A contact sensor counts after 30 s; the valves' own detection and a fast
+   temperature drop count at once.
+3. Otherwise a **boost** wins: every room at the highest temperature its valves allow, until
    the boost ends.
-3. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
+4. Otherwise a **manual change** (from a valve knob, the app, a service or voice) wins until
    the next change of the plan, and at most the longest manual change (default 4 h).
-4. Otherwise the room's **plan** decides, with the room's temperatures.
+5. Otherwise the room's **plan** decides, with the room's temperatures.
 
 It then brings every valve to that value. It recomputes on start, at the next change of
 any room, on every change of settings, every 5 minutes, and when a valve comes back online.
