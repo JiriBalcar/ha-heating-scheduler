@@ -13,6 +13,9 @@ export function roomPayload(room: RoomData, patch: Partial<RoomData> = {}) {
     temperature_entity: merged.temperature_entity,
     area_id: merged.area_id,
     zone_id: merged.zone_id,
+    window_sensors: merged.window_sensors,
+    valve_window_sensors: merged.valve_window_sensors,
+    window_drop: merged.window_drop,
   };
 }
 

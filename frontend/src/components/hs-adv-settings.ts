@@ -16,6 +16,15 @@ function same(a: SettingsData, b: SettingsData): boolean {
 const SAFETY_MINUTES = [1, 2, 5, 10, 15, 30, 60];
 const MISMATCH_MINUTES = [10, 20, 30, 60, 120, 240];
 const BOOST_MINUTES = [30, 60, 90, 120, 180, 240];
+const WINDOW_DELAY_SECONDS = [0, 15, 30, 60, 120, 300, 600];
+const WINDOW_LIMIT_MINUTES = [15, 30, 60, 120, 240, 480, 1440];
+
+/** "At once", "30 s", "2 min". */
+function secondsLabel(seconds: number, t: Translate): string {
+  if (seconds === 0) return t("adv.settings.at_once");
+  if (seconds % 60 === 0) return t("adv.settings.minutes", { n: seconds / 60 });
+  return t("adv.settings.seconds", { n: seconds });
+}
 
 /** Global settings. */
 export class HsAdvSettings extends LitElement {
@@ -137,7 +146,7 @@ export class HsAdvSettings extends LitElement {
     heading: string,
     values: number[],
     current: number,
-    unit: "hours" | "minutes" | "duration",
+    unit: "hours" | "minutes" | "duration" | "seconds",
     onChange: (value: number) => void,
     description?: string,
   ) {
@@ -148,7 +157,9 @@ export class HsAdvSettings extends LitElement {
       label:
         unit === "duration"
           ? formatDuration(value)
-          : t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
+          : unit === "seconds"
+            ? secondsLabel(value, t)
+            : t(unit === "hours" ? "adv.settings.hours" : "adv.settings.minutes", { n: value }),
     }));
     return html`<ha-settings-row>
       <span slot="heading">${heading}</span>
@@ -185,6 +196,17 @@ export class HsAdvSettings extends LitElement {
         )}
         ${this.choice(t("adv.settings.boost"), BOOST_MINUTES, draft.boost_minutes, "duration", (m) =>
           this.set("boost_minutes", m),
+        )}
+        ${this.choice(
+          t("adv.settings.window_delay"),
+          WINDOW_DELAY_SECONDS,
+          draft.window_delay_seconds,
+          "seconds",
+          (s) => this.set("window_delay_seconds", s),
+          t("adv.settings.window_delay_hint"),
+        )}
+        ${this.choice(t("adv.settings.window_limit"), WINDOW_LIMIT_MINUTES, draft.window_limit_minutes, "duration", (m) =>
+          this.set("window_limit_minutes", m),
         )}
         <ha-settings-row>
           <span slot="heading">${t("adv.settings.vacation_mode")}</span>

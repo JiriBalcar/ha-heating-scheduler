@@ -53,9 +53,17 @@ export interface CardConfig {
 }
 
 export type Mode = "comfort" | "eco" | "night" | "away" | "frost" | "off";
-export type TargetMode = Mode | "manual" | "boost";
+export type TargetMode = Mode | "manual" | "boost" | "window";
 export type HouseMode = "auto" | "away" | "vacation" | "frost" | "off";
-export type Source = "plan" | "manual" | "house_away" | "vacation" | "house_frost" | "house_off" | "boost";
+export type Source =
+  | "plan"
+  | "manual"
+  | "house_away"
+  | "vacation"
+  | "house_frost"
+  | "house_off"
+  | "boost"
+  | "window";
 
 export const MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost", "off"];
 export const TEMPERATURE_MODES: readonly Mode[] = ["comfort", "eco", "night", "away", "frost"];
@@ -127,9 +135,17 @@ export interface RoomData {
   temperature_entity: string | null;
   area_id: string | null;
   zone_id: string;
+  /** Contact sensors of the room's windows. */
+  window_sensors: string[];
+  /** Entities that report the valves' own open-window detection. */
+  valve_window_sensors: string[];
+  /** Detect an open window from a fast drop of the room temperature. */
+  window_drop: boolean;
   current_temperature: number | null;
   target: TargetData | null;
   override: OverrideData | null;
+  /** While a window counts as open: since when, and when Frost guard starts. */
+  window: { since: string; limit: string } | null;
   issues: IssueData[];
   trv_status: TrvStatus[];
 }
@@ -150,6 +166,8 @@ export interface SettingsData {
   vacation_mode: "frost" | "away";
   dry_run: boolean;
   boost_minutes: number;
+  window_delay_seconds: number;
+  window_limit_minutes: number;
 }
 
 /** The house mode and holiday of a zone. */
@@ -202,6 +220,7 @@ export interface Candidates {
     area_id: string | null;
     unit: string | null;
   }[];
+  valve_window_entities: { entity_id: string; name: string }[];
   areas: { area_id: string; name: string; climates: string[]; temperature_entity: string | null }[];
   floors: { floor_id: string; name: string; rooms: string[] }[];
 }

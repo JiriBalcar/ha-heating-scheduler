@@ -12,6 +12,7 @@ import {
   mdiSnowflake,
   mdiWeatherNight,
   mdiWhiteBalanceSunny,
+  mdiWindowOpenVariant,
 } from "@mdi/js";
 import type { HouseMode, Mode, Snapshot, TargetMode, RoomData } from "./types";
 
@@ -24,6 +25,7 @@ export const MODE_COLORS: Record<TargetMode, string> = {
   off: "var(--grey-color, #9e9e9e)",
   manual: "var(--purple-color, #9c27b0)",
   boost: "var(--red-color, #f44336)",
+  window: "var(--blue-color, #2196f3)",
 };
 
 export const MODE_ICONS: Record<TargetMode, string> = {
@@ -35,6 +37,7 @@ export const MODE_ICONS: Record<TargetMode, string> = {
   off: mdiRadiatorOff,
   manual: mdiHandBackRight,
   boost: mdiFire,
+  window: mdiWindowOpenVariant,
 };
 
 export const HOUSE_COLORS: Record<HouseMode, string> = {

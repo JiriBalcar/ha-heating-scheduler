@@ -18,9 +18,13 @@ describe("payload helpers", () => {
       temperature_entity: null,
       area_id: "obyvak",
       zone_id: "house",
+      window_sensors: ["binary_sensor.okno"],
+      valve_window_sensors: [],
+      window_drop: true,
       current_temperature: 20,
       target: null,
       override: null,
+      window: null,
       issues: [],
       trv_status: [],
     } as RoomData;
@@ -33,6 +37,9 @@ describe("payload helpers", () => {
       temperature_entity: null,
       area_id: "obyvak",
       zone_id: "house",
+      window_sensors: ["binary_sensor.okno"],
+      valve_window_sensors: [],
+      window_drop: true,
     });
   });
 });

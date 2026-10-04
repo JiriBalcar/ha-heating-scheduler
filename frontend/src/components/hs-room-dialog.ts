@@ -20,6 +20,9 @@ interface RoomForm {
   plan_id: string;
   temp_set_id: string;
   zone_id: string;
+  window_sensors: string[];
+  valve_window_sensors: string[];
+  window_drop: boolean;
 }
 
 const LABELS: Record<keyof RoomForm, TextKey> = {
@@ -29,7 +32,22 @@ const LABELS: Record<keyof RoomForm, TextKey> = {
   plan_id: "adv.rooms.plan",
   temp_set_id: "adv.rooms.temp_set",
   zone_id: "adv.rooms.zone",
+  window_sensors: "adv.rooms.window_sensors",
+  valve_window_sensors: "adv.rooms.valve_window_sensors",
+  window_drop: "adv.rooms.window_drop",
 };
+
+const HELPERS: Partial<Record<keyof RoomForm, TextKey>> = {
+  window_sensors: "adv.rooms.window_sensors_hint",
+  valve_window_sensors: "adv.rooms.valve_window_sensors_hint",
+  window_drop: "adv.rooms.window_drop_hint",
+};
+
+// Window contact sensors: binary sensors of windows and doors, or helpers.
+const WINDOW_FILTER = [
+  { domain: "binary_sensor", device_class: ["window", "door", "opening", "garage_door"] },
+  { domain: "input_boolean" },
+];
 
 /** Create or change a room: name, valves, shown temperature, plan, temperatures. */
 export class HsRoomDialog extends HsHaDialog<RoomParams> {
@@ -80,6 +98,9 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       plan_id: room?.plan_id ?? "house",
       temp_set_id: room?.temp_set_id ?? "house",
       zone_id: room?.zone_id ?? this.snapshot.zones[0]?.id ?? "house",
+      window_sensors: [...(room?.window_sensors ?? [])],
+      valve_window_sensors: [...(room?.valve_window_sensors ?? [])],
+      window_drop: room?.window_drop ?? false,
     };
     this.error = "";
     this.saving = false;
@@ -94,7 +115,18 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     if (!this.room) return null;
     const current = this.snapshot.rooms.find((room) => room.id === this.room!.id);
     if (!current) return null;
-    const fields = ["name", "trvs", "plan_id", "temp_set_id", "temperature_entity", "area_id", "zone_id"] as const;
+    const fields = [
+      "name",
+      "trvs",
+      "plan_id",
+      "temp_set_id",
+      "temperature_entity",
+      "area_id",
+      "zone_id",
+      "window_sensors",
+      "valve_window_sensors",
+      "window_drop",
+    ] as const;
     const same = fields.every((field) => JSON.stringify(current[field]) === JSON.stringify(this.room![field]));
     return same ? null : current;
   }
@@ -121,9 +153,13 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       temperature_entity: null,
       area_id: null,
       zone_id: this.data.zone_id,
+      window_sensors: [],
+      valve_window_sensors: [],
+      window_drop: false,
       current_temperature: null,
       target: null,
       override: null,
+      window: null,
       issues: [],
       trv_status: [],
     };
@@ -134,6 +170,9 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       plan_id: this.data.plan_id,
       temp_set_id: this.data.temp_set_id,
       zone_id: this.data.zone_id,
+      window_sensors: this.data.window_sensors,
+      valve_window_sensors: this.data.valve_window_sensors,
+      window_drop: this.data.window_drop,
     });
     try {
       await storeFor(this.hass).call("room/save", {
@@ -157,6 +196,11 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       ...candidates.temperature_entities.map((sensor) => sensor.entity_id),
       ...candidates.climates.map((climate) => climate.entity_id),
     ];
+    // The valves' own detection: their window entities if Home Assistant knows any.
+    const valveWindows = candidates.valve_window_entities.map((entity) => entity.entity_id);
+    const valveSelector = valveWindows.length
+      ? { entity: { multiple: true, include_entities: [...new Set([...valveWindows, ...this.data.valve_window_sensors])] } }
+      : { entity: { multiple: true, filter: [{ domain: "binary_sensor" }, { domain: "sensor" }] } };
     const zones =
       this.snapshot.zones.length > 1
         ? [
@@ -194,6 +238,9 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
           },
         },
       },
+      { name: "window_sensors", selector: { entity: { multiple: true, filter: WINDOW_FILTER } } },
+      { name: "valve_window_sensors", selector: valveSelector },
+      { name: "window_drop", selector: { boolean: {} } },
     ];
   }
 
@@ -203,7 +250,8 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     const t = this.t;
     if (field.name === "temperature_entity") return `${t("adv.rooms.sensor_empty")} ${t("adv.rooms.sensor_hint")}`;
     if (field.name === "trvs" && this.args?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
-    return undefined;
+    const hint = HELPERS[field.name as keyof RoomForm];
+    return hint ? t(hint) : undefined;
   };
 
   override render() {

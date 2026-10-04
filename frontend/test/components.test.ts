@@ -68,6 +68,8 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
       vacation_mode: "frost",
       dry_run: false,
       boost_minutes: 60,
+      window_delay_seconds: 30,
+      window_limit_minutes: 60,
     },
     boost_until: null,
     plans: [PLAN],
@@ -226,7 +228,13 @@ describe("room dialog (F07)", () => {
       return { room_id: "room_new", revision: 3 };
     });
     installDialogManager(hass);
-    const candidates: Candidates = { climates: [], temperature_entities: [], areas: [], floors: [] };
+    const candidates: Candidates = {
+      climates: [],
+      temperature_entities: [],
+      valve_window_entities: [],
+      areas: [],
+      floors: [],
+    };
     openRoomDialog(document.body, snapshot(1), candidates, null);
     const dialog = await shownDialog("hs-room-dialog");
     dialog.data = { ...dialog.data, name: "New room" };
@@ -254,9 +262,13 @@ const BEDROOM: RoomData = {
   temperature_entity: null,
   area_id: null,
   zone_id: "up",
+  window_sensors: [],
+  valve_window_sensors: [],
+  window_drop: false,
   current_temperature: 19,
   target: { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null },
   override: null,
+  window: null,
   issues: [],
   trv_status: [],
 };
@@ -301,6 +313,22 @@ describe("zones on the overview", () => {
     const upstairs: ZoneData = { ...ZONES[1]!, house: replaced, modes: ["auto", "away", "frost", "off"], replacements: { vacation: "frost" } };
     const data = snapshot(1, { zones: [ZONES[0]!, upstairs], rooms: [BEDROOM] });
     expect(await secondary("hs-house-card", { snapshot: data, zone: upstairs })).toBe("Frost guard for the holiday");
+  });
+});
+
+describe("open window on a room tile", () => {
+  it("shows the window and offers no − / +", async () => {
+    const zones = [{ ...ZONES[0]!, rooms: ["kitchen"] }];
+    const open: RoomData = {
+      ...KITCHEN,
+      window_sensors: ["binary_sensor.kitchen_window"],
+      target: { mode: "window", temperature: 7, source: "window", valid_until: null, next: null },
+      window: { since: "2026-10-05T09:00:00Z", limit: "2026-10-05T10:00:00Z" },
+    };
+    const card = await mount("hs-room-card", { snapshot: snapshot(1, { zones, rooms: [open] }), room: open });
+    expect(text(card.shadowRoot, '[slot="secondary"]')).toBe("19.0 °C · Window open");
+    expect(card.shadowRoot.querySelector("ha-tile-icon").title).toBe("Window open");
+    expect(card.shadowRoot.querySelector("ha-control-number-buttons").disabled).toBe(true);
   });
 });
 

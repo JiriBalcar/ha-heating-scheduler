@@ -214,6 +214,8 @@ export function reasonText(
           ? t("reason.zone_frost", { zone })
           : t(`reason.${target.source}`);
   if (!target.valid_until) return base;
+  // An open window: "Window open: off until 13:00" (then Frost guard).
+  if (target.source === "window") return t("reason.window_until", { until: formatUntil(target.valid_until, now, ctx) });
   // A holiday end is always shown with its date: "until 12:00" alone is ambiguous there.
   const until =
     target.source === "vacation"
