@@ -13,8 +13,21 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import math
 
-from .model import Settings
+from .model import Settings, WindowSignals
+
+__all__ = [
+    "DropDetector",
+    "DropRules",
+    "WindowSignals",
+    "is_open_state",
+    "merge_signal",
+    "window_open_at",
+]
+
+# States that say nothing about the window: Home Assistant is starting, or the sensor is offline.
+UNKNOWN_STATES = frozenset({"unavailable", "unknown"})
 
 # States of window entities that mean open. A binary sensor is "on" when open; valves report
 # their own detection also as a sensor with words (e.g. Danfoss Ally: "open", "external_open").
@@ -26,13 +39,24 @@ def is_open_state(state: str | None) -> bool:
     return state is not None and state.strip().lower() in OPEN_STATES
 
 
-@dataclass(frozen=True, slots=True)
-class WindowSignals:
-    """Since when each signal of a room says open; None while it says closed."""
+def merge_signal(
+    stored: datetime | None, states: list[tuple[str | None, datetime]]
+) -> tuple[datetime | None, datetime | None]:
+    """Combine the stored open-since instant of a signal with the states of its entities.
 
-    contact: datetime | None = None
-    valve: datetime | None = None
-    drop: datetime | None = None
+    `states` holds (state, last_changed) of each entity; a missing entity has state None.
+    Returns (since when the signal says open now, what to store). Open: since the stored instant
+    or the earliest `last_changed` of an open entity, whichever is earlier; a restart or an
+    entity that was offline does not start the delay and the limit again. Closed (every entity
+    known and none open): nothing. Not known (an entity is missing or offline, none open): not
+    open now, but the stored instant is kept until the entities say closed.
+    """
+    opened = [changed for state, changed in states if is_open_state(state)]
+    if opened:
+        since = min(opened) if stored is None else min(stored, *opened)
+        return since, since
+    known = all(state is not None and state not in UNKNOWN_STATES for state, _ in states)
+    return None, None if known else stored
 
 
 def window_open_at(signals: WindowSignals, delay: timedelta) -> datetime | None:
@@ -104,6 +128,14 @@ class DropDetector:
         if highest - temperature >= self._degrees:
             self._since = at
             self._lowest = temperature
+            self._samples.clear()
+
+    def restore(self, since: datetime) -> None:
+        """Count as open since `since`, as stored before a restart; the lowest temperature is
+        not known, so the first sample after it becomes the lowest."""
+        if self._since is None:
+            self._since = since
+            self._lowest = math.inf
             self._samples.clear()
 
     def since(self, now: datetime) -> datetime | None:

@@ -65,7 +65,14 @@ from .core.resolve import next_plan_change, resolve, room_inputs
 from .core.schedule_ops import default_config
 from .core.text import DEFAULT_NAMES, language
 from .core.validation import SETTINGS_LIMITS, ValidationError, check_temperature, validate_config
-from .core.window import DropDetector, DropRules, WindowSignals, is_open_state, window_open_at
+from .core.window import (
+    DropDetector,
+    DropRules,
+    WindowSignals,
+    is_open_state,
+    merge_signal,
+    window_open_at,
+)
 from .health import Issue
 from .log import EventLog, LogEntry, LogKind
 from .storage import HeatingStorage
@@ -150,18 +157,24 @@ class HeatingEngine:
         room_boosts = {
             key: end for key, end in stored.room_boosts.items() if key in config.rooms and end > now
         }
-        self.state = RuntimeState(overrides, house_modes, boost, zone_boosts, room_boosts)
+        # Open windows keep their times; whether they are still open, the sensors tell.
+        windows = {key: item for key, item in stored.windows.items() if key in config.rooms}
+        self.state = RuntimeState(overrides, house_modes, boost, zone_boosts, room_boosts, windows)
         if (
             overrides != dict(stored.overrides)
             or boost != stored.boost_until
             or zone_boosts != dict(stored.zone_boosts)
             or room_boosts != dict(stored.room_boosts)
+            or windows != dict(stored.windows)
         ):
             # Overrides and boosts that ended while Home Assistant was down are dropped.
             await self.storage.async_save_state(self.state)
 
         self.log.load(await self.storage.async_load_log())
         self._rebuild_workers()
+        for room_id, signals in windows.items():
+            if signals.drop is not None and (drop := self._drops.get(room_id)) is not None:
+                drop.restore(signals.drop)
         self._apply_tick_interval()
         self._unsubs.append(
             self.hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, self._on_core_config_update)
@@ -309,27 +322,35 @@ class HeatingEngine:
 
     # ----- open windows -----
 
+    def _signals(self, room: Room, now: datetime) -> tuple[WindowSignals, WindowSignals]:
+        """Return since when each signal of a room says open now, and what to store for it.
+
+        A stored instant is kept while a sensor is offline or Home Assistant is starting, so a
+        restart does not start the delay and the limit again.
+        """
+        stored = self.state.windows.get(room.id, WindowSignals())
+        contact, contact_kept = merge_signal(stored.contact, self._states(room.window_sensors))
+        valve, valve_kept = merge_signal(stored.valve, self._states(room.valve_window_sensors))
+        drop_detector = self._drops.get(room.id)
+        drop = None if drop_detector is None else drop_detector.since(now)
+        return WindowSignals(contact, valve, drop), WindowSignals(contact_kept, valve_kept, drop)
+
+    def _states(self, entity_ids: Iterable[str]) -> list[tuple[str | None, datetime]]:
+        """Return (state, last_changed) of entities; a missing entity has state None."""
+        now = dt_util.utcnow()
+        return [
+            (None, now) if state is None else (state.state, state.last_changed)
+            for entity_id in entity_ids
+            for state in (self.hass.states.get(entity_id),)
+        ]
+
     def _window(self, room: Room, now: datetime) -> OpenWindow | None:
         """Return the open window of a room, also one that counts as open only after the delay
         of its contact sensor; None while every signal of the room says closed."""
-        drop = self._drops.get(room.id)
-        signals = WindowSignals(
-            contact=self._open_since(room.window_sensors),
-            valve=self._open_since(room.valve_window_sensors),
-            drop=None if drop is None else drop.since(now),
-        )
+        signals, _ = self._signals(room, now)
         settings = self.config.settings
         since = window_open_at(signals, settings.window_delay)
         return None if since is None else OpenWindow(since, since + settings.window_limit)
-
-    def _open_since(self, entity_ids: Iterable[str]) -> datetime | None:
-        """Return since when the earliest of the open entities is open, or None."""
-        changes = [
-            state.last_changed
-            for entity_id in entity_ids
-            if (state := self.hass.states.get(entity_id)) is not None and is_open_state(state.state)
-        ]
-        return min(changes, default=None)
 
     def window_open(self, room: Room, now: datetime) -> bool:
         """Return True if a room's window counts as open at `now`."""
@@ -337,12 +358,20 @@ class HeatingEngine:
         return window is not None and window.since <= now
 
     def _update_windows(self, now: datetime) -> None:
-        """Remember which rooms have an open window, and log when it opens and closes."""
+        """Remember which rooms have an open window, store since when, and log when it opens
+        and closes."""
         windows: dict[str, OpenWindow] = {}
+        stored: dict[str, WindowSignals] = {}
         for room in self.config.rooms.values():
+            _, kept = self._signals(room, now)
+            if kept != WindowSignals():
+                stored[room.id] = kept
             window = self._window(room, now)
             if window is not None and window.since <= now:
                 windows[room.id] = window
+        if stored != dict(self.state.windows):
+            self.state = replace(self.state, windows=stored)
+            self._save_state()
         for room_id in windows.keys() - self.windows.keys():
             self.log.add(room_id, LogEntry(now, LogKind.WINDOW_OPEN))
         for room_id in self.windows.keys() - windows.keys():
@@ -497,7 +526,9 @@ class HeatingEngine:
         if left and boost_until is not None and HouseMode.AUTO not in house_modes.values():
             boost_until = None
             self._log_boost(LogKind.BOOST_ENDED, now, rooms.values())
-        new_state = RuntimeState(overrides, house_modes, boost_until, zone_boosts, room_boosts)
+        new_state = RuntimeState(
+            overrides, house_modes, boost_until, zone_boosts, room_boosts, self.state.windows
+        )
         if new_state != self.state:
             self.state = new_state
             self._save_state()

@@ -15,6 +15,7 @@ from custom_components.heating_scheduler.core.model import (
     OverrideOrigin,
     Room,
     RoomBoost,
+    RuntimeState,
     Settings,
     Source,
     Target,
@@ -22,10 +23,13 @@ from custom_components.heating_scheduler.core.model import (
 )
 from custom_components.heating_scheduler.core.resolve import resolve
 from custom_components.heating_scheduler.core.serde import (
+    migrate_state,
     room_from_dict,
     room_to_dict,
     settings_from_dict,
     settings_to_dict,
+    state_from_dict,
+    state_to_dict,
 )
 from custom_components.heating_scheduler.core.validation import (
     ValidationError,
@@ -37,6 +41,7 @@ from custom_components.heating_scheduler.core.window import (
     DropRules,
     WindowSignals,
     is_open_state,
+    merge_signal,
     window_open_at,
 )
 from tests.builders import PRAGUE, STANDARD, TEMPS, prague
@@ -77,6 +82,49 @@ def test_contact_counts_after_the_delay_valve_and_drop_at_once() -> None:
     later = NOON + timedelta(seconds=10)
     assert window_open_at(WindowSignals(contact=NOON, valve=later), DELAY) == later
     assert window_open_at(WindowSignals(contact=NOON, drop=NOON + DELAY * 2), DELAY) == NOON + DELAY
+
+
+def test_merge_signal_keeps_the_stored_instant_until_the_sensors_say_closed() -> None:
+    earlier = NOON - timedelta(minutes=40)
+    # Open: the earlier of the stored instant and the sensor's last change.
+    assert merge_signal(None, [("on", NOON), ("off", earlier)]) == (NOON, NOON)
+    assert merge_signal(earlier, [("on", NOON)]) == (earlier, earlier)
+    assert merge_signal(NOON, [("on", earlier)]) == (earlier, earlier)
+    # Closed: every sensor known and none open.
+    assert merge_signal(earlier, [("off", NOON), ("closed", NOON)]) == (None, None)
+    assert merge_signal(earlier, []) == (None, None)
+    # Not known (starting, offline, missing): not open, but the instant is kept.
+    assert merge_signal(earlier, [("unavailable", NOON)]) == (None, earlier)
+    assert merge_signal(earlier, [("off", NOON), ("unknown", NOON)]) == (None, earlier)
+    assert merge_signal(earlier, [(None, NOON)]) == (None, earlier)
+
+
+def test_drop_detector_restored_after_a_restart() -> None:
+    detector = DropDetector()
+    detector.restore(NOON)
+    assert detector.since(NOON + timedelta(minutes=10)) == NOON
+    assert detector.ends() == NOON + timedelta(minutes=30)
+    # The first sample becomes the lowest; a rise above it closes.
+    detector.add(NOON + timedelta(minutes=10), 18.0)
+    detector.add(NOON + timedelta(minutes=12), 18.2)
+    assert detector.since(NOON + timedelta(minutes=12)) == NOON
+    detector.add(NOON + timedelta(minutes=14), 18.3)
+    assert detector.since(NOON + timedelta(minutes=14)) is None
+
+
+def test_open_window_times_in_the_state_store() -> None:
+    state = RuntimeState(
+        windows={
+            "living": WindowSignals(contact=NOON, drop=NOON + DELAY),
+            "bedroom": WindowSignals(valve=NOON),
+        }
+    )
+    assert state_from_dict(state_to_dict(state)) == state
+    # 2.1 had no windows; broken instants are dropped.
+    old = {key: value for key, value in state_to_dict(state).items() if key != "windows"}
+    assert state_from_dict(migrate_state(2, 1, old)) == RuntimeState()
+    broken = {**state_to_dict(state), "windows": {"living": {"contact": "yesterday"}, "x": 3}}
+    assert state_from_dict(broken).windows == {}
 
 
 def test_drop_detector_opens_on_a_fast_drop_and_closes_when_the_room_warms() -> None:

@@ -24,6 +24,7 @@ from .model import (
     Slot,
     TempSet,
     Vacation,
+    WindowSignals,
     Zone,
 )
 from .validation import ValidationError
@@ -32,7 +33,8 @@ from .validation import ValidationError
 CONFIG_VERSION = 2
 CONFIG_MINOR_VERSION = 2
 STATE_VERSION = 2
-STATE_MINOR_VERSION = 1
+# 2.2: since when the open-window signals of each room say open.
+STATE_MINOR_VERSION = 2
 
 _TIME_PATTERN = re.compile(r"^(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d)$")
 
@@ -379,6 +381,17 @@ def state_to_dict(state: RuntimeState) -> JsonDict:
         "boost_until": None if state.boost_until is None else datetime_to_str(state.boost_until),
         "zone_boosts": {key: datetime_to_str(end) for key, end in state.zone_boosts.items()},
         "room_boosts": {key: datetime_to_str(end) for key, end in state.room_boosts.items()},
+        "windows": {
+            key: {
+                kind: None if since is None else datetime_to_str(since)
+                for kind, since in (
+                    ("contact", signals.contact),
+                    ("valve", signals.valve),
+                    ("drop", signals.drop),
+                )
+            }
+            for key, signals in state.windows.items()
+        },
     }
 
 
@@ -391,6 +404,25 @@ def _boost_ends(data: Mapping[str, Any], key: str) -> dict[str, datetime]:
         except ValidationError:
             continue
     return ends
+
+
+def _windows(data: Mapping[str, Any]) -> dict[str, WindowSignals]:
+    """Parse the open-window signals of rooms; invalid instants are dropped."""
+    windows: dict[str, WindowSignals] = {}
+    for room_id, item in (_opt(data, "windows", dict) or {}).items():
+        if not isinstance(item, Mapping):
+            continue
+        instants: dict[str, datetime | None] = {}
+        for kind in ("contact", "valve", "drop"):
+            try:
+                raw = _opt(item, kind, str)
+                instants[kind] = None if raw is None else datetime_from_str(raw)
+            except ValidationError:
+                instants[kind] = None
+        signals = WindowSignals(**instants)
+        if signals != WindowSignals():
+            windows[room_id] = signals
+    return windows
 
 
 def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
@@ -420,6 +452,7 @@ def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
         boost_until=boost_until,
         zone_boosts=_boost_ends(data, "zone_boosts"),
         room_boosts=_boost_ends(data, "room_boosts"),
+        windows=_windows(data),
     )
 
 
@@ -446,6 +479,7 @@ def migrate_state(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:
     """Migrate stored runtime state to the current version.
 
     1.x -> 2.1: the last effective house mode becomes the mode of the first zone.
+    2.1 -> 2.2: nothing changes; state stored without `windows` has no open windows.
     """
     if old_major > STATE_VERSION:
         raise ValueError(f"state version {old_major} is newer than this integration")

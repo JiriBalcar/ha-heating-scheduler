@@ -9,12 +9,20 @@ from typing import Any
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.util import dt as dt_util
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.heating_scheduler.core.config_ops import put_settings
-from custom_components.heating_scheduler.core.model import Config, HouseMode, Source, TargetMode
+from custom_components.heating_scheduler.core.model import (
+    Config,
+    HouseMode,
+    RuntimeState,
+    Source,
+    TargetMode,
+    WindowSignals,
+)
 from custom_components.heating_scheduler.core.validation import ValidationError
 from custom_components.heating_scheduler.log import LogKind
 
@@ -251,6 +259,86 @@ async def test_drop_rules_come_from_the_settings(
     assert engine.targets["living"].source is Source.WINDOW
     await advance(hass, freezer, 10 * 60)
     assert engine.targets["living"].source is Source.PLAN
+
+
+async def test_a_restart_keeps_the_time_a_window_has_been_open(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    # Open for 40 minutes before the restart; the sensor is offline while HA starts.
+    opened = dt_util.utcnow() - timedelta(minutes=40)
+    hass.states.async_set(WINDOW, "unavailable")
+    store(
+        hass_storage,
+        with_living(window_sensors=(WINDOW,)),
+        RuntimeState(windows={"living": WindowSignals(contact=opened)}),
+    )
+    engine = engine_of(await setup_entry(hass))
+    first, _ = living_trvs(standard_trvs)
+    assert engine.targets["living"].source is Source.PLAN
+    assert engine.state.windows["living"].contact == opened  # kept while not known
+
+    # It reports open with a new last_changed: no new delay, and the limit counts from before.
+    hass.states.async_set(WINDOW, "on")
+    await settle(hass)
+    window = engine.windows["living"]
+    assert window.since == opened + timedelta(seconds=30)
+    assert first.mode == "off"
+    await advance(hass, freezer, 21 * 60)
+    assert engine.targets["living"].temperature == 7.0
+    await advance(hass, freezer, 5)
+    assert hass_storage["heating_scheduler.state"]["data"]["windows"]["living"]["contact"] == (
+        opened.isoformat()
+    )
+
+    hass.states.async_set(WINDOW, "off")
+    await settle(hass)
+    assert engine.state.windows == {}
+
+
+async def test_a_window_closed_while_home_assistant_was_down_is_forgotten(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+) -> None:
+    hass.states.async_set(WINDOW, "off")
+    opened = dt_util.utcnow() - timedelta(hours=3)
+    store(
+        hass_storage,
+        with_living(window_sensors=(WINDOW,)),
+        RuntimeState(windows={"living": WindowSignals(contact=opened)}),
+    )
+    engine = engine_of(await setup_entry(hass))
+    assert engine.state.windows == {}
+    hass.states.async_set(WINDOW, "on")
+    await settle(hass)
+    assert "living" not in engine.windows  # a new opening waits for the delay again
+
+
+async def test_a_restart_keeps_a_drop_detection(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    standard_trvs: dict[str, FakeTrv],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    unit = {"device_class": "temperature", "unit_of_measurement": "°C"}
+    hass.states.async_set(ROOM_TEMPERATURE, "18.0", unit)
+    opened = dt_util.utcnow() - timedelta(minutes=10)
+    store(
+        hass_storage,
+        with_living(temperature_entity=ROOM_TEMPERATURE, window_drop=True),
+        RuntimeState(windows={"living": WindowSignals(drop=opened)}),
+    )
+    engine = engine_of(await setup_entry(hass))
+    first, _ = living_trvs(standard_trvs)
+    assert engine.targets["living"].source is Source.WINDOW
+    assert first.mode == "off"
+    # Closed after the rest of the 30 minutes.
+    await advance(hass, freezer, 20 * 60)
+    assert engine.targets["living"].source is Source.PLAN
+    assert engine.state.windows == {}
 
 
 async def ws_client(

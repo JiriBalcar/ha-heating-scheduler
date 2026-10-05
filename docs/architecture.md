@@ -99,14 +99,19 @@ tests/core/  tests/ha/
   signal says closed, the room returns at once to whatever the plan, a manual change or a boost
   says then; an open window ends none of them. Knob turns while open are undone, changes from
   the app or a service are refused (`window_open`), a boost can start and heats after the window
-  closes. The open-since instant is the `last_changed` of the sensors, so it is not stored: after
-  a restart the delay and the limit count again. The drop detector (`DropDetector`) counts open
+  closes. Since when each signal says open is stored per room in the state store (`windows`,
+  user's decision 2026-10-04), so a restart keeps the delay and the limit: an open signal counts
+  from the earlier of the stored instant and the `last_changed` of its open sensors. While its
+  sensors are offline, missing or not yet known (HA starting), the instant is kept but does not
+  count; once every sensor says closed, it is dropped, so a window closed while HA was down is
+  forgotten (`merge_signal`). A drop detection is restored from its instant; the lowest
+  temperature is not stored, so the first sample after the restart becomes the lowest. The drop detector (`DropDetector`) counts open
   when the room temperature (the shown temperature) falls by `window_drop_degrees` (default 1 °C,
   0.2 to 5) within `window_drop_period` (default 5 min, 1 to 60 min), and closed when it rises
   `window_drop_rise` (default 0.3 °C, 0.1 to 3) above its lowest value since then, or after
   `window_drop_hold` (default 30 min, 5 min to 4 h). The rules are settings for the whole house
   (user's request, 2026-10-04); new rules start the detectors over. Its samples live in memory
-  only. A valve with its own detection may also change its setpoint, just before or after it
+  only; its open-since instant is stored (see above). A valve with its own detection may also change its setpoint, just before or after it
   reports the window: a manual change within 10 s of such a report is undone and not kept as an
   override (`VALVE_WINDOW_GRACE`). The candidates for the valves' detection are the binary sensors
   and sensors with `window` in their id on the valves' devices (not the switch that turns the
@@ -208,12 +213,13 @@ service are refused (`boost_active` during a boost).
 | Store key | Content | Save |
 |---|---|---|
 | `heating_scheduler.config` | zones with their house state, rooms, plans, temperature sets, settings | immediately |
-| `heating_scheduler.state` | overrides, last effective mode of each zone, boost ends (house, zones, rooms) | 2 s delay, flushed on stop |
+| `heating_scheduler.state` | overrides, last effective mode of each zone, boost ends (house, zones, rooms), since when each room's window signals say open | 2 s delay, flushed on stop |
 | `heating_scheduler.log` | last 100 events per room | 60 s delay |
 
 The configuration has a revision; websocket writes must send the revision they edited.
 
-The configuration store is version 2.2, the state store 2.1. The migration from 1.x turns the
+The configuration store is version 2.2, the state store 2.2 (2.2 adds `windows`; older state has
+no open windows). The migration from 1.x turns the
 house state into one zone, named „Dům“ or "House" by the HA language, and puts every room in it.
 2.2 adds the modes of each zone and their replacements; a zone stored without them offers every
 mode. The window fields of rooms and settings were added without a new version: a room stored

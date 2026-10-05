@@ -220,16 +220,32 @@ class Override:
 
 
 @dataclass(frozen=True, slots=True)
+class WindowSignals:
+    """Since when each open-window signal of a room says open; None while it says closed.
+
+    `contact`: its contact sensors, `valve`: the valves' own detection, `drop`: a fast drop of
+    the room temperature.
+    """
+
+    contact: datetime | None = None
+    valve: datetime | None = None
+    drop: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeState:
-    """State that changes while running: overrides, the last effective mode of each zone, and
-    the ends of running boosts (rooms at their valves' maximum). The whole house, each zone and
-    each room have boosts of their own; a room heats at full while any of them covers it."""
+    """State that changes while running: overrides, the last effective mode of each zone, the
+    ends of running boosts (rooms at their valves' maximum), and since when the open-window
+    signals of each room say open (`windows`, so a restart keeps the delay and the limit). The
+    whole house, each zone and each room have boosts of their own; a room heats at full while any
+    of them covers it."""
 
     overrides: Mapping[str, Override] = field(default_factory=dict)
     house_modes: Mapping[str, HouseMode] = field(default_factory=dict)
     boost_until: datetime | None = None
     zone_boosts: Mapping[str, datetime] = field(default_factory=dict)
     room_boosts: Mapping[str, datetime] = field(default_factory=dict)
+    windows: Mapping[str, WindowSignals] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
