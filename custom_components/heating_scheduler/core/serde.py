@@ -24,6 +24,7 @@ from .model import (
     Slot,
     TempSet,
     Vacation,
+    WindowSignals,
     Zone,
 )
 from .validation import ValidationError
@@ -32,7 +33,8 @@ from .validation import ValidationError
 CONFIG_VERSION = 2
 CONFIG_MINOR_VERSION = 2
 STATE_VERSION = 2
-STATE_MINOR_VERSION = 1
+# 2.2: since when the open-window signals of each room say open.
+STATE_MINOR_VERSION = 2
 
 _TIME_PATTERN = re.compile(r"^(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d)$")
 
@@ -167,7 +169,18 @@ def room_to_dict(room: Room) -> JsonDict:
         "temperature_entity": room.temperature_entity,
         "area_id": room.area_id,
         "zone_id": room.zone_id,
+        "window_sensors": list(room.window_sensors),
+        "valve_window_sensors": list(room.valve_window_sensors),
+        "window_drop": room.window_drop,
     }
+
+
+def _entity_ids(data: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    """Parse an optional list of entity ids (window sensors were added after 2.2)."""
+    items = _opt(data, key, list) or []
+    if not all(isinstance(item, str) for item in items):
+        raise _invalid(f"{key} must be entity ids")
+    return tuple(items)
 
 
 def room_from_dict(data: Mapping[str, Any]) -> Room:
@@ -184,6 +197,9 @@ def room_from_dict(data: Mapping[str, Any]) -> Room:
         temperature_entity=_opt(data, "temperature_entity", str),
         area_id=_opt(data, "area_id", str),
         zone_id=_get(data, "zone_id", str),
+        window_sensors=_entity_ids(data, "window_sensors"),
+        valve_window_sensors=_entity_ids(data, "valve_window_sensors"),
+        window_drop=bool(_opt(data, "window_drop", bool)),
     )
 
 
@@ -268,7 +284,22 @@ def settings_to_dict(settings: Settings) -> JsonDict:
         "vacation_mode": settings.vacation_mode.value,
         "dry_run": settings.dry_run,
         "boost_minutes": _minutes(settings.boost),
+        "window_delay_seconds": int(settings.window_delay.total_seconds()),
+        "window_limit_minutes": _minutes(settings.window_limit),
+        "window_drop_degrees": settings.window_drop_degrees,
+        "window_drop_minutes": _minutes(settings.window_drop_period),
+        "window_drop_rise": settings.window_drop_rise,
+        "window_drop_hold_minutes": _minutes(settings.window_drop_hold),
     }
+
+
+def _opt_int(data: Mapping[str, Any], key: str, default: int) -> int:
+    value = _opt(data, key, int)
+    return default if value is None else int(value)
+
+
+def _opt_number(data: Mapping[str, Any], key: str, default: float) -> float:
+    return default if data.get(key) is None else _number(data, key)
 
 
 def settings_from_dict(data: Mapping[str, Any]) -> Settings:
@@ -281,6 +312,13 @@ def settings_from_dict(data: Mapping[str, Any]) -> Settings:
         dry_run=_get(data, "dry_run", bool),
         # Added after 2.1; older stores use the default.
         boost=timedelta(minutes=_opt(data, "boost_minutes", int) or 60),
+        # Added after 2.2; older stores use the defaults.
+        window_delay=timedelta(seconds=_opt_int(data, "window_delay_seconds", 30)),
+        window_limit=timedelta(minutes=_opt_int(data, "window_limit_minutes", 60)),
+        window_drop_degrees=_opt_number(data, "window_drop_degrees", 1.0),
+        window_drop_period=timedelta(minutes=_opt_int(data, "window_drop_minutes", 5)),
+        window_drop_rise=_opt_number(data, "window_drop_rise", 0.3),
+        window_drop_hold=timedelta(minutes=_opt_int(data, "window_drop_hold_minutes", 30)),
     )
 
 
@@ -343,6 +381,17 @@ def state_to_dict(state: RuntimeState) -> JsonDict:
         "boost_until": None if state.boost_until is None else datetime_to_str(state.boost_until),
         "zone_boosts": {key: datetime_to_str(end) for key, end in state.zone_boosts.items()},
         "room_boosts": {key: datetime_to_str(end) for key, end in state.room_boosts.items()},
+        "windows": {
+            key: {
+                kind: None if since is None else datetime_to_str(since)
+                for kind, since in (
+                    ("contact", signals.contact),
+                    ("valve", signals.valve),
+                    ("drop", signals.drop),
+                )
+            }
+            for key, signals in state.windows.items()
+        },
     }
 
 
@@ -355,6 +404,25 @@ def _boost_ends(data: Mapping[str, Any], key: str) -> dict[str, datetime]:
         except ValidationError:
             continue
     return ends
+
+
+def _windows(data: Mapping[str, Any]) -> dict[str, WindowSignals]:
+    """Parse the open-window signals of rooms; invalid instants are dropped."""
+    windows: dict[str, WindowSignals] = {}
+    for room_id, item in (_opt(data, "windows", dict) or {}).items():
+        if not isinstance(item, Mapping):
+            continue
+        instants: dict[str, datetime | None] = {}
+        for kind in ("contact", "valve", "drop"):
+            try:
+                raw = _opt(item, kind, str)
+                instants[kind] = None if raw is None else datetime_from_str(raw)
+            except ValidationError:
+                instants[kind] = None
+        signals = WindowSignals(**instants)
+        if signals != WindowSignals():
+            windows[room_id] = signals
+    return windows
 
 
 def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
@@ -384,6 +452,7 @@ def state_from_dict(data: Mapping[str, Any]) -> RuntimeState:
         boost_until=boost_until,
         zone_boosts=_boost_ends(data, "zone_boosts"),
         room_boosts=_boost_ends(data, "room_boosts"),
+        windows=_windows(data),
     )
 
 
@@ -410,6 +479,7 @@ def migrate_state(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:
     """Migrate stored runtime state to the current version.
 
     1.x -> 2.1: the last effective house mode becomes the mode of the first zone.
+    2.1 -> 2.2: nothing changes; state stored without `windows` has no open windows.
     """
     if old_major > STATE_VERSION:
         raise ValueError(f"state version {old_major} is newer than this integration")

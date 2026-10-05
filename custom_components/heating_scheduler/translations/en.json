@@ -27,7 +27,13 @@
           "frost": "Frost guard",
           "off": "Off",
           "manual": "By hand",
-          "boost": "Boost"
+          "boost": "Boost",
+          "window": "Window open"
+        },
+        "state_attributes": {
+          "window_open": {
+            "name": "Window open"
+          }
         }
       }
     },
@@ -97,6 +103,9 @@
           },
           "status": {
             "name": "Status"
+          },
+          "window_open": {
+            "name": "Window open"
           }
         }
       }
@@ -143,6 +152,15 @@
     },
     "zone_modes": {
       "message": "A zone offers Normal, and every mode it does not offer needs a replacement among its modes."
+    },
+    "window_open": {
+      "message": "A window of this room is open. The heating comes back when it is closed."
+    },
+    "too_many_window_sensors": {
+      "message": "A room can have at most 10 window sensors of each kind."
+    },
+    "duplicate_window_sensor": {
+      "message": "A window sensor is chosen twice."
     }
   },
   "selector": {

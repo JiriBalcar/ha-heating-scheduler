@@ -85,6 +85,11 @@ describe("reason and next", () => {
     expect(reasonText(away, NOW, en, t)).toBe("House: Away");
     expect(reasonText(away, NOW, en, t, "1st floor")).toBe("1st floor: Away");
   });
+  it("says that an open window keeps the heating off until Frost guard", () => {
+    const open: TargetData = { mode: "window", temperature: null, source: "window", valid_until: "2026-10-05T11:00:00Z", next: null };
+    expect(reasonText(open, NOW, en, t)).toBe("Window open: off until 13:00");
+    expect(reasonText({ ...open, temperature: 7, valid_until: null }, NOW, en, t)).toBe("Window open");
+  });
   it("has no next text without a change", () => {
     expect(nextText({ ...plan, valid_until: null, next: null }, NOW, en, t)).toBeNull();
   });

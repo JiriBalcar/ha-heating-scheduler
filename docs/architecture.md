@@ -22,6 +22,7 @@ custom_components/heating_scheduler/
 │   ├── overrides.py   expiry rules incl. max-duration cap
 │   ├── setpoint.py    round, clamp, tolerance, in-sync test
 │   ├── echo.py        own write vs manual change
+│   ├── window.py      open-window signals, temperature-drop detector
 │   ├── validation.py  config rules with stable error codes
 │   ├── schedule_ops.py plan operations, defaults
 │   ├── serde.py       dict ↔ model, store migrations
@@ -86,17 +87,50 @@ tests/core/  tests/ha/
   (`boost_active`). Boosts that ended while HA was stopped are dropped at start. The zone boost
   has no control in the panel (user's decision): a tile of HA for its switch starts it.
 
+- **Open windows (decision, 2026-10-04, user request TIN2-10)**: a room has up to three signals,
+  because valves differ: contact sensors (`window_sensors`: binary sensors of windows or doors,
+  or `input_boolean`), the valves' own detection (`valve_window_sensors`: a binary sensor, or a
+  sensor whose state is a word such as `open`, as some valves report it), and a fast drop of the
+  room temperature (`window_drop`). A contact counts after `window_delay` (default 30 s, 0 s to
+  10 min), so a quick open and close does nothing; the valves' detection and the drop count at
+  once, they have waited already. The room counts as open from the earliest signal. While open,
+  its valves are off (HVAC off, else their minimum). After `window_limit` (default 1 h, 15 min
+  to 24 h) the room heats at Frost guard, so a forgotten window cannot freeze it. When every
+  signal says closed, the room returns at once to whatever the plan, a manual change or a boost
+  says then; an open window ends none of them. Knob turns while open are undone, changes from
+  the app or a service are refused (`window_open`), a boost can start and heats after the window
+  closes. Since when each signal says open is stored per room in the state store (`windows`,
+  user's decision 2026-10-04), so a restart keeps the delay and the limit: an open signal counts
+  from the earlier of the stored instant and the `last_changed` of its open sensors. While its
+  sensors are offline, missing or not yet known (HA starting), the instant is kept but does not
+  count; once every sensor says closed, it is dropped, so a window closed while HA was down is
+  forgotten (`merge_signal`). A drop detection is restored from its instant; the lowest
+  temperature is not stored, so the first sample after the restart becomes the lowest. The drop detector (`DropDetector`) counts open
+  when the room temperature (the shown temperature) falls by `window_drop_degrees` (default 1 °C,
+  0.2 to 5) within `window_drop_period` (default 5 min, 1 to 60 min), and closed when it rises
+  `window_drop_rise` (default 0.3 °C, 0.1 to 3) above its lowest value since then, or after
+  `window_drop_hold` (default 30 min, 5 min to 4 h). The rules are settings for the whole house
+  (user's request, 2026-10-04); new rules start the detectors over. Its samples live in memory
+  only; its open-since instant is stored (see above). A valve with its own detection may also change its setpoint, just before or after it
+  reports the window: a manual change within 10 s of such a report is undone and not kept as an
+  override (`VALVE_WINDOW_GRACE`). The candidates for the valves' detection are the binary sensors
+  and sensors with `window` in their id on the valves' devices (not the switch that turns the
+  detection on, e.g. the TRVZB's `open_window`).
+
 ## resolve()
 
 ```python
-resolve(now, house, plan, temperatures, override, tz, boost=None) -> RoomTarget(
+resolve(now, house, plan, temperatures, override, tz, boost=None, window=None) -> RoomTarget(
     mode, temperature, reason, valid_until, next)
 ```
 
 `house` is the house state of the room's zone.
 
-Precedence **(decision)**: house mode `off` / `frost` / `vacation` / `away` → boost → manual
-change (override) → the room's plan. A boost starts only when every zone is Normal, so a house mode
+Precedence **(decision)**: house mode `off` / `frost` / `vacation` / `away` → open window →
+boost → manual change (override) → the room's plan. An open window is `OpenWindow(since, limit)`;
+its target is mode `window`, off until `limit` and at the Frost guard temperature after it. When
+it closes is not known, so `resolve()` keeps it open in the forecast; a `since` in the future
+(the delay of a contact sensor) is the next change. A boost starts only when every zone is Normal, so a house mode
 wins over it only when a planned holiday starts during the boost; the holiday start is a
 change instant, so the timer runs then and housekeeping ends the boost. A manual change never
 beats a house mode or a boost; knob changes then are undone, and changes from the app or a
@@ -167,8 +201,8 @@ service are refused (`boost_active` during a boost).
 - Anything else is a manual change and becomes an override for the room: until the next
   plan change, capped by the max duration (default 4 h). After 3 s without further knob
   changes, the value goes to the other TRVs of the room.
-- In house modes away / vacation / frost / off, and during a boost, a manual change is logged
-  and undone.
+- In house modes away / vacation / frost / off, while a window is open, and during a boost, a
+  manual change is logged and undone.
 - After an echo that moved the setpoint or HVAC mode (for example a cancelled write that
   landed late), an idle worker checks the TRV again and corrects it at once.
 - Config commands return the new revision. Editors detect whether the edited item itself
@@ -179,15 +213,17 @@ service are refused (`boost_active` during a boost).
 | Store key | Content | Save |
 |---|---|---|
 | `heating_scheduler.config` | zones with their house state, rooms, plans, temperature sets, settings | immediately |
-| `heating_scheduler.state` | overrides, last effective mode of each zone, boost ends (house, zones, rooms) | 2 s delay, flushed on stop |
+| `heating_scheduler.state` | overrides, last effective mode of each zone, boost ends (house, zones, rooms), since when each room's window signals say open | 2 s delay, flushed on stop |
 | `heating_scheduler.log` | last 100 events per room | 60 s delay |
 
 The configuration has a revision; websocket writes must send the revision they edited.
 
-The configuration store is version 2.2, the state store 2.1. The migration from 1.x turns the
+The configuration store is version 2.2, the state store 2.2 (2.2 adds `windows`; older state has
+no open windows). The migration from 1.x turns the
 house state into one zone, named „Dům“ or "House" by the HA language, and puts every room in it.
 2.2 adds the modes of each zone and their replacements; a zone stored without them offers every
-mode.
+mode. The window fields of rooms and settings were added without a new version: a room stored
+without them has no window signals, and the settings use the defaults.
 
 ## Home Assistant surface
 
@@ -196,10 +232,12 @@ mode.
   without `area_id` is kept.
 - The engine also follows the rooms' display temperature entities, so the panel, the card
   and the mode sensor show a new room temperature at once.
-- Per room: `sensor` (mode, attributes: target, reason, until, next, override), `button`
+- Per room: `sensor` (mode, attributes: target, reason, until, next, override, `window_open`),
+  `button`
   (back to plan), `binary_sensor` (problem), `climate` (virtual thermostat) **(decision)**.
-- Room thermostat: `heat` during a manual change or a boost. The preset `boost` is always
-  listed: it starts the room's own boost. The attribute `status` holds the room tile's text.
+- Room thermostat: `heat` during a manual change or a boost, `off` while a window is open (until
+  the limit). The preset `boost` is always listed: it starts the room's own boost. The attribute
+  `status` holds the room tile's text, `window_open` says that a window counts as open.
 - House: `select` (house mode), `switch` (boost; attributes `until`, `duration_minutes`), five
   `number` entities (house temperatures). The house mode
   select sets every zone. While the zones differ, its state is `mixed` ("Různě", decision

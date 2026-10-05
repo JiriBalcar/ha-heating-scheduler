@@ -30,6 +30,8 @@ class LogKind(StrEnum):
     AVAILABLE = "available"
     BOOST_STARTED = "boost_started"  # every room at its valves' maximum
     BOOST_ENDED = "boost_ended"
+    WINDOW_OPEN = "window_open"  # the room counts as open: heating off
+    WINDOW_CLOSED = "window_closed"
 
 
 @dataclass(frozen=True, slots=True)

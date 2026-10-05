@@ -57,6 +57,7 @@ class TargetMode(StrEnum):
     OFF = "off"
     MANUAL = "manual"
     BOOST = "boost"
+    WINDOW = "window"
 
 
 class HouseMode(StrEnum):
@@ -90,6 +91,7 @@ class Source(StrEnum):
     HOUSE_FROST = "house_frost"
     HOUSE_OFF = "house_off"
     BOOST = "boost"
+    WINDOW = "window"
 
 
 class OverrideOrigin(StrEnum):
@@ -130,7 +132,11 @@ class TempSet:
 
 @dataclass(frozen=True, slots=True)
 class Room:
-    """A room: its TRVs and which plan and temperature set it uses."""
+    """A room: its TRVs and which plan and temperature set it uses.
+
+    Open windows: `window_sensors` are contact sensors, `valve_window_sensors` report the
+    valves' own open-window detection, `window_drop` detects a fast temperature drop.
+    """
 
     id: str
     name: str
@@ -140,6 +146,9 @@ class Room:
     temperature_entity: str | None = None
     area_id: str | None = None
     zone_id: str = HOUSE_ID
+    window_sensors: tuple[str, ...] = ()
+    valve_window_sensors: tuple[str, ...] = ()
+    window_drop: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,16 +220,32 @@ class Override:
 
 
 @dataclass(frozen=True, slots=True)
+class WindowSignals:
+    """Since when each open-window signal of a room says open; None while it says closed.
+
+    `contact`: its contact sensors, `valve`: the valves' own detection, `drop`: a fast drop of
+    the room temperature.
+    """
+
+    contact: datetime | None = None
+    valve: datetime | None = None
+    drop: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeState:
-    """State that changes while running: overrides, the last effective mode of each zone, and
-    the ends of running boosts (rooms at their valves' maximum). The whole house, each zone and
-    each room have boosts of their own; a room heats at full while any of them covers it."""
+    """State that changes while running: overrides, the last effective mode of each zone, the
+    ends of running boosts (rooms at their valves' maximum), and since when the open-window
+    signals of each room say open (`windows`, so a restart keeps the delay and the limit). The
+    whole house, each zone and each room have boosts of their own; a room heats at full while any
+    of them covers it."""
 
     overrides: Mapping[str, Override] = field(default_factory=dict)
     house_modes: Mapping[str, HouseMode] = field(default_factory=dict)
     boost_until: datetime | None = None
     zone_boosts: Mapping[str, datetime] = field(default_factory=dict)
     room_boosts: Mapping[str, datetime] = field(default_factory=dict)
+    windows: Mapping[str, WindowSignals] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +254,14 @@ class RoomBoost:
 
     until: datetime
     temperature: float
+
+
+@dataclass(frozen=True, slots=True)
+class OpenWindow:
+    """An open window in a room: heating off since `since`, at Frost guard from `limit`."""
+
+    since: datetime
+    limit: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +274,16 @@ class Settings:
     vacation_mode: Mode = Mode.FROST
     dry_run: bool = False
     boost: timedelta = timedelta(hours=1)
+    # A contact sensor counts after `window_delay`; after `window_limit` open, Frost guard.
+    window_delay: timedelta = timedelta(seconds=30)
+    window_limit: timedelta = timedelta(hours=1)
+    # Temperature drop: open when the room falls `window_drop_degrees` within
+    # `window_drop_period`; closed when it rises `window_drop_rise` above its lowest value, or
+    # after `window_drop_hold`.
+    window_drop_degrees: float = 1.0
+    window_drop_period: timedelta = timedelta(minutes=5)
+    window_drop_rise: float = 0.3
+    window_drop_hold: timedelta = timedelta(minutes=30)
 
 
 def _default_zones() -> dict[str, Zone]:

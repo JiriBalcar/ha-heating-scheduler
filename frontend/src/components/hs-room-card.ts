@@ -241,9 +241,12 @@ export class HsRoomCard extends LitElement {
     if (!room || !this.snapshot || !this.hass) return nothing;
     const t = this.t;
     const target = room.target;
-    // − / + only follow the plan's rooms: not during a house mode or a boost.
+    // − / + only follow the plan's rooms: not during a house mode, a boost or an open window.
     const canChange =
-      zoneOf(this.snapshot, room).house.effective === "auto" && target !== null && target.source !== "boost";
+      zoneOf(this.snapshot, room).house.effective === "auto" &&
+      target !== null &&
+      target.source !== "boost" &&
+      target.source !== "window";
     const manual = this.pending !== null || target?.source === "manual";
     const mode = manual ? "manual" : (target?.mode ?? "off");
     const problems = room.issues.length > 0;

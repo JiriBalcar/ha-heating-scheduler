@@ -27,7 +27,13 @@
           "frost": "Proti mrazu",
           "off": "Vypnuto",
           "manual": "Ručně",
-          "boost": "Naplno"
+          "boost": "Naplno",
+          "window": "Otevřené okno"
+        },
+        "state_attributes": {
+          "window_open": {
+            "name": "Otevřené okno"
+          }
         }
       }
     },
@@ -97,6 +103,9 @@
           },
           "status": {
             "name": "Stav"
+          },
+          "window_open": {
+            "name": "Otevřené okno"
           }
         }
       }
@@ -143,6 +152,15 @@
     },
     "zone_modes": {
       "message": "Zóna nabízí Normálně a každý režim, který nenabízí, potřebuje náhradu z jejích režimů."
+    },
+    "window_open": {
+      "message": "V této místnosti je otevřené okno. Topení se vrátí, až se okno zavře."
+    },
+    "too_many_window_sensors": {
+      "message": "Místnost může mít nejvýše 10 okenních čidel každého druhu."
+    },
+    "duplicate_window_sensor": {
+      "message": "Okenní čidlo je vybrané dvakrát."
     }
   },
   "selector": {

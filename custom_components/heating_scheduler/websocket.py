@@ -143,6 +143,12 @@ def snapshot(engine: HeatingEngine) -> dict[str, Any]:
                     },
                 },
                 "override": None if override is None else override_to_dict(override),
+                "window": None
+                if (window := engine.windows.get(room.id)) is None
+                else {
+                    "since": datetime_to_str(window.since),
+                    "limit": datetime_to_str(window.limit),
+                },
                 "issues": [issue.as_dict() for issue in engine.health.get(room.id, [])],
                 "trv_status": [
                     engine.workers[entity_id].as_dict()
@@ -228,6 +234,9 @@ ROOM_SCHEMA = vol.Schema(
         vol.Optional("temperature_entity"): vol.Any(None, str),
         vol.Optional("area_id"): vol.Any(None, str),
         vol.Optional("zone_id"): vol.Any(None, str),
+        vol.Optional("window_sensors", default=[]): [str],
+        vol.Optional("valve_window_sensors", default=[]): [str],
+        vol.Optional("window_drop", default=False): bool,
     }
 )
 
@@ -263,6 +272,9 @@ async def ws_room_save(
         temperature_entity=data.get("temperature_entity") or None,
         area_id=data.get("area_id") or None,
         zone_id=zone_id,
+        window_sensors=tuple(data["window_sensors"]),
+        valve_window_sensors=tuple(data["valve_window_sensors"]),
+        window_drop=data["window_drop"],
     )
     await engine.async_apply_config(put_room(engine.config, room), msg["revision"])
     connection.send_result(msg["id"], {"room_id": room_id, "revision": engine.config.revision})
@@ -701,6 +713,11 @@ def _area_of(entity_id: str, entities: er.EntityRegistry, devices: dr.DeviceRegi
     return None
 
 
+def _name(hass: HomeAssistant, entity_id: str) -> str:
+    state = hass.states.get(entity_id)
+    return entity_id if state is None else state.name
+
+
 @websocket_command({vol.Required("type"): f"{PREFIX}candidates"})
 @async_response
 @_guarded
@@ -740,6 +757,20 @@ async def ws_candidates(
                 "unit": state.attributes.get("unit_of_measurement"),
             }
         )
+    # A valve's own open-window detection: its entities with "window" in the id (Zigbee2MQTT
+    # and ZHA name them so). The switch that turns the detection on is not one of them.
+    valve_devices = {
+        entry.device_id
+        for item in climates
+        if (entry := entities.async_get(str(item["entity_id"]))) is not None and entry.device_id
+    }
+    valve_windows = [
+        {"entity_id": entry.entity_id, "name": _name(hass, entry.entity_id)}
+        for entry in entities.entities.values()
+        if entry.device_id in valve_devices
+        and entry.domain in ("binary_sensor", "sensor")
+        and "window" in entry.entity_id
+    ]
     area_list = []
     for area in areas.async_list_areas():
         area_climates = [item["entity_id"] for item in climates if item["area_id"] == area.id]
@@ -763,6 +794,7 @@ async def ws_candidates(
         {
             "climates": climates,
             "temperature_entities": temperatures,
+            "valve_window_entities": valve_windows,
             "areas": area_list,
             "floors": list(floors.values()),
         },

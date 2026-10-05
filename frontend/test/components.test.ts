@@ -68,6 +68,12 @@ function snapshot(revision: number, extra: Partial<Snapshot> = {}): Snapshot {
       vacation_mode: "frost",
       dry_run: false,
       boost_minutes: 60,
+      window_delay_seconds: 30,
+      window_limit_minutes: 60,
+      window_drop_degrees: 1,
+      window_drop_minutes: 5,
+      window_drop_rise: 0.3,
+      window_drop_hold_minutes: 30,
     },
     boost_until: null,
     plans: [PLAN],
@@ -196,6 +202,29 @@ describe("saving keeps edits made while waiting (F05)", () => {
     expect(sent[0].settings.dry_run).toBe(true);
     expect(settings.dirty).toBe(true);
   });
+
+  it("settings offer the open-window rules", async () => {
+    const sent: Any[] = [];
+    const hass = fakeHass(async (message) => {
+      sent.push(message);
+      return { revision: 2 };
+    });
+    const settings = document.createElement("hs-adv-settings") as Any;
+    settings.hass = hass;
+    settings.snapshot = snapshot(1);
+    document.body.appendChild(settings);
+    await settings.updateComplete;
+    const selects = [...settings.shadowRoot.querySelectorAll("ha-select")] as Any[];
+    const labels = selects.map((select) => select.options.map((option: Any) => option.label));
+    expect(labels).toContainEqual(["0.5 °C", "0.8 °C", "1.0 °C", "1.5 °C", "2.0 °C", "3.0 °C"]);
+    expect(labels).toContainEqual(["At once", "15 s", "30 s", "1 min", "2 min", "5 min", "10 min"]);
+    settings.set("window_drop_degrees", 1.5);
+    settings.set("window_drop_hold_minutes", 45);
+    await settings.save();
+    expect(sent[0].settings.window_drop_degrees).toBe(1.5);
+    expect(sent[0].settings.window_drop_hold_minutes).toBe(45);
+    expect(sent[0].settings.window_drop_minutes).toBe(5);
+  });
 });
 
 /** Stands in for HA's dialog manager: create the dialog once, give it hass, show it. */
@@ -226,7 +255,13 @@ describe("room dialog (F07)", () => {
       return { room_id: "room_new", revision: 3 };
     });
     installDialogManager(hass);
-    const candidates: Candidates = { climates: [], temperature_entities: [], areas: [], floors: [] };
+    const candidates: Candidates = {
+      climates: [],
+      temperature_entities: [],
+      valve_window_entities: [],
+      areas: [],
+      floors: [],
+    };
     openRoomDialog(document.body, snapshot(1), candidates, null);
     const dialog = await shownDialog("hs-room-dialog");
     dialog.data = { ...dialog.data, name: "New room" };
@@ -254,9 +289,13 @@ const BEDROOM: RoomData = {
   temperature_entity: null,
   area_id: null,
   zone_id: "up",
+  window_sensors: [],
+  valve_window_sensors: [],
+  window_drop: false,
   current_temperature: 19,
   target: { mode: "away", temperature: 16, source: "house_away", valid_until: null, next: null },
   override: null,
+  window: null,
   issues: [],
   trv_status: [],
 };
@@ -301,6 +340,22 @@ describe("zones on the overview", () => {
     const upstairs: ZoneData = { ...ZONES[1]!, house: replaced, modes: ["auto", "away", "frost", "off"], replacements: { vacation: "frost" } };
     const data = snapshot(1, { zones: [ZONES[0]!, upstairs], rooms: [BEDROOM] });
     expect(await secondary("hs-house-card", { snapshot: data, zone: upstairs })).toBe("Frost guard for the holiday");
+  });
+});
+
+describe("open window on a room tile", () => {
+  it("shows the window and offers no − / +", async () => {
+    const zones = [{ ...ZONES[0]!, rooms: ["kitchen"] }];
+    const open: RoomData = {
+      ...KITCHEN,
+      window_sensors: ["binary_sensor.kitchen_window"],
+      target: { mode: "window", temperature: 7, source: "window", valid_until: null, next: null },
+      window: { since: "2026-10-05T09:00:00Z", limit: "2026-10-05T10:00:00Z" },
+    };
+    const card = await mount("hs-room-card", { snapshot: snapshot(1, { zones, rooms: [open] }), room: open });
+    expect(text(card.shadowRoot, '[slot="secondary"]')).toBe("19.0 °C · Window open");
+    expect(card.shadowRoot.querySelector("ha-tile-icon").title).toBe("Window open");
+    expect(card.shadowRoot.querySelector("ha-control-number-buttons").disabled).toBe(true);
   });
 });
 

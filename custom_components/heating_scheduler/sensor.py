@@ -83,6 +83,7 @@ class RoomModeSensor(RoomEntity, SensorEntity):
                 "origin": override.origin.value,
                 "entity_id": override.entity_id,
             },
+            "window_open": room.id in engine.windows,
             "plan": None if plan is None else plan.name,
             "temperature_set": None if temp_set is None else temp_set.name,
             "current_temperature": engine.room_temperature(room),
