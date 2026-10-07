@@ -758,16 +758,17 @@ async def ws_candidates(
             }
         )
     # A valve's own open-window detection: its entities with "window" in the id (Zigbee2MQTT
-    # and ZHA name them so). The switch that turns the detection on is not one of them.
-    valve_devices = {
-        entry.device_id
-        for item in climates
-        if (entry := entities.async_get(str(item["entity_id"]))) is not None and entry.device_id
-    }
+    # and ZHA name them so). The switch that turns the detection on is not one of them. `trvs`
+    # are the valves of the same device: the room dialog offers the detection of a room's valves.
+    valve_devices: dict[str, list[str]] = {}
+    for item in climates:
+        entry = entities.async_get(str(item["entity_id"]))
+        if entry is not None and entry.device_id:
+            valve_devices.setdefault(entry.device_id, []).append(str(item["entity_id"]))
     valve_windows = [
-        {"entity_id": entry.entity_id, "name": _name(hass, entry.entity_id)}
+        {"entity_id": entry.entity_id, "name": _name(hass, entry.entity_id), "trvs": trvs}
         for entry in entities.entities.values()
-        if entry.device_id in valve_devices
+        if (trvs := valve_devices.get(entry.device_id or ""))
         and entry.domain in ("binary_sensor", "sensor")
         and "window" in entry.entity_id
     ]

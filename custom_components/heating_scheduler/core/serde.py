@@ -30,8 +30,9 @@ from .model import (
 from .validation import ValidationError
 
 # 2.1: the house mode and holiday moved into zones (1.1 had one house state).
+# 2.3: a room detects an open window in one way.
 CONFIG_VERSION = 2
-CONFIG_MINOR_VERSION = 2
+CONFIG_MINOR_VERSION = 3
 STATE_VERSION = 2
 # 2.2: since when the open-window signals of each room say open.
 STATE_MINOR_VERSION = 2
@@ -463,16 +464,30 @@ def migrate_config(
 
     1.x -> 2.1: the house state becomes the first zone, named `zone_name`, with every room.
     2.1 -> 2.2: nothing changes; a zone stored without `modes` offers every mode.
+    2.2 -> 2.3: a room that detects an open window in several ways keeps one: its window
+    sensors, else the valves' own detection, else the temperature drop.
     """
     if old_major > CONFIG_VERSION:
         raise ValueError(f"configuration version {old_major} is newer than this integration")
-    del old_minor
     if old_major < 2:
         house = data.get("house")
         data = {key: value for key, value in data.items() if key != "house"}
         data["zones"] = [{"id": HOUSE_ID, "name": zone_name, "house": house}]
         data["rooms"] = [{**room, "zone_id": HOUSE_ID} for room in data.get("rooms", [])]
+    if (old_major, old_minor) < (2, 3) and isinstance(data.get("rooms"), list):
+        data = {**data, "rooms": [_one_window_method(room) for room in data["rooms"]]}
     return data
+
+
+def _one_window_method(room: Any) -> Any:
+    """Keep the most reliable way a stored room detects an open window."""
+    if not isinstance(room, dict):
+        return room  # Loading reports it.
+    if room.get("window_sensors"):
+        return {**room, "valve_window_sensors": [], "window_drop": False}
+    if room.get("valve_window_sensors"):
+        return {**room, "window_drop": False}
+    return room
 
 
 def migrate_state(old_major: int, old_minor: int, data: JsonDict) -> JsonDict:

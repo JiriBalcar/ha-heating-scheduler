@@ -249,15 +249,17 @@ def test_validation_of_window_sensors_and_settings() -> None:
         validate_room(Room("r", "R", window_sensors=("sensor.a",)))
     assert err.value.code == "invalid_entity"
     with pytest.raises(ValidationError) as err:
-        validate_room(
-            Room(
-                "r",
-                "R",
-                window_sensors=("binary_sensor.a",),
-                valve_window_sensors=("binary_sensor.a",),
-            )
-        )
+        validate_room(Room("r", "R", window_sensors=("binary_sensor.a", "binary_sensor.a")))
     assert err.value.code == "duplicate_window_sensor"
+    validate_room(Room("r", "R", window_drop=True))
+    for several in (
+        Room("r", "R", window_sensors=("binary_sensor.a",), valve_window_sensors=("sensor.b",)),
+        Room("r", "R", window_sensors=("binary_sensor.a",), window_drop=True),
+        Room("r", "R", valve_window_sensors=("sensor.b",), window_drop=True),
+    ):
+        with pytest.raises(ValidationError) as err:
+            validate_room(several)
+        assert err.value.code == "one_window_method"
     with pytest.raises(ValidationError) as err:
         validate_settings(Settings(window_limit=timedelta(minutes=5)))
     assert err.value.code == "setting_range"

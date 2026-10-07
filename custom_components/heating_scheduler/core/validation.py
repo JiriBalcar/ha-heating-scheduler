@@ -150,6 +150,8 @@ def validate_room(room: Room) -> None:
             raise ValidationError("too_many_window_sensors", "too many window sensors in a room")
         for entity_id in sensors:
             check_entity_id(entity_id, domains)
+    if sum((bool(room.window_sensors), bool(room.valve_window_sensors), room.window_drop)) > 1:
+        raise ValidationError("one_window_method", "a room detects an open window in one way")
     windows = room.window_sensors + room.valve_window_sensors
     if len(set(windows)) != len(windows):
         raise ValidationError("duplicate_window_sensor", "a window sensor is listed twice")

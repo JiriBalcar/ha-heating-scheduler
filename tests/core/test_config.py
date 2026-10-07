@@ -269,6 +269,34 @@ def test_migrations() -> None:
         migrate_state(STATE_VERSION + 1, 1, {})
 
 
+def test_migration_to_one_window_method() -> None:
+    """Up to 2.2 a room could detect an open window in several ways; 2.3 keeps the best one."""
+    data = config_to_dict(full_config())
+    sensors, valves, drop = ["binary_sensor.window"], ["sensor.trv_window"], True
+    base = {**data["rooms"][0], "trvs": []}
+    rooms = [
+        {**base, "id": "a", "name": "A", "window_sensors": sensors, "valve_window_sensors": valves}
+        | {"window_drop": drop},
+        {**base, "id": "b", "name": "B", "valve_window_sensors": valves, "window_drop": drop},
+        {**base, "id": "c", "name": "C", "window_drop": drop},
+        {**base, "id": "d", "name": "D"},
+    ]
+    migrated = migrate_config(2, 2, {**data, "rooms": rooms})
+    kept = [
+        (room["window_sensors"], room["valve_window_sensors"], room["window_drop"])
+        for room in migrated["rooms"]
+    ]
+    assert kept == [
+        (sensors, [], False),
+        ([], valves, False),
+        ([], [], True),
+        ([], [], False),
+    ]
+    config = config_from_dict(migrated)
+    assert config.rooms["a"].window_sensors == ("binary_sensor.window",)
+    assert migrate_config(2, 3, {**data, "rooms": rooms})["rooms"] == rooms
+
+
 def test_migration_to_zones() -> None:
     """Version 1.1 had one house state; it becomes the first zone with every room."""
     new = config_to_dict(full_config())

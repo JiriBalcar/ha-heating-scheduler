@@ -135,7 +135,8 @@ class Room:
     """A room: its TRVs and which plan and temperature set it uses.
 
     Open windows: `window_sensors` are contact sensors, `valve_window_sensors` report the
-    valves' own open-window detection, `window_drop` detects a fast temperature drop.
+    valves' own open-window detection, `window_drop` detects a fast temperature drop. A room uses
+    at most one of them.
     """
 
     id: str

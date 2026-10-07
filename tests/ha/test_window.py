@@ -357,22 +357,22 @@ async def test_room_save_and_snapshot_with_windows(
 ) -> None:
     ws = await ws_client(hass, hass_storage, hass_ws_client)
     engine = engine_of(hass.config_entries.async_entries("heating_scheduler")[0])
-    await ws.ok(
+    room = {
+        "id": "living",
+        "name": "Living room",
+        "trvs": ["climate.living_trv_1", "climate.living_trv_2"],
+    }
+    # One way to detect an open window per room.
+    assert await ws.error(
         "room/save",
         revision=0,
-        room={
-            "id": "living",
-            "name": "Living room",
-            "trvs": ["climate.living_trv_1", "climate.living_trv_2"],
-            "window_sensors": [WINDOW],
-            "valve_window_sensors": [VALVE_WINDOW],
-            "window_drop": True,
-        },
-    )
+        room={**room, "window_sensors": [WINDOW], "valve_window_sensors": [VALVE_WINDOW]},
+    ) == ("one_window_method")
+    await ws.ok("room/save", revision=0, room={**room, "valve_window_sensors": [VALVE_WINDOW]})
     living = engine.config.rooms["living"]
-    assert living.window_sensors == (WINDOW,)
+    assert living.window_sensors == ()
     assert living.valve_window_sensors == (VALVE_WINDOW,)
-    assert living.window_drop is True
+    assert living.window_drop is False
     assert await ws.error(
         "room/save",
         revision=1,
@@ -382,7 +382,7 @@ async def test_room_save_and_snapshot_with_windows(
     await ws.ok("subscribe")
     data = await ws.event()
     assert data["rooms"][0]["window"] is None
-    assert data["rooms"][0]["window_sensors"] == [WINDOW]
+    assert data["rooms"][0]["valve_window_sensors"] == [VALVE_WINDOW]
     hass.states.async_set(VALVE_WINDOW, "on")
     await settle(hass)
     data = await ws.latest()
@@ -415,6 +415,6 @@ async def test_candidates_offer_the_valves_window_entities(
         )
         hass.states.async_set(item.entity_id, "off")
     result = await ws.ok("candidates")
-    assert [item["entity_id"] for item in result["valve_window_entities"]] == [
-        "binary_sensor.kitchen_trv_window_open"
+    assert [(item["entity_id"], item["trvs"]) for item in result["valve_window_entities"]] == [
+        ("binary_sensor.kitchen_trv_window_open", ["climate.kitchen_trv"])
     ]
