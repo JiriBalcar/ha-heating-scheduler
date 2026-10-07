@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
-import { formatContext, formatTemp } from "../format";
+import { mdiThermometerMinus, mdiThermostat } from "@mdi/js";
+import { formatContext, formatDuration, formatTemp } from "../format";
 import { showDialog } from "../ha";
 import { languageOf, translator, type TextKey } from "../i18n";
 import { roomPayload } from "../payload";
@@ -14,6 +15,9 @@ interface RoomParams {
   room: RoomData | null;
 }
 
+/** How a room detects an open window: one way only (the integration refuses more). */
+type WindowMethod = "off" | "sensors" | "drop" | "valves";
+
 interface RoomForm {
   name: string;
   trvs: string[];
@@ -21,9 +25,8 @@ interface RoomForm {
   plan_id: string;
   temp_set_id: string;
   zone_id: string;
+  window_method: WindowMethod;
   window_sensors: string[];
-  valve_window_sensors: string[];
-  window_drop: boolean;
 }
 
 const LABELS: Record<keyof RoomForm, TextKey> = {
@@ -33,15 +36,24 @@ const LABELS: Record<keyof RoomForm, TextKey> = {
   plan_id: "adv.rooms.plan",
   temp_set_id: "adv.rooms.temp_set",
   zone_id: "adv.rooms.zone",
+  window_method: "adv.rooms.window_method",
   window_sensors: "adv.rooms.window_sensors",
-  valve_window_sensors: "adv.rooms.valve_window_sensors",
-  window_drop: "adv.rooms.window_drop",
 };
 
-const HELPERS: Partial<Record<keyof RoomForm, TextKey>> = {
-  window_sensors: "adv.rooms.window_sensors_hint",
-  valve_window_sensors: "adv.rooms.valve_window_sensors_hint",
+const METHODS: Record<WindowMethod, { label: TextKey; description: TextKey }> = {
+  off: { label: "adv.rooms.method.off", description: "adv.rooms.method.off_hint" },
+  sensors: { label: "adv.rooms.method.sensors", description: "adv.rooms.method.sensors_hint" },
+  drop: { label: "adv.rooms.method.drop", description: "adv.rooms.method.drop_hint" },
+  valves: { label: "adv.rooms.method.valves", description: "adv.rooms.method.valves_hint" },
 };
+
+/** The way a stored room detects an open window. */
+function windowMethodOf(room: RoomData | null): WindowMethod {
+  if (room?.window_sensors.length) return "sensors";
+  if (room?.valve_window_sensors.length) return "valves";
+  if (room?.window_drop) return "drop";
+  return "off";
+}
 
 // Window contact sensors: binary sensors of windows and doors, or helpers.
 const WINDOW_FILTER = [
@@ -71,6 +83,22 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       display: block;
       margin-top: var(--ha-space-4, 16px);
     }
+    /* What the chosen way of detecting an open window does, when it has nothing to choose. */
+    .window-info {
+      display: flex;
+      gap: var(--ha-space-3, 12px);
+      align-items: flex-start;
+      margin-top: var(--ha-space-4, 16px);
+      padding: var(--ha-space-3, 12px) var(--ha-space-4, 16px);
+      border-radius: var(--ha-border-radius-lg, 12px);
+      background: var(--input-fill-color, var(--secondary-background-color));
+      font-size: var(--ha-font-size-m, 14px);
+      line-height: 20px;
+    }
+    .window-info ha-svg-icon {
+      flex: none;
+      color: var(--secondary-text-color);
+    }
   `;
 
   protected override dialogOpened(params: RoomParams): void {
@@ -98,9 +126,8 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       plan_id: room?.plan_id ?? "house",
       temp_set_id: room?.temp_set_id ?? "house",
       zone_id: room?.zone_id ?? this.snapshot.zones[0]?.id ?? "house",
+      window_method: windowMethodOf(room),
       window_sensors: [...(room?.window_sensors ?? [])],
-      valve_window_sensors: [...(room?.valve_window_sensors ?? [])],
-      window_drop: room?.window_drop ?? false,
     };
     this.error = "";
     this.saving = false;
@@ -142,6 +169,11 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       }
       this.room = current;
     }
+    const windows = this.windowFields();
+    if (typeof windows === "string") {
+      this.error = t(windows);
+      return;
+    }
     this.saving = true;
     this.error = "";
     const base: RoomData = this.room ?? {
@@ -170,9 +202,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       plan_id: this.data.plan_id,
       temp_set_id: this.data.temp_set_id,
       zone_id: this.data.zone_id,
-      window_sensors: this.data.window_sensors,
-      valve_window_sensors: this.data.valve_window_sensors,
-      window_drop: this.data.window_drop,
+      ...windows,
     });
     try {
       await storeFor(this.hass).call("room/save", {
@@ -187,6 +217,33 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     }
   }
 
+  /** The stored fields of the chosen way to detect an open window, or what is missing for it. */
+  private windowFields():
+    | Pick<RoomData, "window_sensors" | "valve_window_sensors" | "window_drop">
+    | TextKey {
+    const method = this.data.window_method;
+    if (method === "sensors" && !this.data.window_sensors.length) return "adv.rooms.window_sensors_missing";
+    const valves = method === "valves" ? this.valveWindows() : [];
+    if (method === "valves" && !valves.length) return "adv.rooms.window_valves_missing";
+    return {
+      window_sensors: method === "sensors" ? this.data.window_sensors : [],
+      valve_window_sensors: valves,
+      window_drop: method === "drop",
+    };
+  }
+
+  /**
+   * The valves' own open-window entities: those of the room's chosen valves. A room that has
+   * others (1.1 let them be chosen by hand) keeps them while its valves offer none.
+   */
+  private valveWindows(): string[] {
+    const trvs = new Set(this.data.trvs);
+    const found = (this.args?.candidates.valve_window_entities ?? [])
+      .filter((entity) => entity.trvs.some((trv) => trvs.has(trv)))
+      .map((entity) => entity.entity_id);
+    return found.length ? found : [...(this.room?.valve_window_sensors ?? [])];
+  }
+
   private schema(candidates: Candidates) {
     // Valves of other rooms can't be chosen.
     const free = candidates.climates
@@ -196,11 +253,9 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
       ...candidates.temperature_entities.map((sensor) => sensor.entity_id),
       ...candidates.climates.map((climate) => climate.entity_id),
     ];
-    // The valves' own detection: their window entities if Home Assistant knows any.
-    const valveWindows = candidates.valve_window_entities.map((entity) => entity.entity_id);
-    const valveSelector = valveWindows.length
-      ? { entity: { multiple: true, include_entities: [...new Set([...valveWindows, ...this.data.valve_window_sensors])] } }
-      : { entity: { multiple: true, filter: [{ domain: "binary_sensor" }, { domain: "sensor" }] } };
+    // The valves' own detection only where the room's valves report an open window.
+    const methods: WindowMethod[] = ["off", "sensors", "drop"];
+    if (this.valveWindows().length) methods.push("valves");
     const zones =
       this.snapshot.zones.length > 1
         ? [
@@ -238,9 +293,23 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
           },
         },
       },
-      { name: "window_sensors", selector: { entity: { multiple: true, filter: WINDOW_FILTER } } },
-      { name: "valve_window_sensors", selector: valveSelector },
-      { name: "window_drop", selector: { boolean: {} } },
+      {
+        name: "window_method",
+        selector: {
+          select: {
+            mode: "box",
+            box_max_columns: 1,
+            options: methods.map((method) => ({
+              value: method,
+              label: this.t(METHODS[method].label),
+              description: this.t(METHODS[method].description),
+            })),
+          },
+        },
+      },
+      ...(this.data.window_method === "sensors"
+        ? [{ name: "window_sensors", selector: { entity: { multiple: true, filter: WINDOW_FILTER } } }]
+        : []),
     ];
   }
 
@@ -250,17 +319,60 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
     const t = this.t;
     if (field.name === "temperature_entity") return `${t("adv.rooms.sensor_empty")} ${t("adv.rooms.sensor_hint")}`;
     if (field.name === "trvs" && this.args?.candidates.climates.length === 0) return t("adv.rooms.no_climates");
-    if (field.name === "window_drop") {
+    if (field.name === "window_sensors") {
+      const seconds = this.snapshot.settings.window_delay_seconds;
+      if (seconds === 0) return t("adv.rooms.window_sensors_hint_now");
+      const delay =
+        seconds % 60 === 0 ? t("adv.settings.minutes", { n: seconds / 60 }) : t("adv.settings.seconds", { n: seconds });
+      return t("adv.rooms.window_sensors_hint", { delay });
+    }
+    return undefined;
+  };
+
+  /** What the temperature drop or the valves' own detection does: there is nothing to choose. */
+  private windowInfo() {
+    const t = this.t;
+    if (this.data.window_method === "drop") {
       const settings = this.snapshot.settings;
       const ctx = formatContext(this.hass, languageOf(this.hass), this.snapshot);
-      return t("adv.rooms.window_drop_hint", {
-        degrees: formatTemp(settings.window_drop_degrees, ctx),
-        minutes: settings.window_drop_minutes,
-      });
+      const entity = this.data.temperature_entity;
+      const sensor = entity
+        ? ((this.hass.states[entity]?.attributes.friendly_name as string | undefined) ?? entity)
+        : t("adv.rooms.window_drop_valves");
+      return html`<div class="window-info">
+        <ha-svg-icon .path=${mdiThermometerMinus}></ha-svg-icon>
+        <span>
+          ${t("adv.rooms.window_drop_info", {
+            sensor,
+            degrees: formatTemp(settings.window_drop_degrees, ctx),
+            minutes: settings.window_drop_minutes,
+            rise: formatTemp(settings.window_drop_rise, ctx),
+            hold: formatDuration(settings.window_drop_hold_minutes),
+          })}
+        </span>
+      </div>`;
     }
-    const hint = HELPERS[field.name as keyof RoomForm];
-    return hint ? t(hint) : undefined;
-  };
+    if (this.data.window_method === "valves") {
+      // The valves whose detection is used; for entities kept from 1.1, the entities.
+      const trvs = new Set(this.data.trvs);
+      const reporting = (this.args?.candidates.valve_window_entities ?? []).flatMap((entity) =>
+        entity.trvs.filter((trv) => trvs.has(trv)),
+      );
+      const shown = reporting.length ? [...new Set(reporting)] : this.valveWindows();
+      const names = shown.map(
+        (entity) => (this.hass.states[entity]?.attributes.friendly_name as string | undefined) ?? entity,
+      );
+      return html`<div class="window-info">
+        <ha-svg-icon .path=${mdiThermostat}></ha-svg-icon>
+        <span>
+          ${names.length
+            ? t("adv.rooms.window_valves_info", { valves: names.join(", ") })
+            : t("adv.rooms.window_valves_missing")}
+        </span>
+      </div>`;
+    }
+    return nothing;
+  }
 
   override render() {
     if (!this.args || !this.hass || !this.snapshot) return nothing;
@@ -279,6 +391,7 @@ export class HsRoomDialog extends HsHaDialog<RoomParams> {
           .computeHelper=${this.helper}
           @value-changed=${(e: CustomEvent<{ value: RoomForm }>) => (this.data = { ...this.data, ...e.detail.value })}
         ></ha-form>
+        ${this.windowInfo()}
         ${this.error ? html`<ha-alert alert-type="error">${this.error}</ha-alert>` : nothing}
         <ha-dialog-footer slot="footer">
           <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>

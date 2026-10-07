@@ -224,7 +224,8 @@ export interface Candidates {
     area_id: string | null;
     unit: string | null;
   }[];
-  valve_window_entities: { entity_id: string; name: string }[];
+  /** Entities of the valves' own open-window detection, with the valves of the same device. */
+  valve_window_entities: { entity_id: string; name: string; trvs: string[] }[];
   areas: { area_id: string; name: string; climates: string[]; temperature_entity: string | null }[];
   floors: { floor_id: string; name: string; rooms: string[] }[];
 }

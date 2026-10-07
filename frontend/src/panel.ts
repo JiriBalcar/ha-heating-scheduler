@@ -15,6 +15,7 @@ import "./components/hs-advanced-view";
 import "./components/hs-home-view";
 import "./components/hs-plans-view";
 import "./components/hs-temps-view";
+import { FAB_EVENT, type Fab } from "./fab";
 import { HA_ELEMENTS, whenDefined } from "./ha";
 import { languageOf, translator } from "./i18n";
 import { acquireScrim, releaseScrim } from "./scrim";
@@ -47,6 +48,7 @@ export class HeatingSchedulerPanel extends LitElement {
     waitedTooLong: { state: true },
     ready: { state: true },
     tick: { state: true },
+    fab: { state: true },
   };
   declare hass: HomeAssistant;
   declare narrow: boolean;
@@ -56,6 +58,8 @@ export class HeatingSchedulerPanel extends LitElement {
   declare waitedTooLong: boolean;
   declare ready: boolean;
   declare tick: number;
+  /** The floating button of the view on screen, and the view (see ./fab). */
+  declare fab: { source: Element; value: Fab } | null;
 
   private unsubscribe: (() => void) | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
@@ -71,7 +75,11 @@ export class HeatingSchedulerPanel extends LitElement {
     this.waitedTooLong = false;
     this.ready = false;
     this.tick = 0;
+    this.fab = null;
     this.addEventListener("hs-navigate", (event) => this.navigate((event as CustomEvent<string>).detail));
+    this.addEventListener(FAB_EVENT, (event) => {
+      this.fab = { source: event.composedPath()[0] as Element, value: (event as CustomEvent<Fab>).detail };
+    });
     this.addEventListener(UNSAVED_EVENT, (event) => {
       const source = event.composedPath()[0] as Element;
       if ((event as CustomEvent<boolean>).detail) this.unsaved.add(source);
@@ -100,6 +108,23 @@ export class HeatingSchedulerPanel extends LitElement {
         padding: var(--ha-space-8, 32px) var(--ha-space-4, 16px);
         text-align: center;
         color: var(--secondary-text-color);
+      }
+      /* HA's editors slide their Save in from below while there are changes. */
+      ha-button[slot="fab"] {
+        --ha-button-box-shadow: var(--ha-box-shadow-l);
+        transition:
+          transform 0.3s,
+          opacity 0.3s,
+          visibility 0s;
+      }
+      ha-button[slot="fab"]:not(.shown) {
+        transform: translateY(calc(100% + 120px));
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          transform 0.3s,
+          opacity 0.3s,
+          visibility 0s 0.3s;
       }
     `,
   ];
@@ -143,6 +168,8 @@ export class HeatingSchedulerPanel extends LitElement {
       void this.askToLeave(path);
       return;
     }
+    // A new view reports its own floating button once it is on screen.
+    if (path !== shown) this.fab = null;
     this.shownPath = path;
   }
 
@@ -222,10 +249,23 @@ export class HeatingSchedulerPanel extends LitElement {
     ];
     // The panel's own URL shows the overview.
     const route = { prefix, path: this.tab === "home" ? "/overview" : this.path };
+    const fab = this.fab?.source.isConnected ? this.fab.value : null;
     return html`
-      <hass-tabs-subpage .hass=${this.hass} .route=${route} .tabs=${tabs} main-page>
+      <hass-tabs-subpage .hass=${this.hass} .route=${route} .tabs=${tabs} .hasFab=${fab !== null} main-page>
         <span slot="header">${t("app.title")}</span>
         <div class="content" data-tick=${this.tick}>${this.view()}</div>
+        ${fab
+          ? html`<ha-button
+              slot="fab"
+              size="l"
+              class=${fab.shown ? "shown" : ""}
+              .loading=${fab.busy}
+              .disabled=${fab.busy}
+              @click=${fab.run}
+            >
+              <ha-svg-icon slot="start" .path=${fab.icon}></ha-svg-icon>${fab.label}
+            </ha-button>`
+          : nothing}
       </hass-tabs-subpage>
     `;
   }

@@ -18,6 +18,7 @@ import "../src/components/hs-temps-view";
 import "../src/components/hs-zone-modes-dialog";
 import { gridOptions } from "../src/card-config";
 import { openRoomDialog } from "../src/components/hs-room-dialog";
+import { FAB_EVENT, type Fab } from "../src/fab";
 import { fitReplacements, type ZoneModes } from "../src/components/hs-zone-modes-dialog";
 import type { Candidates, HomeAssistant, HouseData, HouseMode, PlanData, RoomData, Snapshot, ZoneData } from "../src/types";
 
@@ -730,5 +731,116 @@ describe("zone modes dialog", () => {
       revision: 8,
       zone: { id: "up", name: "Attic", ...choice },
     });
+  });
+});
+
+describe("settings in cards", () => {
+  it("fold the drop rules with the rooms that use them, and save from HA's floating button", async () => {
+    const sent: Any[] = [];
+    const fabs: Fab[] = [];
+    const listen = (event: Event) => fabs.push((event as CustomEvent<Fab>).detail);
+    document.addEventListener(FAB_EVENT, listen);
+    const settings = document.createElement("hs-adv-settings") as Any;
+    settings.hass = fakeHass(async (message) => (sent.push(message), { revision: 2 }));
+    settings.snapshot = snapshot(1, { zones: ZONES, rooms: [BEDROOM, { ...KITCHEN, window_drop: true }] });
+    document.body.appendChild(settings);
+    await settings.updateComplete;
+
+    const cards = [...settings.shadowRoot.querySelectorAll("ha-card")] as Any[];
+    expect(cards.map((card) => card.header)).toEqual([undefined, "Heating", "Open windows", "Valves"]);
+    expect(text(cards[0], '[slot="heading"]')).toBe("Test mode");
+    const drop = settings.shadowRoot.querySelector("ha-expansion-panel");
+    expect(drop.secondary).toBe("Open at 1.0 °C less within 5 min · used by Kitchen");
+    expect(drop.querySelectorAll("ha-settings-row")).toHaveLength(4);
+
+    // Nothing to save: the button stays out of sight. A change brings it; it saves.
+    expect(fabs.at(-1)).toMatchObject({ label: "Save", shown: false, busy: false });
+    settings.set("boost_minutes", 120);
+    await settings.updateComplete;
+    expect(fabs.at(-1)!.shown).toBe(true);
+    fabs.at(-1)!.run();
+    await new Promise((resolve) => setTimeout(resolve));
+    await settings.updateComplete;
+    expect(sent[0].settings.boost_minutes).toBe(120);
+    expect(fabs.at(-1)).toMatchObject({ shown: false, busy: false });
+    document.removeEventListener(FAB_EVENT, listen);
+    settings.remove();
+  });
+});
+
+describe("room dialog: one way to detect an open window", () => {
+  const VALVE_WINDOW = { entity_id: "binary_sensor.kitchen_valve_window", name: "Window", trvs: ["climate.kitchen"] };
+  const ROOM: RoomData = { ...KITCHEN, trvs: ["climate.kitchen"] };
+
+  async function open(
+    room: RoomData,
+    valveWindows: Candidates["valve_window_entities"],
+    callWS: (message: Any) => Promise<unknown> = async () => ({ room_id: room.id, revision: 2 }),
+  ): Promise<Any> {
+    const dialog = document.createElement("hs-room-dialog") as Any;
+    dialog.hass = fakeHass(callWS);
+    document.body.appendChild(dialog);
+    dialog.showDialog({
+      snapshot: snapshot(1, { zones: ZONES, rooms: [room] }),
+      candidates: {
+        climates: [{ entity_id: "climate.kitchen", name: "Kitchen valve", area_id: null, room_id: room.id }],
+        temperature_entities: [],
+        valve_window_entities: valveWindows,
+        areas: [],
+        floors: [],
+      },
+      room,
+    });
+    await dialog.updateComplete;
+    return dialog;
+  }
+
+  function methods(dialog: Any): string[] {
+    const field = dialog.schema(dialog.args.candidates).find((item: Any) => item.name === "window_method");
+    return field.selector.select.options.map((option: Any) => option.value);
+  }
+
+  it("shows the room's way; the valves' detection only for valves that report one", async () => {
+    const drop = await open({ ...ROOM, window_drop: true }, []);
+    expect(drop.data.window_method).toBe("drop");
+    expect(methods(drop)).toEqual(["off", "sensors", "drop"]);
+    expect(text(drop.shadowRoot, ".window-info")).toBe(
+      "Open when the valves’ temperature drops by 1.0 °C within 5 min; closed when it rises by 0.3 °C, at the latest after 30 min (Advanced → Settings).",
+    );
+    expect(drop.schema(drop.args.candidates).some((item: Any) => item.name === "window_sensors")).toBe(false);
+    drop.remove();
+
+    const valves = await open(ROOM, [VALVE_WINDOW]);
+    expect(valves.data.window_method).toBe("off");
+    expect(methods(valves)).toEqual(["off", "sensors", "drop", "valves"]);
+    valves.remove();
+  });
+
+  it("saves only the chosen way", async () => {
+    const sent: Any[] = [];
+    const dialog = await open({ ...ROOM, window_sensors: ["binary_sensor.kitchen_window"] }, [VALVE_WINDOW], async (message) => {
+      sent.push(message);
+      return { room_id: "kitchen", revision: 2 };
+    });
+    expect(dialog.data.window_method).toBe("sensors");
+    expect(dialog.schema(dialog.args.candidates).some((item: Any) => item.name === "window_sensors")).toBe(true);
+    dialog.data = { ...dialog.data, window_method: "valves" };
+    await dialog.save();
+    expect(sent[0].room).toMatchObject({
+      window_sensors: [],
+      valve_window_sensors: ["binary_sensor.kitchen_valve_window"],
+      window_drop: false,
+    });
+    dialog.remove();
+  });
+
+  it("asks for a window sensor before saving Window sensors without one", async () => {
+    const sent: Any[] = [];
+    const dialog = await open(ROOM, [], async (message) => (sent.push(message), {}));
+    dialog.data = { ...dialog.data, window_method: "sensors" };
+    await dialog.save();
+    expect(sent).toHaveLength(0);
+    expect(dialog.error).toBe("Choose a window sensor, or another way to detect an open window.");
+    dialog.remove();
   });
 });

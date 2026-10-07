@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeAll, expect, it } from "vitest";
 import "../src/panel";
+import { reportFab } from "../src/fab";
 import { reportUnsaved } from "../src/unsaved";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -62,4 +63,39 @@ it("asks before a tab switch drops unsaved edits, and stays unless they are disc
   expect(asked).toHaveLength(2);
   expect(panel.path).toBe("/advanced");
   delete window.loadCardHelpers;
+});
+
+it("shows a view's Save as HA's floating button, until another view is on screen", async () => {
+  const panel = document.createElement("heating-scheduler-panel") as Any;
+  panel.hass = {
+    language: "en",
+    locale: { language: "en" },
+    config: { time_zone: "Europe/Prague" },
+    states: {},
+    connection: { subscribeMessage: async () => async () => undefined },
+    callWS: async () => undefined,
+  };
+  panel.route = { prefix: "/heating-scheduler", path: "/advanced/settings" };
+  document.body.appendChild(panel);
+  panel.ready = true;
+  await panel.updateComplete;
+
+  let saved = 0;
+  const view = panel.appendChild(document.createElement("div"));
+  const fab = { label: "Save", icon: "M0,0H24V24H0Z", shown: false, busy: false, run: () => (saved += 1) };
+  const button = () => panel.shadowRoot.querySelector('ha-button[slot="fab"]');
+  reportFab(view, fab);
+  await panel.updateComplete;
+  expect(button().classList.contains("shown")).toBe(false);
+  expect(panel.shadowRoot.querySelector("hass-tabs-subpage").hasFab).toBe(true);
+  reportFab(view, { ...fab, shown: true });
+  await panel.updateComplete;
+  expect(button().classList.contains("shown")).toBe(true);
+  button().click();
+  expect(saved).toBe(1);
+
+  panel.route = { prefix: "/heating-scheduler", path: "/advanced/rooms" };
+  await panel.updateComplete;
+  expect(button()).toBeNull();
+  panel.remove();
 });

@@ -1,4 +1,6 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { mdiContentSave } from "@mdi/js";
+import { reportFab } from "../fab";
 import { formatContext, formatDuration, formatNumber } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
@@ -30,7 +32,7 @@ function secondsLabel(seconds: number, t: Translate): string {
   return t("adv.settings.seconds", { n: seconds });
 }
 
-/** Global settings. */
+/** Global settings, in cards: test mode, heating, open windows, valves. */
 export class HsAdvSettings extends LitElement {
   static override properties = {
     hass: { attribute: false },
@@ -56,13 +58,27 @@ export class HsAdvSettings extends LitElement {
     baseStyles,
     css`
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        gap: var(--ha-space-4, 16px);
       }
       ha-settings-row {
         border-top: 1px solid var(--divider-color);
       }
       ha-settings-row:first-child {
         border-top: none;
+      }
+      /* The temperature-drop rules fold under one row, a step in from the card's edge. */
+      ha-expansion-panel {
+        display: block;
+        border-top: 1px solid var(--divider-color);
+        --expansion-panel-summary-padding: 0 var(--ha-space-4, 16px);
+        --expansion-panel-content-padding: 0;
+      }
+      ha-expansion-panel ha-settings-row,
+      ha-expansion-panel ha-settings-row:first-child {
+        border-top: 1px solid var(--divider-color);
+        padding-inline-start: var(--ha-space-8, 32px);
       }
       ha-select {
         min-width: 140px;
@@ -79,12 +95,6 @@ export class HsAdvSettings extends LitElement {
           padding-bottom: var(--ha-space-3, 12px);
           --settings-row-content-padding-block: 0;
         }
-      }
-      .card-actions {
-        display: flex;
-        justify-content: flex-end;
-        border-top: 1px solid var(--divider-color);
-        padding: var(--ha-space-2, 8px);
       }
     `,
   ];
@@ -112,12 +122,23 @@ export class HsAdvSettings extends LitElement {
   }
 
   private reportedUnsaved = false;
+  private reportedFab: { shown: boolean; busy: boolean } | null = null;
 
   protected override updated(): void {
     const unsaved = this.dirty;
     if (unsaved !== this.reportedUnsaved) {
       this.reportedUnsaved = unsaved;
       reportUnsaved(this, unsaved);
+    }
+    if (unsaved !== this.reportedFab?.shown || this.busy !== this.reportedFab.busy) {
+      this.reportedFab = { shown: unsaved, busy: this.busy };
+      reportFab(this, {
+        label: this.t("common.save"),
+        icon: mdiContentSave,
+        shown: unsaved,
+        busy: this.busy,
+        run: () => void this.save(),
+      });
     }
   }
 
@@ -186,6 +207,16 @@ export class HsAdvSettings extends LitElement {
     const draft = this.draft;
     return html`
       <ha-card>
+        <ha-settings-row>
+          <span slot="heading">${t("adv.settings.dry_run")}</span>
+          <span slot="description">${t("adv.settings.dry_run_hint")}</span>
+          <ha-switch
+            .checked=${draft.dry_run}
+            @change=${(e: Event) => this.set("dry_run", (e.target as HTMLInputElement).checked)}
+          ></ha-switch>
+        </ha-settings-row>
+      </ha-card>
+      <ha-card .header=${t("adv.settings.heating")}>
         ${this.choice(
           t("adv.settings.max_override"),
           OVERRIDE_HOURS,
@@ -194,46 +225,8 @@ export class HsAdvSettings extends LitElement {
           (hours) => this.set("max_override_minutes", Math.round(hours * 60)),
           t("adv.settings.max_override_hint"),
         )}
-        ${this.choice(t("adv.settings.safety_interval"), SAFETY_MINUTES, draft.safety_interval_minutes, "minutes", (m) =>
-          this.set("safety_interval_minutes", m),
-        )}
-        ${this.choice(t("adv.settings.mismatch_alert"), MISMATCH_MINUTES, draft.mismatch_alert_minutes, "minutes", (m) =>
-          this.set("mismatch_alert_minutes", m),
-        )}
         ${this.choice(t("adv.settings.boost"), BOOST_MINUTES, draft.boost_minutes, "duration", (m) =>
           this.set("boost_minutes", m),
-        )}
-        ${this.choice(
-          t("adv.settings.window_delay"),
-          WINDOW_DELAY_SECONDS,
-          draft.window_delay_seconds,
-          "seconds",
-          (s) => this.set("window_delay_seconds", s),
-          t("adv.settings.window_delay_hint"),
-        )}
-        ${this.choice(t("adv.settings.window_limit"), WINDOW_LIMIT_MINUTES, draft.window_limit_minutes, "duration", (m) =>
-          this.set("window_limit_minutes", m),
-        )}
-        ${this.choice(
-          t("adv.settings.window_drop_degrees"),
-          DROP_DEGREES,
-          draft.window_drop_degrees,
-          "degrees",
-          (d) => this.set("window_drop_degrees", d),
-          t("adv.settings.window_drop_hint"),
-        )}
-        ${this.choice(t("adv.settings.window_drop_minutes"), DROP_MINUTES, draft.window_drop_minutes, "minutes", (m) =>
-          this.set("window_drop_minutes", m),
-        )}
-        ${this.choice(t("adv.settings.window_drop_rise"), DROP_RISE, draft.window_drop_rise, "degrees", (d) =>
-          this.set("window_drop_rise", d),
-        )}
-        ${this.choice(
-          t("adv.settings.window_drop_hold"),
-          DROP_HOLD_MINUTES,
-          draft.window_drop_hold_minutes,
-          "duration",
-          (m) => this.set("window_drop_hold_minutes", m),
         )}
         <ha-settings-row>
           <span slot="heading">${t("adv.settings.vacation_mode")}</span>
@@ -248,20 +241,71 @@ export class HsAdvSettings extends LitElement {
             }}
           ></ha-select>
         </ha-settings-row>
-        <ha-settings-row>
-          <span slot="heading">${t("adv.settings.dry_run")}</span>
-          <ha-switch
-            .checked=${draft.dry_run}
-            @change=${(e: Event) => this.set("dry_run", (e.target as HTMLInputElement).checked)}
-          ></ha-switch>
-        </ha-settings-row>
-        <div class="card-actions">
-          <ha-button .disabled=${this.busy || !this.dirty} .loading=${this.busy} @click=${this.save}>
-            ${t("common.save")}
-          </ha-button>
-        </div>
+      </ha-card>
+      <ha-card .header=${t("adv.settings.windows")}>
+        ${this.choice(
+          t("adv.settings.window_delay"),
+          WINDOW_DELAY_SECONDS,
+          draft.window_delay_seconds,
+          "seconds",
+          (s) => this.set("window_delay_seconds", s),
+          t("adv.settings.window_delay_hint"),
+        )}
+        ${this.choice(
+          t("adv.settings.window_limit"),
+          WINDOW_LIMIT_MINUTES,
+          draft.window_limit_minutes,
+          "duration",
+          (m) => this.set("window_limit_minutes", m),
+          t("adv.settings.window_limit_hint"),
+        )}
+        <ha-expansion-panel .header=${t("adv.settings.window_drop")} .secondary=${this.dropSummary()}>
+          ${this.choice(
+            t("adv.settings.window_drop_degrees"),
+            DROP_DEGREES,
+            draft.window_drop_degrees,
+            "degrees",
+            (d) => this.set("window_drop_degrees", d),
+            t("adv.settings.window_drop_hint"),
+          )}
+          ${this.choice(t("adv.settings.window_drop_minutes"), DROP_MINUTES, draft.window_drop_minutes, "minutes", (m) =>
+            this.set("window_drop_minutes", m),
+          )}
+          ${this.choice(t("adv.settings.window_drop_rise"), DROP_RISE, draft.window_drop_rise, "degrees", (d) =>
+            this.set("window_drop_rise", d),
+          )}
+          ${this.choice(
+            t("adv.settings.window_drop_hold"),
+            DROP_HOLD_MINUTES,
+            draft.window_drop_hold_minutes,
+            "duration",
+            (m) => this.set("window_drop_hold_minutes", m),
+          )}
+        </ha-expansion-panel>
+      </ha-card>
+      <ha-card .header=${t("adv.settings.valves")}>
+        ${this.choice(t("adv.settings.safety_interval"), SAFETY_MINUTES, draft.safety_interval_minutes, "minutes", (m) =>
+          this.set("safety_interval_minutes", m),
+        )}
+        ${this.choice(t("adv.settings.mismatch_alert"), MISMATCH_MINUTES, draft.mismatch_alert_minutes, "minutes", (m) =>
+          this.set("mismatch_alert_minutes", m),
+        )}
       </ha-card>
     `;
+  }
+
+  /** "Open at 1 °C less within 5 min · used by Kitchen": the rule and the rooms that use it. */
+  private dropSummary(): string {
+    const t = this.t;
+    const draft = this.draft;
+    const rooms = this.snapshot.rooms.filter((room) => room.window_drop).map((room) => room.name);
+    return t("adv.settings.window_drop_summary", {
+      degrees: `${formatNumber(draft.window_drop_degrees, formatContext(this.hass, languageOf(this.hass)))} °C`,
+      minutes: draft.window_drop_minutes,
+      used: rooms.length
+        ? t("adv.settings.window_drop_used", { rooms: rooms.join(", ") })
+        : t("adv.settings.window_drop_unused"),
+    });
   }
 }
 
