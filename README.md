@@ -59,13 +59,14 @@ Home Assistant.
 3. **Advanced → Rooms → Add rooms from areas** creates one room per Home Assistant area that
    has valves. You can also add rooms by hand and pick their valves.
 4. Optional: choose a **Temperature shown** sensor per room. It is used only for display.
-   Optional: choose the room's **Window sensors**, the **Open window detected by the valves**
-   entities (for valves that report their own detection), or turn on **Detect an open window when
-   the room temperature drops fast** (for rooms without sensors).
-   **Advanced → Settings** has how long a contact sensor must be open (default 30 s), when an
-   open window gets Frost guard (default 1 h), and the drop rules: how far the temperature must
-   drop (default 1 °C) and within what time (default 5 minutes), and when the window counts as
-   closed again (a rise of 0.3 °C, at the latest after 30 minutes).
+   Optional: under **Open window**, choose how the room knows that a window is open, one way per
+   room: **Window sensors** (then pick the contact sensors), **Temperature drop** (for rooms
+   without sensors), or **The valves’ own detection** (offered only for valves that report it).
+   **Advanced → Settings → Open windows** has how long a contact sensor must be open (default
+   30 s), when an open window gets Frost guard (default 1 h), and, under **Temperature drop**, the
+   drop rules: how far the temperature must drop (default 1 °C) and within what time (default 5
+   minutes), and when the window counts as closed again (a rise of 0.3 °C, at the latest after
+   30 minutes).
 5. **Plans**: change the house plan, or give some rooms their own plan.
 6. **Temperatures**: the house temperatures, and own sets for rooms that need
    other values (for example a warmer bathroom).

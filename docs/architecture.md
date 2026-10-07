@@ -87,11 +87,14 @@ tests/core/  tests/ha/
   (`boost_active`). Boosts that ended while HA was stopped are dropped at start. The zone boost
   has no control in the panel (user's decision): a tile of HA for its switch starts it.
 
-- **Open windows (decision, 2026-10-04, user request TIN2-10)**: a room has up to three signals,
-  because valves differ: contact sensors (`window_sensors`: binary sensors of windows or doors,
-  or `input_boolean`), the valves' own detection (`valve_window_sensors`: a binary sensor, or a
-  sensor whose state is a word such as `open`, as some valves report it), and a fast drop of the
-  room temperature (`window_drop`). A contact counts after `window_delay` (default 30 s, 0 s to
+- **Open windows (decision, 2026-10-04, user request TIN2-10)**: a room detects an open window
+  in one of three ways, because valves differ: contact sensors (`window_sensors`: binary sensors
+  of windows or doors, or `input_boolean`), the valves' own detection (`valve_window_sensors`: a
+  binary sensor, or a sensor whose state is a word such as `open`, as some valves report it), or
+  a fast drop of the room temperature (`window_drop`). One way per room (user's decision,
+  2026-10-07: setting all three at once was confusing): validation refuses more
+  (`one_window_method`), and configuration 2.3 keeps a stored room's window sensors, else the
+  valves' detection, else the drop. A contact counts after `window_delay` (default 30 s, 0 s to
   10 min), so a quick open and close does nothing; the valves' detection and the drop count at
   once, they have waited already. The room counts as open from the earliest signal. While open,
   its valves are off (HVAC off, else their minimum). After `window_limit` (default 1 h, 15 min
@@ -218,12 +221,13 @@ service are refused (`boost_active` during a boost).
 
 The configuration has a revision; websocket writes must send the revision they edited.
 
-The configuration store is version 2.2, the state store 2.2 (2.2 adds `windows`; older state has
+The configuration store is version 2.3, the state store 2.2 (2.2 adds `windows`; older state has
 no open windows). The migration from 1.x turns the
 house state into one zone, named „Dům“ or "House" by the HA language, and puts every room in it.
 2.2 adds the modes of each zone and their replacements; a zone stored without them offers every
 mode. The window fields of rooms and settings were added without a new version: a room stored
-without them has no window signals, and the settings use the defaults.
+without them has no window signals, and the settings use the defaults. 2.3 keeps one way to
+detect an open window per room (see Open windows).
 
 ## Home Assistant surface
 
@@ -391,6 +395,17 @@ without them has no window signals, and the settings use the defaults.
   and asks before discarding. HA's dialog box answers before it closes and then goes back in
   the browser history; `confirmDialog()` and its siblings return only after that, so a
   navigation that follows (for example "Discard" and leave) is not undone.
+- **Open window in the room dialog (decision, 2026-10-07, user, from designs on a canvas).** One
+  choice in HA's choice boxes (the `select` selector with `mode: box`): Off, Window sensors,
+  Temperature drop, and the valves' own detection only where the room's valves report one (the
+  candidates give each such entity with its valves; the dialog fills them in, nothing to pick).
+  Only Window sensors shows a picker; the drop and the valves' detection say what they do, with
+  the current rule. Window sensors without a sensor is not saved: the dialog asks for one.
+- **Settings in cards (decision, 2026-10-07, user).** Test mode on top, then Heating, Open
+  windows (the four drop rules fold into HA's `ha-expansion-panel`, with the rule and the rooms
+  that use it as its summary) and Valves. Save is HA's floating button, shown while there are
+  unsaved changes, as in HA's editors. Only a direct child of `hass-tabs-subpage` fills its
+  `fab` slot, so the settings view reports its button (`fab.ts`) and the panel shows it.
 - **Tabs (decision, 2026-09-30).** Overview · Plans · Temperatures · Advanced. Temperatures
   has its own tab like Plans, with the same layout: cards, a New button, and a card with the
   choice of each room. Advanced keeps the setup: rooms, zones, settings, health, log.
