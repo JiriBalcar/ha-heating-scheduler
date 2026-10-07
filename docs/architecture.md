@@ -262,11 +262,20 @@ without them has no window signals, and the settings use the defaults.
   `brand/icon@2x.png` (256 and 512 px, centred): HA 2026.3 and newer serves them itself, and HACS
   accepts them instead of an entry in `home-assistant/brands`. The sidebar shows the same dial in
   one colour, `heating-scheduler:dial`: HA's `<ha-icon>` looks up other prefixes than `mdi` in
-  `window.customIcons`, which the card loader fills on every page before HA draws the sidebar
-  (`icons.ts`; HACS does the same for its icon). The dial's track is `secondaryPath`, which HA
-  draws at half opacity. Next to the knob the arc ends straight inside the knob's ring, so the ring
-  hides the ends the way the colour icon's white knob does. A page opened before the integration
-  was installed shows no sidebar icon until it reloads, like the card.
+  `window.customIcons`, which the sidebar icon module fills on every page (`icons.ts`; HACS does
+  the same for its icon). The dial's track is `secondaryPath`, which HA draws at half opacity. Next
+  to the knob the arc ends straight inside the knob's ring, so the ring hides the ends the way the
+  colour icon's white knob does.
+- **Sidebar icon drawn too early (fix, 2026-10-07; the user kept the dial over an MDI icon).**
+  After a fresh install the sidebar entry showed its title with an empty icon. `<ha-icon>` draws a
+  prefix it does not know as the legacy `<iron-icon>`, which HA no longer has, and never looks
+  again. That happens in every page opened before the integration was added: HA adds the icon
+  module to a page only when the page loads, and on the first reload HA's service worker serves
+  its old copy of a visited page, so only the second reload brought the dial. It also happens when
+  HA draws the sidebar before the icon module ran. The icon module and the main bundle (the panel,
+  and the card, which loads it) therefore redraw our icons once the dial is registered
+  (`redrawIcons`): they reset `<ha-icon>`'s internal `_legacy` flag and set the icon again. Opening
+  the panel once draws the dial in such a page. If HA renames the flag, the redraw does nothing.
 - Permissions: every HA user may use every function **(decision)**.
 - Each room can have a display temperature entity (sensor or climate); without one, the
   UI shows the average `current_temperature` of the room's TRVs **(decision)**.
@@ -291,7 +300,8 @@ without them has no window signals, and the settings use the defaults.
   does; not a public API): it creates it, updates an old URL and removes duplicates. A reload
   keeps it; removing the integration deletes it. Resources kept in YAML cannot be written: a
   warning names the URL to add. The sidebar icon must load on every page, so it stays an extra
-  module; it defines no element, so the start order cannot break it.
+  module; it defines no element, so the start order cannot break HA's app, and a dial that HA drew
+  before the module ran is redrawn (see the sidebar icon above).
 - **Card loader (decision, 2026-09-30).** HA's service worker serves old copies of pages and
   files for a while after an update, so the card loader can be old. The loader therefore
   imports the main bundle by the URL in HA's live panel list, and the card and the panel always

@@ -11,3 +11,7 @@ it("the panel bundle defines the dashboard card too, for pages opened before the
   await customElements.whenDefined("heating-scheduler-card");
   expect(window.customCards?.filter((card) => card.type === "heating-scheduler-card")).toHaveLength(1);
 });
+
+it("the panel bundle registers the sidebar dial too, for pages opened before the icon module", () => {
+  expect(window.customIcons?.["heating-scheduler"]).toBeDefined();
+});

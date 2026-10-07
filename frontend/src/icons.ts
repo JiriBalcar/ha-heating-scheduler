@@ -1,8 +1,8 @@
 // The integration's own icons, for the sidebar and HA's icon picker: "heating-scheduler:dial" is the
 // brand icon (a thermostat dial around a flame) in one colour. HA's <ha-icon> looks up prefixes other
 // than mdi in window.customIcons, and draws `secondaryPath` at half opacity, like the dial's track.
-// The sidebar icon module (sidebar-icons.ts) registers them on every page before HA draws the
-// sidebar (HACS does the same).
+// The sidebar icon module (sidebar-icons.ts) registers them on every page (HACS does the same), and
+// redraws the dial if HA drew the sidebar first.
 
 export const ICON_PREFIX = "heating-scheduler";
 
@@ -37,4 +37,39 @@ export function registerIcons(): void {
     getIcon: async (name) => ICONS[name] ?? { path: "" },
     getIconList: async () => Object.keys(ICONS).map((name) => ({ name })),
   };
+}
+
+/** HA's <ha-icon>, with its internal flag for the legacy <iron-icon>. */
+interface HaIcon extends HTMLElement {
+  icon?: string;
+  _legacy?: boolean;
+}
+
+/**
+ * Redraw our icons that HA drew before they were registered, such as the dial in the sidebar.
+ *
+ * <ha-icon> draws a prefix it does not know as the legacy <iron-icon>, which HA no longer has, and
+ * never looks again: the sidebar shows an empty icon. This happens in pages opened before the
+ * integration was added, and when HA draws the sidebar before the icon module ran. `_legacy` is
+ * internal to HA (frontend 20260826.7): if HA renames it, this does nothing.
+ */
+export function redrawIcons(): void {
+  for (const icon of haIcons(document)) {
+    if (!icon._legacy || !icon.icon?.startsWith(`${ICON_PREFIX}:`)) continue;
+    const name = icon.icon;
+    icon._legacy = false;
+    // A changed value makes <ha-icon> look the icon up again.
+    icon.icon = undefined;
+    icon.icon = name;
+  }
+}
+
+/** Every <ha-icon> under `root`, in shadow roots too. */
+function haIcons(root: ParentNode): HaIcon[] {
+  const found: HaIcon[] = [];
+  for (const element of root.querySelectorAll("*")) {
+    if (element.localName === "ha-icon") found.push(element as HaIcon);
+    if (element.shadowRoot) found.push(...haIcons(element.shadowRoot));
+  }
+  return found;
 }

@@ -6,6 +6,9 @@ import "./card";
 // installed (the phone app can keep one open for days) has no dashboard card until it reloads.
 // The panel defines the card too, so opening the panel once brings the cards back.
 import "./card-loader";
+// The same for the sidebar icon module: such a page shows the sidebar entry with an empty icon
+// until the panel draws the dial.
+import "./sidebar-icons";
 import { define } from "./components/define";
 import { confirmDialog } from "./components/hs-dialog";
 import "./components/hs-advanced-view";
