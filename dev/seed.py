@@ -28,7 +28,11 @@ from custom_components.heating_scheduler.core.schedule_ops import (  # noqa: E40
     default_house_temps,
     uniform_plan,
 )
-from custom_components.heating_scheduler.core.serde import config_to_dict  # noqa: E402
+from custom_components.heating_scheduler.core.serde import (  # noqa: E402
+    CONFIG_MINOR_VERSION,
+    CONFIG_VERSION,
+    config_to_dict,
+)
 
 STORAGE = ROOT / "dev" / "config" / ".storage"
 FAKE_TRV = ROOT / "dev" / "config" / "custom_components" / "fake_trv"
@@ -110,8 +114,8 @@ def main() -> None:
     target.write_text(
         json.dumps(
             {
-                "version": 1,
-                "minor_version": 1,
+                "version": CONFIG_VERSION,
+                "minor_version": CONFIG_MINOR_VERSION,
                 "key": "heating_scheduler.config",
                 "data": config_to_dict(config),
             },
