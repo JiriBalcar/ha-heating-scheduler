@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "heating_scheduler"
-VERSION: Final = "1.1.0"
+VERSION: Final = "1.2.0"
 
 # Dispatcher signals.
 SIGNAL_UPDATE: Final = f"{DOMAIN}_update"

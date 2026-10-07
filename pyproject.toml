@@ -1,6 +1,6 @@
 [project]
 name = "heating-scheduler"
-version = "1.1.0"
+version = "1.2.0"
 description = "Home Assistant integration: heating schedules, modes and manual changes for radiator valves"
 readme = "README.md"
 license = "MIT"
