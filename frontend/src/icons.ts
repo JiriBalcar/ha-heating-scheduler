@@ -51,7 +51,7 @@ interface HaIcon extends HTMLElement {
  * <ha-icon> draws a prefix it does not know as the legacy <iron-icon>, which HA no longer has, and
  * never looks again: the sidebar shows an empty icon. This happens in pages opened before the
  * integration was added, and when HA draws the sidebar before the icon module ran. `_legacy` is
- * internal to HA (frontend 20260826.7): if HA renames it, this does nothing.
+ * internal to HA (frontend 20260930.2): if HA renames it, this does nothing.
  */
 export function redrawIcons(): void {
   for (const icon of haIcons(document)) {

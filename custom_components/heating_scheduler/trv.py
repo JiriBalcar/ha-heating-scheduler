@@ -37,7 +37,7 @@ from homeassistant.core import Context, HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import TemperatureConverter
-import voluptuous as vol
+import probatio
 
 from .const import PENDING_GRACE, SERVICE_CALL_TIMEOUT, VERIFY_TIMEOUTS
 from .core.echo import PendingWrite, settle_pending
@@ -502,7 +502,7 @@ class TrvWorker:
                             blocking=True,
                             context=context,
                         )
-            except (HomeAssistantError, TimeoutError, vol.Invalid) as err:
+            except (HomeAssistantError, TimeoutError, probatio.Invalid) as err:
                 self.last_error = str(err) or type(err).__name__
                 _LOGGER.debug("Write to %s failed: %s", self.entity_id, self.last_error)
                 return False

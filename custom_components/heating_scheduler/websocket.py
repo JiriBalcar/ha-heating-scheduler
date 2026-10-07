@@ -21,7 +21,7 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
-import voluptuous as vol
+import probatio
 
 from .const import DOMAIN, SIGNAL_UPDATE
 from .core.config_ops import (
@@ -187,7 +187,7 @@ def snapshot(engine: HeatingEngine) -> dict[str, Any]:
     }
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}subscribe"})
+@websocket_command({probatio.Required("type"): f"{PREFIX}subscribe"})
 @callback
 def ws_subscribe(hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]) -> None:
     """Send the snapshot now and after every change."""
@@ -224,28 +224,28 @@ def _check_trvs(hass: HomeAssistant, engine: HeatingEngine, trvs: list[str]) -> 
             )
 
 
-ROOM_SCHEMA = vol.Schema(
+ROOM_SCHEMA = probatio.Schema(
     {
-        vol.Optional("id"): vol.Any(None, str),
-        vol.Required("name"): str,
-        vol.Required("trvs"): [str],
-        vol.Optional("plan_id", default=HOUSE_ID): str,
-        vol.Optional("temp_set_id", default=HOUSE_ID): str,
-        vol.Optional("temperature_entity"): vol.Any(None, str),
-        vol.Optional("area_id"): vol.Any(None, str),
-        vol.Optional("zone_id"): vol.Any(None, str),
-        vol.Optional("window_sensors", default=[]): [str],
-        vol.Optional("valve_window_sensors", default=[]): [str],
-        vol.Optional("window_drop", default=False): bool,
+        probatio.Optional("id"): probatio.Any(None, str),
+        probatio.Required("name"): str,
+        probatio.Required("trvs"): [str],
+        probatio.Optional("plan_id", default=HOUSE_ID): str,
+        probatio.Optional("temp_set_id", default=HOUSE_ID): str,
+        probatio.Optional("temperature_entity"): probatio.Any(None, str),
+        probatio.Optional("area_id"): probatio.Any(None, str),
+        probatio.Optional("zone_id"): probatio.Any(None, str),
+        probatio.Optional("window_sensors", default=[]): [str],
+        probatio.Optional("valve_window_sensors", default=[]): [str],
+        probatio.Optional("window_drop", default=False): bool,
     }
 )
 
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}room/save",
-        vol.Required("revision"): int,
-        vol.Required("room"): ROOM_SCHEMA,
+        probatio.Required("type"): f"{PREFIX}room/save",
+        probatio.Required("revision"): int,
+        probatio.Required("room"): ROOM_SCHEMA,
     }
 )
 @async_response
@@ -282,9 +282,9 @@ async def ws_room_save(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}room/delete",
-        vol.Required("revision"): int,
-        vol.Required("room_id"): str,
+        probatio.Required("type"): f"{PREFIX}room/delete",
+        probatio.Required("revision"): int,
+        probatio.Required("room_id"): str,
     }
 )
 @async_response
@@ -299,9 +299,9 @@ async def ws_room_delete(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}rooms/reorder",
-        vol.Required("revision"): int,
-        vol.Required("order"): [str],
+        probatio.Required("type"): f"{PREFIX}rooms/reorder",
+        probatio.Required("revision"): int,
+        probatio.Required("order"): [str],
     }
 )
 @async_response
@@ -316,9 +316,9 @@ async def ws_rooms_reorder(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}plan/save",
-        vol.Required("revision"): int,
-        vol.Required("plan"): dict,
+        probatio.Required("type"): f"{PREFIX}plan/save",
+        probatio.Required("revision"): int,
+        probatio.Required("plan"): dict,
     }
 )
 @async_response
@@ -342,9 +342,9 @@ async def ws_plan_save(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}plan/delete",
-        vol.Required("revision"): int,
-        vol.Required("plan_id"): str,
+        probatio.Required("type"): f"{PREFIX}plan/delete",
+        probatio.Required("revision"): int,
+        probatio.Required("plan_id"): str,
     }
 )
 @async_response
@@ -359,9 +359,9 @@ async def ws_plan_delete(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}temp_set/save",
-        vol.Required("revision"): int,
-        vol.Required("temp_set"): dict,
+        probatio.Required("type"): f"{PREFIX}temp_set/save",
+        probatio.Required("revision"): int,
+        probatio.Required("temp_set"): dict,
     }
 )
 @async_response
@@ -383,9 +383,9 @@ async def ws_temp_set_save(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}temp_set/delete",
-        vol.Required("revision"): int,
-        vol.Required("temp_set_id"): str,
+        probatio.Required("type"): f"{PREFIX}temp_set/delete",
+        probatio.Required("revision"): int,
+        probatio.Required("temp_set_id"): str,
     }
 )
 @async_response
@@ -401,9 +401,9 @@ async def ws_temp_set_delete(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}settings/save",
-        vol.Required("revision"): int,
-        vol.Required("settings"): dict,
+        probatio.Required("type"): f"{PREFIX}settings/save",
+        probatio.Required("revision"): int,
+        probatio.Required("settings"): dict,
     }
 )
 @async_response
@@ -419,14 +419,14 @@ async def ws_settings_save(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}override/set",
-        vol.Required("room_id"): str,
-        vol.Required("temperature"): vol.Any(None, vol.Coerce(float)),
-        vol.Optional("kind", default=ExpiryKind.NEXT_CHANGE.value): vol.In(
+        probatio.Required("type"): f"{PREFIX}override/set",
+        probatio.Required("room_id"): str,
+        probatio.Required("temperature"): probatio.Any(None, probatio.Coerce(float)),
+        probatio.Optional("kind", default=ExpiryKind.NEXT_CHANGE.value): probatio.In(
             [kind.value for kind in ExpiryKind]
         ),
-        vol.Optional("minutes"): vol.All(int, vol.Range(min=1)),
-        vol.Optional("until"): str,
+        probatio.Optional("minutes"): probatio.All(int, probatio.Range(min=1)),
+        probatio.Optional("until"): str,
     }
 )
 @async_response
@@ -447,7 +447,9 @@ async def ws_override_set(
     connection.send_result(msg["id"], override_to_dict(override))
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}override/clear", vol.Required("room_id"): str})
+@websocket_command(
+    {probatio.Required("type"): f"{PREFIX}override/clear", probatio.Required("room_id"): str}
+)
 @async_response
 @_guarded
 async def ws_override_clear(
@@ -460,9 +462,9 @@ async def ws_override_clear(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}house_mode/set",
-        vol.Required("mode"): vol.In([mode.value for mode in HouseMode]),
-        vol.Optional("zone_id"): vol.Any(None, str),
+        probatio.Required("type"): f"{PREFIX}house_mode/set",
+        probatio.Required("mode"): probatio.In([mode.value for mode in HouseMode]),
+        probatio.Optional("zone_id"): probatio.Any(None, str),
     }
 )
 @async_response
@@ -477,11 +479,13 @@ async def ws_house_mode_set(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}vacation/set",
-        vol.Optional("start"): vol.Any(None, str),
-        vol.Optional("end"): vol.Any(None, str),
-        vol.Optional("mode"): vol.Any(None, vol.In([Mode.FROST.value, Mode.AWAY.value])),
-        vol.Optional("zone_id"): vol.Any(None, str),
+        probatio.Required("type"): f"{PREFIX}vacation/set",
+        probatio.Optional("start"): probatio.Any(None, str),
+        probatio.Optional("end"): probatio.Any(None, str),
+        probatio.Optional("mode"): probatio.Any(
+            None, probatio.In([Mode.FROST.value, Mode.AWAY.value])
+        ),
+        probatio.Optional("zone_id"): probatio.Any(None, str),
     }
 )
 @async_response
@@ -503,7 +507,10 @@ async def ws_vacation_set(
 
 
 @websocket_command(
-    {vol.Required("type"): f"{PREFIX}vacation/cancel", vol.Optional("zone_id"): vol.Any(None, str)}
+    {
+        probatio.Required("type"): f"{PREFIX}vacation/cancel",
+        probatio.Optional("zone_id"): probatio.Any(None, str),
+    }
 )
 @async_response
 @_guarded
@@ -517,15 +524,15 @@ async def ws_vacation_cancel(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}zone/save",
-        vol.Required("revision"): int,
-        vol.Required("zone"): vol.Schema(
+        probatio.Required("type"): f"{PREFIX}zone/save",
+        probatio.Required("revision"): int,
+        probatio.Required("zone"): probatio.Schema(
             {
-                vol.Optional("id"): vol.Any(None, str),
-                vol.Required("name"): str,
-                vol.Optional("modes"): [vol.In([mode.value for mode in HouseMode])],
-                vol.Optional("replacements"): {
-                    vol.In([mode.value for mode in HouseMode]): vol.In(
+                probatio.Optional("id"): probatio.Any(None, str),
+                probatio.Required("name"): str,
+                probatio.Optional("modes"): [probatio.In([mode.value for mode in HouseMode])],
+                probatio.Optional("replacements"): {
+                    probatio.In([mode.value for mode in HouseMode]): probatio.In(
                         [mode.value for mode in HouseMode]
                     )
                 },
@@ -564,9 +571,9 @@ async def ws_zone_save(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}zone/delete",
-        vol.Required("revision"): int,
-        vol.Required("zone_id"): str,
+        probatio.Required("type"): f"{PREFIX}zone/delete",
+        probatio.Required("revision"): int,
+        probatio.Required("zone_id"): str,
     }
 )
 @async_response
@@ -581,9 +588,9 @@ async def ws_zone_delete(
 
 @websocket_command(
     {
-        vol.Required("type"): f"{PREFIX}zones/reorder",
-        vol.Required("revision"): int,
-        vol.Required("order"): [str],
+        probatio.Required("type"): f"{PREFIX}zones/reorder",
+        probatio.Required("revision"): int,
+        probatio.Required("order"): [str],
     }
 )
 @async_response
@@ -644,7 +651,7 @@ def _room_floors(hass: HomeAssistant, engine: HeatingEngine) -> dict[str, tuple[
 
 
 @websocket_command(
-    {vol.Required("type"): f"{PREFIX}zones/from_floors", vol.Required("revision"): int}
+    {probatio.Required("type"): f"{PREFIX}zones/from_floors", probatio.Required("revision"): int}
 )
 @async_response
 @_guarded
@@ -657,7 +664,7 @@ async def ws_zones_from_floors(
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}log", vol.Required("room_id"): str})
+@websocket_command({probatio.Required("type"): f"{PREFIX}log", probatio.Required("room_id"): str})
 @async_response
 @_guarded
 async def ws_log(
@@ -669,7 +676,7 @@ async def ws_log(
     connection.send_result(msg["id"], {"entries": entries})
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}boost/start"})
+@websocket_command({probatio.Required("type"): f"{PREFIX}boost/start"})
 @async_response
 @_guarded
 async def ws_boost_start(
@@ -680,7 +687,7 @@ async def ws_boost_start(
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}boost/stop"})
+@websocket_command({probatio.Required("type"): f"{PREFIX}boost/stop"})
 @async_response
 @_guarded
 async def ws_boost_stop(
@@ -691,7 +698,7 @@ async def ws_boost_stop(
     connection.send_result(msg["id"], {"revision": engine.config.revision})
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}reconcile"})
+@websocket_command({probatio.Required("type"): f"{PREFIX}reconcile"})
 @async_response
 @_guarded
 async def ws_reconcile(
@@ -718,7 +725,7 @@ def _name(hass: HomeAssistant, entity_id: str) -> str:
     return entity_id if state is None else state.name
 
 
-@websocket_command({vol.Required("type"): f"{PREFIX}candidates"})
+@websocket_command({probatio.Required("type"): f"{PREFIX}candidates"})
 @async_response
 @_guarded
 async def ws_candidates(

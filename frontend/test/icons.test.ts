@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import { ICONS, redrawIcons, registerIcons } from "../src/icons";
 import "../src/sidebar-icons";
 
-/** HA's <ha-icon> (frontend 20260826.7), reduced to how it looks up an icon. */
+/** HA's <ha-icon> (frontend 20260930.2), reduced to how it looks up an icon. */
 class FakeHaIcon extends HTMLElement {
   _legacy = false;
   path?: string;

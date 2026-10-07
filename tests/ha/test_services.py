@@ -55,13 +55,13 @@ async def test_set_override_duration_until_and_clear(
 async def test_set_override_rejects_bad_input(
     hass: HomeAssistant, hass_storage: dict[str, Any], standard_trvs: dict[str, FakeTrv]
 ) -> None:
-    import voluptuous as vol
+    import probatio
 
     store(hass_storage, two_rooms())
     await setup_entry(hass)
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "set_override", {"entity_id": THERMOSTAT, "temperature": 45})
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(
             hass,
             "set_override",
