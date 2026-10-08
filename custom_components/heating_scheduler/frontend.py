@@ -25,7 +25,7 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-import voluptuous as vol
+import probatio
 
 from .const import (
     CARD_FILE,
@@ -114,7 +114,7 @@ async def _async_keep_card_resource(hass: HomeAssistant, url: str) -> None:
             await resources.async_update_item(first["id"], {"res_type": "module", "url": url})
         for item in others:
             await resources.async_delete_item(item["id"])
-    except (HomeAssistantError, vol.Invalid) as err:
+    except (HomeAssistantError, probatio.Invalid) as err:
         _LOGGER.warning("Could not add the Heating Scheduler card to the dashboards: %s", err)
 
 

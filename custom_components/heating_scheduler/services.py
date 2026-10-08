@@ -10,7 +10,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, service
 from homeassistant.helpers.typing import VolDictType
 from homeassistant.util import dt as dt_util
-import voluptuous as vol
+import probatio
 
 from .const import DOMAIN
 from .core.model import MAX_TEMPERATURE, MIN_TEMPERATURE, HouseMode, Mode
@@ -27,31 +27,31 @@ SERVICE_RECONCILE_NOW = "reconcile_now"
 SERVICE_BOOST = "boost"
 
 SET_OVERRIDE_SCHEMA: VolDictType = {
-    vol.Required("temperature"): vol.All(
-        vol.Coerce(float), vol.Range(min=MIN_TEMPERATURE, max=MAX_TEMPERATURE)
+    probatio.Required("temperature"): probatio.All(
+        probatio.Coerce(float), probatio.Range(min=MIN_TEMPERATURE, max=MAX_TEMPERATURE)
     ),
-    vol.Exclusive("duration", "end"): cv.positive_time_period,
-    vol.Exclusive("until", "end"): cv.datetime,
+    probatio.Exclusive("duration", "end"): cv.positive_time_period,
+    probatio.Exclusive("until", "end"): cv.datetime,
 }
 # `zone` is a zone's name or id; without it, a house action applies to every zone.
-SET_HOUSE_MODE_SCHEMA = vol.Schema(
+SET_HOUSE_MODE_SCHEMA = probatio.Schema(
     {
-        vol.Required("mode"): vol.In([m.value for m in HouseMode]),
-        vol.Optional("zone"): cv.string,
+        probatio.Required("mode"): probatio.In([m.value for m in HouseMode]),
+        probatio.Optional("zone"): cv.string,
     }
 )
-SET_VACATION_SCHEMA = vol.Schema(
+SET_VACATION_SCHEMA = probatio.Schema(
     {
-        vol.Optional("start"): cv.datetime,
-        vol.Optional("end"): cv.datetime,
-        vol.Optional("mode"): vol.In([Mode.FROST.value, Mode.AWAY.value]),
-        vol.Optional("zone"): cv.string,
+        probatio.Optional("start"): cv.datetime,
+        probatio.Optional("end"): cv.datetime,
+        probatio.Optional("mode"): probatio.In([Mode.FROST.value, Mode.AWAY.value]),
+        probatio.Optional("zone"): cv.string,
     }
 )
-CANCEL_VACATION_SCHEMA = vol.Schema({vol.Optional("zone"): cv.string})
+CANCEL_VACATION_SCHEMA = probatio.Schema({probatio.Optional("zone"): cv.string})
 
-BOOST_SCHEMA = vol.Schema(
-    {vol.Optional("duration"): cv.positive_time_period, vol.Optional("zone"): cv.string}
+BOOST_SCHEMA = probatio.Schema(
+    {probatio.Optional("duration"): cv.positive_time_period, probatio.Optional("zone"): cv.string}
 )
 
 
