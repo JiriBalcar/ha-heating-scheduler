@@ -5,8 +5,10 @@
 // content has its own compositing layers, such as the house tile's selector (seen with HA's entity
 // dialog on a dashboard with our cards, 2026-09-30). A black overlay of 32 % dims exactly as much
 // and is drawn in one pass. Our own dialogs set it on themselves (hs-dialog.ts); HA's dialogs get
-// it from the page root while one of our elements is on the page. A theme that sets its own
-// dimming keeps it.
+// it from the page root. The sidebar icon module holds it on every page (sidebar-icons.ts), because
+// the seam also showed on pages without our elements, such as Settings with a repair dialog
+// (2026-10-07); the card and the panel hold it too, for a page where that module has not run. A
+// theme that sets its own dimming keeps it.
 
 const FILTER = "--ha-dialog-scrim-backdrop-filter";
 const COLOR = "--mdc-dialog-scrim-color";

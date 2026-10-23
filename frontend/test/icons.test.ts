@@ -72,3 +72,9 @@ it("a dial that HA drew before the icons were registered is drawn again", async 
   expect(mdi.path).toBe("mdi:radiator");
   sidebar.remove();
 });
+
+it("the sidebar icon module makes HA's dialogs dim with an overlay on every page", () => {
+  const root = document.documentElement.style;
+  expect(root.getPropertyValue("--ha-dialog-scrim-backdrop-filter")).toBe("none");
+  expect(root.getPropertyValue("--mdc-dialog-scrim-color")).toBe("rgba(0, 0, 0, 0.32)");
+});
