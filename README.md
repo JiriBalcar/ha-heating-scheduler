@@ -43,9 +43,12 @@ Boiler control, valve positions and temperature sensors of the valves are not to
 
 ### HACS
 
-1. HACS → ⋮ → **Custom repositories** → add
-   `https://github.com/JiriBalcar/ha-heating-scheduler`, type **Integration**.
-2. Install **Heating Scheduler** and restart Home Assistant.
+1. In HACS, search for **Heating Scheduler** and download it.
+2. Restart Home Assistant.
+
+If the search does not find it yet (HACS refreshes its list every few hours), add it as a custom
+repository instead: HACS → ⋮ → **Custom repositories** → add
+`https://github.com/JiriBalcar/ha-heating-scheduler`, type **Integration**.
 
 ### Manual
 
