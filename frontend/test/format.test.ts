@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatContext,
   formatDateTime,
   formatDuration,
   formatTemp,
@@ -12,13 +13,45 @@ import {
   zonedToUtc,
   type FormatContext,
 } from "../src/format";
-import { translator } from "../src/i18n";
-import type { HomeAssistant, RoomData, TargetData } from "../src/types";
+import { languageOf, translator } from "../src/i18n";
+import type { HassLocale, HomeAssistant, RoomData, TargetData } from "../src/types";
 
 const cs: FormatContext = { lang: "cs", decimalSeparator: ",", hour12: false, timeZone: "Europe/Prague" };
 const en: FormatContext = { lang: "en", decimalSeparator: ".", hour12: false, timeZone: "Europe/Prague" };
 // Monday 2026-10-05 12:00 in Prague (CEST, UTC+2).
 const NOW = new Date("2026-10-05T10:00:00Z");
+
+describe("the user's clock and decimal separator", () => {
+  /** A user with this Home Assistant language; the profile says "as in my language" unless given. */
+  const user = (language: string, locale: Partial<HassLocale> = {}) =>
+    ({
+      language,
+      locale: { language, number_format: "language", time_format: "language", ...locale },
+      config: { time_zone: "Europe/Prague" },
+    }) as unknown as HomeAssistant;
+  const formats = (hass: HomeAssistant) => {
+    const ctx = formatContext(hass, languageOf(hass));
+    return [ctx.lang, ctx.hour12 ? "12 h" : "24 h", ctx.decimalSeparator];
+  };
+
+  it("follow the user's language, also where the panel's texts are English", () => {
+    expect(formats(user("cs"))).toEqual(["cs", "24 h", ","]);
+    expect(formats(user("en"))).toEqual(["en", "12 h", "."]);
+    // A German user reads English texts with the German clock and decimal comma.
+    expect(formats(user("de"))).toEqual(["en", "24 h", ","]);
+    expect(formats(user("en-GB"))).toEqual(["en", "24 h", "."]);
+  });
+
+  it("follow the clock and the numbers chosen in the profile", () => {
+    expect(formats(user("de", { time_format: "12", number_format: "comma_decimal" }))).toEqual(["en", "12 h", "."]);
+    expect(formats(user("en", { time_format: "24", number_format: "decimal_comma" }))).toEqual(["en", "24 h", ","]);
+  });
+
+  it("follow the texts' language where the browser does not know the user's", () => {
+    expect(formats(user("not a language"))).toEqual(["en", "12 h", "."]);
+    expect(formats(user("tlh"))).toEqual(["en", "12 h", "."]);
+  });
+});
 
 describe("temperatures", () => {
   it("formats with the decimal separator", () => {
