@@ -649,13 +649,13 @@ describe("copy dialog", () => {
     const dialog = await mount("hs-copy-dialog", {});
     dialog.showDialog({ source: 2, resolve: (days: number[]) => chosen.push(days) });
     await dialog.updateComplete;
-    const rows = () => [...dialog.shadowRoot.querySelectorAll("ha-md-list-item")] as Any[];
+    const rows = () => [...dialog.shadowRoot.querySelectorAll("ha-list-item-button")] as Any[];
     expect(rows()).toHaveLength(7);
     expect(rows()[2].hasAttribute("disabled")).toBe(true);
     rows()[0].click();
     rows()[4].click();
     await dialog.updateComplete;
-    expect(rows().map((row) => row.getAttribute("aria-pressed"))).toEqual(["true", "false", "true", "false", "true", "false", "false"]);
+    expect(rows().map((row) => row.getAttribute("aria-selected"))).toEqual(["true", "false", "true", "false", "true", "false", "false"]);
     dialog.copy();
     dialog.shadowRoot.querySelector("ha-dialog").dispatchEvent(new Event("closed"));
     expect(chosen).toEqual([[0, 4]]);

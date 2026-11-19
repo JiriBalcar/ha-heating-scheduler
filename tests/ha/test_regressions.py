@@ -112,7 +112,7 @@ async def test_f03_unrelated_report_does_not_confirm_a_mode_switch(
     assert worker.pending
     assert not worker.pending[-1].confirmed
     # An unrelated report (room temperature) arrives while the valve is still off.
-    trv._attr_current_temperature = 19.0
+    trv._attr_native_current_temperature = 19.0
     trv.write()
     for _ in range(20):
         await asyncio.sleep(0)

@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { mdiChevronDown, mdiChevronUp, mdiDelete, mdiDotsVertical, mdiHomeFloor1, mdiPencil, mdiPlus, mdiTune } from "@mdi/js";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
-import { baseStyles } from "../styles";
+import { baseStyles, listStyles } from "../styles";
 import type { Candidates, HomeAssistant, Snapshot, ZoneData } from "../types";
 import { define } from "./define";
 import { alertDialog, confirmDialog, promptDialog } from "./hs-dialog";
@@ -26,6 +26,7 @@ export class HsAdvZones extends LitElement {
 
   static override styles = [
     baseStyles,
+    listStyles,
     css`
       :host {
         display: flex;
@@ -163,34 +164,36 @@ export class HsAdvZones extends LitElement {
       </div>
       ${zones.length < 2 ? html`<p class="muted">${t("adv.zones.one_hint")}</p>` : nothing}
       <ha-card>
-        ${zones.map(
-          (zone, index) => html`<ha-md-list-item type="button" @click=${() => this.edit(zone)}>
-            <span slot="headline">${zone.name}</span>
-            <span slot="supporting-text">${this.roomNames(zone)}</span>
-            <ha-dropdown
-              slot="end"
-              @click=${(e: Event) => e.stopPropagation()}
-              @wa-select=${(e: CustomEvent<{ item: { value: string } }>) => this.menu(zone, e.detail.item.value)}
-            >
-              <ha-icon-button slot="trigger" .path=${mdiDotsVertical} .label=${zone.name}></ha-icon-button>
-              <ha-dropdown-item value="edit">
-                <ha-svg-icon slot="icon" .path=${mdiPencil}></ha-svg-icon>${t("common.edit")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="modes" .disabled=${this.busy}>
-                <ha-svg-icon slot="icon" .path=${mdiTune}></ha-svg-icon>${t("adv.zones.modes")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="up" .disabled=${this.busy || index === 0}>
-                <ha-svg-icon slot="icon" .path=${mdiChevronUp}></ha-svg-icon>${t("adv.rooms.move_up")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="down" .disabled=${this.busy || index === zones.length - 1}>
-                <ha-svg-icon slot="icon" .path=${mdiChevronDown}></ha-svg-icon>${t("adv.rooms.move_down")}
-              </ha-dropdown-item>
-              <ha-dropdown-item value="delete" variant="danger" .disabled=${this.busy || zones.length < 2}>
-                <ha-svg-icon slot="icon" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
-              </ha-dropdown-item>
-            </ha-dropdown>
-          </ha-md-list-item>`,
-        )}
+        <ha-list-base aria-label=${t("adv.zones")}>
+          ${zones.map(
+            (zone, index) => html`<ha-list-item-button @click=${() => this.edit(zone)}>
+              <span slot="headline">${zone.name}</span>
+              <span slot="supporting-text">${this.roomNames(zone)}</span>
+              <ha-dropdown
+                slot="end"
+                @click=${(e: Event) => e.stopPropagation()}
+                @wa-select=${(e: CustomEvent<{ item: { value: string } }>) => this.menu(zone, e.detail.item.value)}
+              >
+                <ha-icon-button slot="trigger" .path=${mdiDotsVertical} .label=${zone.name}></ha-icon-button>
+                <ha-dropdown-item value="edit">
+                  <ha-svg-icon slot="icon" .path=${mdiPencil}></ha-svg-icon>${t("common.edit")}
+                </ha-dropdown-item>
+                <ha-dropdown-item value="modes" .disabled=${this.busy}>
+                  <ha-svg-icon slot="icon" .path=${mdiTune}></ha-svg-icon>${t("adv.zones.modes")}
+                </ha-dropdown-item>
+                <ha-dropdown-item value="up" .disabled=${this.busy || index === 0}>
+                  <ha-svg-icon slot="icon" .path=${mdiChevronUp}></ha-svg-icon>${t("adv.rooms.move_up")}
+                </ha-dropdown-item>
+                <ha-dropdown-item value="down" .disabled=${this.busy || index === zones.length - 1}>
+                  <ha-svg-icon slot="icon" .path=${mdiChevronDown}></ha-svg-icon>${t("adv.rooms.move_down")}
+                </ha-dropdown-item>
+                <ha-dropdown-item value="delete" variant="danger" .disabled=${this.busy || zones.length < 2}>
+                  <ha-svg-icon slot="icon" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
+                </ha-dropdown-item>
+              </ha-dropdown>
+            </ha-list-item-button>`,
+          )}
+        </ha-list-base>
       </ha-card>
     `;
   }

@@ -3,7 +3,7 @@ import { mdiRefresh } from "@mdi/js";
 import { formatContext, formatDateTime, formatTemp } from "../format";
 import { languageOf, translator, type Translate } from "../i18n";
 import { errorText, storeFor, toast } from "../store";
-import { baseStyles } from "../styles";
+import { baseStyles, listStyles } from "../styles";
 import type { HomeAssistant, Snapshot, TrvStatus } from "../types";
 import { define } from "./define";
 
@@ -37,6 +37,7 @@ export class HsAdvHealth extends LitElement {
 
   static override styles = [
     baseStyles,
+    listStyles,
     css`
       :host {
         display: flex;
@@ -119,34 +120,35 @@ export class HsAdvHealth extends LitElement {
           ${room.trv_status.length === 0
             ? html`<div class="card-content muted">${t("adv.rooms.none_trvs")}</div>`
             : nothing}
-          ${room.trv_status.map(
-            (trv) => html`<ha-md-list-item
-                type="button"
-                @click=${() => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: trv.entity_id }, bubbles: true, composed: true }))}
-              >
-                <span slot="headline">${name(trv.entity_id)}</span>
-                <span slot="supporting-text">
-                  ${t("adv.health.wanted")} ${formatTemp(trv.desired, ctx)} · ${t("adv.health.valve")}
-                  ${formatTemp(trv.setpoint, ctx)} · ${t("adv.health.mode")} ${trv.available ? hvacMode(trv.hvac_mode) : "—"}
-                </span>
-                <span slot="supporting-text">
-                  ${t("adv.health.last_write")}: ${trv.last_write ? formatDateTime(trv.last_write, ctx) : "—"}
-                </span>
-                <span slot="end" class="phase">
-                  <span class="dot" style="background:${PHASE_COLORS[phase(trv)]}"></span>
-                  ${t(`adv.health.phase.${phase(trv)}`)}
-                </span>
-              </ha-md-list-item>
-              ${room.issues
-                .filter((issue) => issue.entity_id === trv.entity_id)
-                .map(
-                  (issue) =>
-                    html`<ha-alert alert-type="warning">${t(`health.${issue.kind}`, { name: name(trv.entity_id) })}</ha-alert>`,
-                )}
-              ${trv.last_error
-                ? html`<ha-alert alert-type="error">${t("adv.health.error")}: ${trv.last_error}</ha-alert>`
-                : nothing}`,
-          )}
+          <ha-list-base aria-label=${room.name}>
+            ${room.trv_status.map(
+              (trv) => html`<ha-list-item-button
+                  @click=${() => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: trv.entity_id }, bubbles: true, composed: true }))}
+                >
+                  <span slot="headline">${name(trv.entity_id)}</span>
+                  <div slot="supporting-text">
+                    ${t("adv.health.wanted")} ${formatTemp(trv.desired, ctx)} · ${t("adv.health.valve")}
+                    ${formatTemp(trv.setpoint, ctx)} · ${t("adv.health.mode")} ${trv.available ? hvacMode(trv.hvac_mode) : "—"}
+                  </div>
+                  <div slot="supporting-text">
+                    ${t("adv.health.last_write")}: ${trv.last_write ? formatDateTime(trv.last_write, ctx) : "—"}
+                  </div>
+                  <span slot="end" class="phase">
+                    <span class="dot" style="background:${PHASE_COLORS[phase(trv)]}"></span>
+                    ${t(`adv.health.phase.${phase(trv)}`)}
+                  </span>
+                </ha-list-item-button>
+                ${room.issues
+                  .filter((issue) => issue.entity_id === trv.entity_id)
+                  .map(
+                    (issue) =>
+                      html`<ha-alert alert-type="warning">${t(`health.${issue.kind}`, { name: name(trv.entity_id) })}</ha-alert>`,
+                  )}
+                ${trv.last_error
+                  ? html`<ha-alert alert-type="error">${t("adv.health.error")}: ${trv.last_error}</ha-alert>`
+                  : nothing}`,
+            )}
+          </ha-list-base>
         </ha-card>`,
       )}
     `;

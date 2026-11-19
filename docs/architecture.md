@@ -5,8 +5,9 @@ differ. Decisions agreed on 2026-09-29 are marked **(decision)**.
 
 ## Environment
 
-- Home Assistant 2026.9.x, Python ≥ 3.14.2. Tests pin HA 2026.9.4
-  (`pytest-homeassistant-custom-component==0.13.367`).
+- Home Assistant 2026.9 or newer, Python ≥ 3.14.2. Tests run on HA 2026.11.2 with Home
+  Assistant's own test package (`pytest-homeassistant==2026.11.2`; each of its releases is for
+  the HA release of the same number, so the two are raised together).
 - TRVs: Sonoff TRVZB through Zigbee2MQTT. On a TRVZB, HVAC mode `auto` runs the valve's
   own weekly schedule, so the integration always uses `heat`.
 - Time zone: HA's configured zone (Europe/Prague in production).
@@ -173,6 +174,15 @@ service are refused (`boost_active` during a boost).
   the TRV's step. Display sensors are converted from their own `unit_of_measurement`.
 - The room thermostat and the house temperature numbers declare °C; Home Assistant
   converts them for display.
+- **Thermostat temperatures under two names (2026-11-19).** HA 2026.11 renamed a climate
+  entity's unit, current temperature and target temperature to `native_…` and logs a
+  deprecation for the old names (they stop working in 2027.11). HA 2026.9 and 2026.10 know only
+  the old names. The room thermostat has both: HA 2026.11 reads the native ones and logs
+  nothing for a class that has both. HA marks the old names final for type checkers, so those
+  three lines carry a type ignore. Remove the old names when the oldest supported version is
+  2026.11. Checked on 2026.9.4, 2026.10.0 and 2026.11.2: the same state, temperatures, presets
+  and service calls. The fake valves of the tests and of `dev/` run on 2026.11 only and use
+  the native names.
 
 ## TRV writes
 
@@ -321,21 +331,34 @@ detect an open window per room (see Open windows).
   HA has one: page layout with tabs (`hass-tabs-subpage`), `ha-card`, tile parts
   (`ha-tile-*`), `ha-control-select`, `ha-control-number-buttons`, `ha-control-button`,
   `ha-dialog`, `ha-form` with selectors (entity, area, date, time, select), `ha-select`,
-  `ha-input`, `ha-switch`, `ha-settings-row`, `ha-md-list-item`, `ha-dropdown`, `ha-alert`,
-  `ha-button`, `ha-icon-button`, `ha-svg-icon`. Own elements remain only where HA has none:
-  day bars, week view, the time stepper. HA guarantees none of these to a custom panel; they
-  come with chunks HA loads in the background, and the panel waits for them (`ha.ts`). HA
-  changes its internal elements between releases, so an HA update can require a release of
-  this integration (accepted by the user).
+  `ha-input`, `ha-switch`, `ha-settings-row`, `ha-list-base` with `ha-list-item-button`,
+  `ha-dropdown`, `ha-alert`, `ha-button`, `ha-icon-button`, `ha-svg-icon`. Own elements remain
+  only where HA has none: day bars, week view, the time stepper. HA guarantees none of these to
+  a custom panel; they come with chunks HA loads in the background, and the panel waits for
+  them (`ha.ts`). HA changes its internal elements between releases, so an HA update can
+  require a release of this integration (accepted by the user).
+- **List rows (2026-11-19).** HA 2026.11 removed `ha-md-list-item`; a browser shows an unknown
+  element's children as plain text in one line, which broke the Advanced page, Rooms, Zones,
+  Valves, the parts of a day and the copy dialog. The rows are now HA's own
+  `ha-list-item-button` in `ha-list-base`, which HA 2026.9 to 2026.11 all load before the panel
+  opens (checked in a browser on 2026.9.4, 2026.10.0 and 2026.11.2). The list gives the rows
+  the keyboard: one Tab stop, arrows, Home and End, Enter or Space. HA cuts a row's texts to
+  one line; ours wrap through the row's parts (`listStyles`), as HA's own pages do, so long
+  valve names stay readable on a phone. The days in the copy dialog are options of a list box
+  (`role="option"`, `aria-selected`).
 - Dialogs follow HA's dialog protocol (`showDialog` / `closeDialog` / `dialog-closed`) and
   are opened through HA's dialog manager, so Back closes them. Messages use HA's toast
   (`hass-notification`); a valve opens HA's entity dialog (`hass-more-info`).
 - **HA's own dialog box (decision, 2026-09-30).** Questions, a zone's name and notices use HA's
   `dialog-box` through `showConfirmationDialog`, `showPromptDialog` and `showAlertDialog` from
   `window.loadCardHelpers()`. HA gives these helpers to custom cards; they are not in HA's docs,
-  but HA's maintainers point custom cards to them. HA's dashboard code defines them and HA loads
-  it in the background, also when our panel opens first. Without them, the browser asks. Own
-  dialogs remain only for content HA has no dialog for: forms, previews and the house dialog.
+  but HA's maintainers point custom cards to them. HA's dashboard code defines them, and HA
+  loads that code only when a dashboard opens. On a page that opened with our panel (a reload,
+  a bookmark), the first question asks HA to load it: the routes of HA's panel router hold the
+  import (`loadDashboardCode` in `ha.ts`; HA has no API for it). Until 2026-11-19 the panel
+  waited 10 s for code that never came, and then the browser asked. Without the helpers (HA's
+  page built differently, or 3 s without an answer), the browser asks. Own dialogs remain only
+  for content HA has no dialog for: forms, previews and the house dialog.
 - Our own dialogs dim the page with a black overlay of 32 % instead of HA's `backdrop-filter:
   brightness(68%)`. Both dim the same, but browsers can draw the filter with a seam: a thin line
   across the whole page, darkened twice (seen in the user's browser, 2026-09-30). It also showed
@@ -424,10 +447,14 @@ detect an open window per room (see Open windows).
 ## Testing
 
 - `tests/core/`: pure unit tests and hypothesis property tests of `resolve()`.
-- `tests/ha/`: `pytest-homeassistant-custom-component`. Fake TRVs are real climate entities
-  on a mock platform, so Home Assistant keeps the service context on them for 5 seconds,
-  like on Zigbee2MQTT entities. They can confirm late, round values, lose commands and go
-  offline.
+- `tests/ha/`: `pytest-homeassistant`, Home Assistant's own test package. It replaced
+  `pytest-homeassistant-custom-component`, whose last release is for HA 2026.10 and does not
+  load under 2026.11. Fake TRVs are real climate entities on a mock platform, so Home
+  Assistant keeps the service context on them for 5 seconds, like on Zigbee2MQTT entities.
+  They can confirm late, round values, lose commands and go offline. HA logs a deprecation
+  instead of raising; a test fails if HA logged one for our code or for the tests' own
+  entities while it ran (`no_deprecations`), so the next one shows when the tested HA
+  version is raised, not in a user's log.
 - `frontend/test/`: vitest for formatting, time zones, translations, plan operations, zones,
   components and dialogs.
 - `dev/`: a local Home Assistant with simulated TRVZB valves (1–8 s confirmation delay) and

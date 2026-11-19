@@ -9,7 +9,7 @@ import {
   mdiRadiator,
 } from "@mdi/js";
 import { languageOf, translator, type TextKey } from "../i18n";
-import { baseStyles } from "../styles";
+import { baseStyles, listStyles } from "../styles";
 import type { HomeAssistant, Snapshot } from "../types";
 import { define } from "./define";
 import "./hs-adv-health";
@@ -39,6 +39,7 @@ export class HsAdvancedView extends LitElement {
 
   static override styles = [
     baseStyles,
+    listStyles,
     css`
       :host {
         display: flex;
@@ -108,16 +109,18 @@ export class HsAdvancedView extends LitElement {
             <h1>${t(current.label)}</h1>
             ${this.content()}`
         : html`<ha-card class="list">
-            ${SECTIONS.map(
-              (item) => html`<ha-md-list-item type="button" @click=${() => this.navigate(item.id)}>
-                <div slot="start" class="icon" style="background-color:${item.color}">
-                  <ha-svg-icon .path=${item.icon}></ha-svg-icon>
-                </div>
-                <span slot="headline">${t(item.label)}</span>
-                <span slot="supporting-text">${t(item.description)}</span>
-                <ha-svg-icon slot="end" .path=${mdiChevronRight}></ha-svg-icon>
-              </ha-md-list-item>`,
-            )}
+            <ha-list-base aria-label=${t("nav.advanced")}>
+              ${SECTIONS.map(
+                (item) => html`<ha-list-item-button @click=${() => this.navigate(item.id)}>
+                  <div slot="start" class="icon" style="background-color:${item.color}">
+                    <ha-svg-icon .path=${item.icon}></ha-svg-icon>
+                  </div>
+                  <span slot="headline">${t(item.label)}</span>
+                  <span slot="supporting-text">${t(item.description)}</span>
+                  <ha-svg-icon slot="end" .path=${mdiChevronRight}></ha-svg-icon>
+                </ha-list-item-button>`,
+              )}
+            </ha-list-base>
           </ha-card>`}
     `;
   }

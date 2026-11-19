@@ -16,7 +16,7 @@ import {
   type Day,
 } from "../schedule/ops";
 import { errorText, storeFor, toast } from "../store";
-import { baseStyles } from "../styles";
+import { baseStyles, listStyles } from "../styles";
 import type { HomeAssistant, PlanData, Snapshot } from "../types";
 import { reportUnsaved } from "../unsaved";
 import { define } from "./define";
@@ -61,6 +61,7 @@ export class HsPlanEditor extends LitElement {
 
   static override styles = [
     baseStyles,
+    listStyles,
     css`
       :host {
         display: flex;
@@ -112,7 +113,7 @@ export class HsPlanEditor extends LitElement {
       .parts {
         margin: 0 calc(-1 * var(--ha-space-4, 16px));
       }
-      .parts ha-md-list-item ha-svg-icon[slot="start"] {
+      .parts ha-svg-icon[slot="start"] {
         color: var(--mode-color);
       }
       .card-actions {
@@ -345,11 +346,9 @@ export class HsPlanEditor extends LitElement {
           <div class="axis" aria-hidden="true">
             ${[0, 6, 12, 18, 24].map((hour) => html`<span style="left:${(hour / 24) * 100}%">${hour}:00</span>`)}
           </div>
-          <div class="parts" role="list" aria-label=${t("editor.parts")}>
+          <ha-list-base class="parts" aria-label=${t("editor.parts")}>
             ${segments(day).map(
-              (segment) => html`<ha-md-list-item
-                type="button"
-                role="listitem"
+              (segment) => html`<ha-list-item-button
                 style="--mode-color:${MODE_COLORS[segment.mode]}"
                 @click=${() => this.openSheet(segment.index, null)}
               >
@@ -357,9 +356,9 @@ export class HsPlanEditor extends LitElement {
                 <span slot="headline">${toHHMM(segment.start)} – ${toHHMM(segment.end)}</span>
                 <span slot="supporting-text">${t(`mode.${segment.mode}`)}</span>
                 <ha-svg-icon slot="end" .path=${mdiChevronRight}></ha-svg-icon>
-              </ha-md-list-item>`,
+              </ha-list-item-button>`,
             )}
-          </div>
+          </ha-list-base>
         </div>
         <div class="card-actions">
           <ha-button appearance="plain" @click=${this.copyDay}>

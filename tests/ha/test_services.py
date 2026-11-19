@@ -196,7 +196,7 @@ async def test_panel_registered_and_removed(
 async def test_broken_stored_config_fails_setup(
     hass: HomeAssistant, hass_storage: dict[str, Any]
 ) -> None:
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     config = two_rooms()
     store(hass_storage, config)

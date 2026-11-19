@@ -13,7 +13,7 @@ import { showDialog } from "../ha";
 import { languageOf, translator, type Translate } from "../i18n";
 import { roomPayload, uniqueName } from "../payload";
 import { errorText, storeFor, toast } from "../store";
-import { baseStyles } from "../styles";
+import { baseStyles, listStyles } from "../styles";
 import type { Candidates, HomeAssistant, RoomData, Snapshot } from "../types";
 import { moveWithin, roomsOf, zoneOf } from "../zones";
 import { define } from "./define";
@@ -41,6 +41,7 @@ export class HsAdvRooms extends LitElement {
 
   static override styles = [
     baseStyles,
+    listStyles,
     css`
       :host {
         display: flex;
@@ -204,12 +205,12 @@ export class HsAdvRooms extends LitElement {
     const t = this.t;
     const planName = this.snapshot.plans.find((plan) => plan.id === room.plan_id)?.name ?? room.plan_id;
     const setName = this.snapshot.temp_sets.find((set) => set.id === room.temp_set_id)?.name ?? room.temp_set_id;
-    return html`<ha-md-list-item type="button" @click=${() => this.edit(room)}>
+    return html`<ha-list-item-button @click=${() => this.edit(room)}>
       <span slot="headline">${room.name}</span>
-      <span slot="supporting-text">${t("adv.rooms.trvs")}: ${this.valveNames(room)}</span>
-      <span slot="supporting-text">
+      <div slot="supporting-text">${t("adv.rooms.trvs")}: ${this.valveNames(room)}</div>
+      <div slot="supporting-text">
         ${t("adv.rooms.plan")}: ${planName} · ${t("adv.rooms.temp_set")}: ${setName}
-      </span>
+      </div>
       <ha-dropdown
         slot="end"
         @click=${(e: Event) => e.stopPropagation()}
@@ -229,13 +230,15 @@ export class HsAdvRooms extends LitElement {
           <ha-svg-icon slot="icon" .path=${mdiDelete}></ha-svg-icon>${t("common.delete")}
         </ha-dropdown-item>
       </ha-dropdown>
-    </ha-md-list-item>`;
+    </ha-list-item-button>`;
   }
 
-  private list(rooms: RoomData[], empty: string) {
+  private list(rooms: RoomData[], empty: string, label: string) {
     return html`<ha-card>
       ${rooms.length
-        ? rooms.map((room, index) => this.row(room, index, rooms.length))
+        ? html`<ha-list-base aria-label=${label}>
+            ${rooms.map((room, index) => this.row(room, index, rooms.length))}
+          </ha-list-base>`
         : html`<p class="empty">${empty}</p>`}
     </ha-card>`;
   }
@@ -257,10 +260,10 @@ export class HsAdvRooms extends LitElement {
         ? snapshot.zones.map(
             (zone) => html`<section>
               <h2><ha-svg-icon .path=${mdiHomeFloor1}></ha-svg-icon>${zone.name}</h2>
-              ${this.list(roomsOf(snapshot, zone), t("adv.zones.no_rooms"))}
+              ${this.list(roomsOf(snapshot, zone), t("adv.zones.no_rooms"), zone.name)}
             </section>`,
           )
-        : this.list(snapshot.rooms, t("adv.rooms.empty"))}
+        : this.list(snapshot.rooms, t("adv.rooms.empty"), t("adv.rooms"))}
     `;
   }
 }

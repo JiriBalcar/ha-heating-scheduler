@@ -70,7 +70,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_preset_modes = [*PRESETS, MANUAL_PRESET, BOOST_PRESET]
     _attr_min_temp = MIN_TEMPERATURE
@@ -124,16 +124,24 @@ class RoomThermostat(RoomEntity, ClimateEntity):
     # ----- state -----
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the room temperature."""
         room = self.room
         return None if room is None else self._engine.room_temperature(room)
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the target temperature, None when off."""
         target = self.target
         return None if target is None else target.temperature
+
+    # Home Assistant 2026.11 renamed these three to "native"; older versions know only the old
+    # names. A class that has both gets no deprecation warning: 2026.11 reads the native ones.
+    # HA marks the old names final for type checkers, hence the ignores. Remove the old names
+    # when the oldest supported version is 2026.11.
+    _attr_temperature_unit = _attr_native_temperature_unit  # type: ignore[misc]
+    current_temperature = native_current_temperature  # type: ignore[misc]
+    target_temperature = native_target_temperature  # type: ignore[misc]
 
     @property
     def hvac_mode(self) -> HVACMode | None:
@@ -253,7 +261,7 @@ class RoomThermostat(RoomEntity, ClimateEntity):
         elif (target := self.target) is not None and target.source is Source.BOOST:
             return  # The room already heats, at full.
         else:
-            current = self.target_temperature
+            current = self.native_target_temperature
             await self._override(current if current is not None else self._comfort())
 
     def _comfort(self) -> float:

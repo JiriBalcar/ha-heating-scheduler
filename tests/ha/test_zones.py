@@ -12,7 +12,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import area_registry as ar, entity_registry as er, floor_registry as fr
 from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant_custom_component.typing import WebSocketGenerator
+from pytest_homeassistant.typing import WebSocketGenerator
 
 from custom_components.heating_scheduler.const import DOMAIN
 from custom_components.heating_scheduler.core.config_ops import put_zone

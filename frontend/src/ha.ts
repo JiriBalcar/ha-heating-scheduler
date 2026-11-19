@@ -16,6 +16,8 @@ export const HA_ELEMENTS = [
   "ha-dialog",
   "ha-dialog-header",
   "ha-dialog-footer",
+  "ha-list-base",
+  "ha-list-item-button",
   "ha-tile-container",
   "ha-tile-icon",
   "ha-tile-info",
@@ -101,11 +103,43 @@ declare global {
   }
 }
 
+/** A route of HA's panel router, as far as we read it. */
+interface PanelRoute {
+  tag?: string;
+  load?: () => Promise<unknown>;
+}
+
 /**
- * HA's generic dialogs. HA's dashboard code defines `window.loadCardHelpers`; HA loads that code in
- * the background also when a custom panel opens first. Null if HA does not have it.
+ * Ask HA to load its dashboard code, as HA does itself when a dashboard opens. HA has no API for
+ * this: the routes of its panel router hold the import. Does nothing if HA's page is built
+ * differently.
+ */
+async function loadDashboardCode(): Promise<void> {
+  const main = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main");
+  const router = main?.shadowRoot?.querySelector("partial-panel-resolver") as
+    | (Element & { routerOptions?: { routes?: Record<string, PanelRoute | undefined> } })
+    | null
+    | undefined;
+  const route = Object.values(router?.routerOptions?.routes ?? {}).find((item) => item?.tag === "ha-panel-lovelace");
+  await route?.load?.();
+}
+
+/** How long a question waits for HA's dashboard code before the browser asks instead. */
+const DASHBOARD_CODE_TIMEOUT = 3000;
+
+/**
+ * HA's generic dialogs. HA's dashboard code defines `window.loadCardHelpers`, and HA loads that
+ * code only when a dashboard opens. On a page that opened with our panel, the first question asks
+ * HA to load it. Null if HA does not have it.
  */
 export async function haDialogs(): Promise<HaDialogs | null> {
-  if (!window.loadCardHelpers) await whenDefined(["ha-panel-lovelace"]);
+  if (!window.loadCardHelpers) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      loadDashboardCode().catch(() => undefined),
+      new Promise((resolve) => (timer = setTimeout(resolve, DASHBOARD_CODE_TIMEOUT))),
+    ]);
+    clearTimeout(timer);
+  }
   return window.loadCardHelpers ? window.loadCardHelpers() : null;
 }
