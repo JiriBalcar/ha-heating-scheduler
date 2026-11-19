@@ -5,8 +5,9 @@ differ. Decisions agreed on 2026-09-29 are marked **(decision)**.
 
 ## Environment
 
-- Home Assistant 2026.9.x, Python ≥ 3.14.2. Tests pin HA 2026.9.4
-  (`pytest-homeassistant-custom-component==0.13.367`).
+- Home Assistant 2026.9 or newer, Python ≥ 3.14.2. Tests run on HA 2026.11.2 with Home
+  Assistant's own test package (`pytest-homeassistant==2026.11.2`; each of its releases is for
+  the HA release of the same number, so the two are raised together).
 - TRVs: Sonoff TRVZB through Zigbee2MQTT. On a TRVZB, HVAC mode `auto` runs the valve's
   own weekly schedule, so the integration always uses `heat`.
 - Time zone: HA's configured zone (Europe/Prague in production).
@@ -173,6 +174,15 @@ service are refused (`boost_active` during a boost).
   the TRV's step. Display sensors are converted from their own `unit_of_measurement`.
 - The room thermostat and the house temperature numbers declare °C; Home Assistant
   converts them for display.
+- **Thermostat temperatures under two names (2026-11-19).** HA 2026.11 renamed a climate
+  entity's unit, current temperature and target temperature to `native_…` and logs a
+  deprecation for the old names (they stop working in 2027.11). HA 2026.9 and 2026.10 know only
+  the old names. The room thermostat has both: HA 2026.11 reads the native ones and logs
+  nothing for a class that has both. HA marks the old names final for type checkers, so those
+  three lines carry a type ignore. Remove the old names when the oldest supported version is
+  2026.11. Checked on 2026.9.4, 2026.10.0 and 2026.11.2: the same state, temperatures, presets
+  and service calls. The fake valves of the tests and of `dev/` run on 2026.11 only and use
+  the native names.
 
 ## TRV writes
 
@@ -437,10 +447,14 @@ detect an open window per room (see Open windows).
 ## Testing
 
 - `tests/core/`: pure unit tests and hypothesis property tests of `resolve()`.
-- `tests/ha/`: `pytest-homeassistant-custom-component`. Fake TRVs are real climate entities
-  on a mock platform, so Home Assistant keeps the service context on them for 5 seconds,
-  like on Zigbee2MQTT entities. They can confirm late, round values, lose commands and go
-  offline.
+- `tests/ha/`: `pytest-homeassistant`, Home Assistant's own test package. It replaced
+  `pytest-homeassistant-custom-component`, whose last release is for HA 2026.10 and does not
+  load under 2026.11. Fake TRVs are real climate entities on a mock platform, so Home
+  Assistant keeps the service context on them for 5 seconds, like on Zigbee2MQTT entities.
+  They can confirm late, round values, lose commands and go offline. HA logs a deprecation
+  instead of raising; a test fails if HA logged one for our code or for the tests' own
+  entities while it ran (`no_deprecations`), so the next one shows when the tested HA
+  version is raised, not in a user's log.
 - `frontend/test/`: vitest for formatting, time zones, translations, plan operations, zones,
   components and dialogs.
 - `dev/`: a local Home Assistant with simulated TRVZB valves (1–8 s confirmation delay) and

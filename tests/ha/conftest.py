@@ -8,8 +8,9 @@ exactly as for Zigbee2MQTT entities.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from datetime import timedelta
+import logging
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
@@ -21,7 +22,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.setup import async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import (
+from pytest_homeassistant.common import (
     MockConfigEntry,
     MockPlatform,
     async_fire_time_changed,
@@ -47,9 +48,34 @@ START = "2026-10-05 10:00:00+00:00"
 TRV_IDS = ("climate.living_trv_1", "climate.living_trv_2", "climate.bedroom_trv")
 
 
+class Deprecations(logging.Handler):
+    """Collects what Home Assistant logs about deprecated use.
+
+    Home Assistant logs a deprecation instead of raising: "... this will stop working in Home
+    Assistant 2027.11". For a class it logs when the class is created, which can be while the
+    tests are collected, so this listens from the start.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        message = record.getMessage()
+        if "stop working in Home Assistant" in message:
+            self.messages.append(f"{record.name}: {message}")
+
+
+DEPRECATIONS = Deprecations()
+logging.getLogger().addHandler(DEPRECATIONS)
+
+
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
-    """Load custom integrations in every HA test."""
+def no_deprecations() -> Generator[None]:
+    """Fail the test during which Home Assistant logged a deprecation for our code or tests."""
+    yield
+    messages, DEPRECATIONS.messages = DEPRECATIONS.messages, []
+    assert not messages, "Home Assistant logged deprecations:\n" + "\n".join(messages)
 
 
 @pytest.fixture(autouse=True)
@@ -64,7 +90,7 @@ class FakeTrv(ClimateEntity):
     """A TRV: stores commands, can answer late, round, lose commands or go offline."""
 
     _attr_should_poll = False
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TURN_ON
@@ -99,7 +125,7 @@ class FakeTrv(ClimateEntity):
         self._attr_target_temperature_step = step
         self._attr_min_temp = min_temp
         self._attr_max_temp = max_temp
-        self._attr_current_temperature = current
+        self._attr_native_current_temperature = current
         self._attr_hvac_action = hvac_action  # type: ignore[assignment]
         self.respond = respond  # False: commands are lost
         self.delay = delay  # > 0: the TRV reports this many seconds later
@@ -113,7 +139,7 @@ class FakeTrv(ClimateEntity):
         return self.mode
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return self.setpoint
 
     @property

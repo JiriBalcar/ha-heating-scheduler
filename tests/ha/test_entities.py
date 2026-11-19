@@ -195,7 +195,7 @@ async def test_thermostat_follows_trv_temperatures_and_action(
     assert state.attributes["current_temperature"] == 19.5
     assert state.attributes["hvac_action"] == "idle"
     second._attr_hvac_action = "heating"  # type: ignore[assignment]
-    second._attr_current_temperature = 21.0
+    second._attr_native_current_temperature = 21.0
     second.async_write_ha_state()
     await settle(hass)
     state = hass.states.get(THERMOSTAT)

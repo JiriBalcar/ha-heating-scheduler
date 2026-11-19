@@ -158,7 +158,7 @@ async def test_schedule_boundary_writes_new_target(
     store(hass_storage, two_rooms())
     await setup_entry(hass)
     freezer.move_to(prague(2026, 10, 5, 22))
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
 
     async_fire_time_changed(hass)
     await settle(hass)
