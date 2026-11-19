@@ -12,7 +12,8 @@ const DICTIONARIES: Record<Lang, Record<TextKey, string>> = { cs, en };
 export function languageOf(hass: Pick<HomeAssistant, "language" | "locale"> | undefined): Lang {
   const tag = (hass?.locale?.language ?? hass?.language ?? "").toLowerCase();
   if (tag.startsWith("en")) return "en";
-  return "cs";
+  if (tag.startsWith("cs")) return "cs";
+  return "en";
 }
 
 export type Translate = (key: TextKey, params?: Record<string, string | number>) => string;
