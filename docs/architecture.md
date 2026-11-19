@@ -342,9 +342,13 @@ detect an open window per room (see Open windows).
 - **HA's own dialog box (decision, 2026-09-30).** Questions, a zone's name and notices use HA's
   `dialog-box` through `showConfirmationDialog`, `showPromptDialog` and `showAlertDialog` from
   `window.loadCardHelpers()`. HA gives these helpers to custom cards; they are not in HA's docs,
-  but HA's maintainers point custom cards to them. HA's dashboard code defines them and HA loads
-  it in the background, also when our panel opens first. Without them, the browser asks. Own
-  dialogs remain only for content HA has no dialog for: forms, previews and the house dialog.
+  but HA's maintainers point custom cards to them. HA's dashboard code defines them, and HA
+  loads that code only when a dashboard opens. On a page that opened with our panel (a reload,
+  a bookmark), the first question asks HA to load it: the routes of HA's panel router hold the
+  import (`loadDashboardCode` in `ha.ts`; HA has no API for it). Until 2026-11-19 the panel
+  waited 10 s for code that never came, and then the browser asked. Without the helpers (HA's
+  page built differently, or 3 s without an answer), the browser asks. Own dialogs remain only
+  for content HA has no dialog for: forms, previews and the house dialog.
 - Our own dialogs dim the page with a black overlay of 32 % instead of HA's `backdrop-filter:
   brightness(68%)`. Both dim the same, but browsers can draw the filter with a seam: a thin line
   across the whole page, darkened twice (seen in the user's browser, 2026-09-30). It also showed

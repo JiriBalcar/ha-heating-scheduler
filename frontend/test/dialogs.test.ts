@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // HA's dialog manager treats an element with a `params` property as its newer dialog type: it
 // drops the element after closing and creates the next one without `hass`. Ours must not have one.
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../src/panel";
 import { alertDialog, confirmDialog, promptDialog } from "../src/components/hs-dialog";
 
@@ -101,5 +101,63 @@ describe("HA's own dialogs", () => {
       ["alert", { title: "Floors", text: "No room is on a floor." }],
     ]);
     delete window.loadCardHelpers;
+  });
+
+  /** The browser's own question, which answers yes. The test browser has none. */
+  function browserQuestion() {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("confirm", confirm);
+    return confirm;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete window.loadCardHelpers;
+  });
+
+  /** HA's page as far as the panel reads it: the panel router with its routes. */
+  function haPage(routes: Record<string, unknown>) {
+    const root = document.createElement("home-assistant");
+    const main = document.createElement("home-assistant-main");
+    const router = Object.assign(document.createElement("partial-panel-resolver"), { routerOptions: { routes } });
+    main.attachShadow({ mode: "open" }).append(router);
+    root.attachShadow({ mode: "open" }).append(main);
+    document.body.append(root);
+    return root;
+  }
+
+  it("are loaded on a page that opened with the panel: HA loads them only for a dashboard", async () => {
+    const asked: unknown[] = [];
+    const browser = browserQuestion();
+    const root = haPage({
+      "heating-scheduler": { tag: "ha-panel-custom", load: async () => undefined },
+      lovelace: {
+        tag: "ha-panel-lovelace",
+        // HA's dashboard code defines the helpers when it loads.
+        load: async () => {
+          window.loadCardHelpers = async () =>
+            ({ showConfirmationDialog: async (_element: HTMLElement, params: unknown) => (asked.push(params), true) }) as never;
+        },
+      },
+    });
+    const options = { heading: "Boost", message: "Heat every room?", confirm: "Yes, heat", cancel: "Cancel" };
+    expect(await confirmDialog(document.body, options)).toBe(true);
+    expect(asked).toEqual([{ title: "Boost", text: "Heat every room?", confirmText: "Yes, heat", dismissText: "Cancel", destructive: undefined }]);
+    expect(browser).not.toHaveBeenCalled();
+    root.remove();
+  });
+
+  it("are replaced by the browser's question at once where HA has none", async () => {
+    const browser = browserQuestion();
+    const started = Date.now();
+    const options = { heading: "Boost", message: "Heat every room?", confirm: "Yes, heat", cancel: "Cancel" };
+    // No HA page at all, and an HA page whose dashboard route fails to load.
+    expect(await confirmDialog(document.body, options)).toBe(true);
+    const root = haPage({ lovelace: { tag: "ha-panel-lovelace", load: async () => Promise.reject(new Error("offline")) } });
+    expect(await confirmDialog(document.body, options)).toBe(true);
+    expect(browser).toHaveBeenCalledTimes(2);
+    expect(browser).toHaveBeenLastCalledWith("Boost\n\nHeat every room?");
+    expect(Date.now() - started).toBeLessThan(1000);
+    root.remove();
   });
 });
