@@ -159,15 +159,24 @@ async def test_config_flow_creates_single_entry(hass: HomeAssistant) -> None:
     assert again["reason"] == "single_instance_allowed"
 
 
+@pytest.mark.parametrize(
+    ("language", "plan", "temperatures"),
+    [
+        ("cs", "Plán domu", "Teploty domu"),
+        ("en-GB", "House plan", "House temperatures"),
+        # A language without texts of its own gets English.
+        ("de", "House plan", "House temperatures"),
+    ],
+)
 async def test_first_setup_creates_localized_defaults(
-    hass: HomeAssistant, hass_storage: dict[str, Any]
+    hass: HomeAssistant, hass_storage: dict[str, Any], language: str, plan: str, temperatures: str
 ) -> None:
-    hass.config.language = "cs"
+    hass.config.language = language
     entry = await setup_entry(hass)
     config = engine_of(entry).config
-    assert config.plans["house"].name == "Plán domu"
-    assert config.temp_sets["house"].name == "Teploty domu"
-    assert hass_storage[f"{DOMAIN}.config"]["data"]["plans"][0]["name"] == "Plán domu"
+    assert config.plans["house"].name == plan
+    assert config.temp_sets["house"].name == temperatures
+    assert hass_storage[f"{DOMAIN}.config"]["data"]["plans"][0]["name"] == plan
 
 
 async def test_panel_registered_and_removed(

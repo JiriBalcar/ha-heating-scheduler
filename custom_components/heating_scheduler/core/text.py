@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, tzinfo
 
 from .model import Reason, RoomTarget, Source, TargetMode
 
-DEFAULT_LANGUAGE = "cs"
+# The language for every Home Assistant language but Czech, as in the panel.
+DEFAULT_LANGUAGE = "en"
 LANGUAGES = ("cs", "en")
 
 # Names of the house plan and the house temperatures in a new installation.
