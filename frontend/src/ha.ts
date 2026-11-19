@@ -16,6 +16,8 @@ export const HA_ELEMENTS = [
   "ha-dialog",
   "ha-dialog-header",
   "ha-dialog-footer",
+  "ha-list-base",
+  "ha-list-item-button",
   "ha-tile-container",
   "ha-tile-icon",
   "ha-tile-info",

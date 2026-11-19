@@ -321,12 +321,21 @@ detect an open window per room (see Open windows).
   HA has one: page layout with tabs (`hass-tabs-subpage`), `ha-card`, tile parts
   (`ha-tile-*`), `ha-control-select`, `ha-control-number-buttons`, `ha-control-button`,
   `ha-dialog`, `ha-form` with selectors (entity, area, date, time, select), `ha-select`,
-  `ha-input`, `ha-switch`, `ha-settings-row`, `ha-md-list-item`, `ha-dropdown`, `ha-alert`,
-  `ha-button`, `ha-icon-button`, `ha-svg-icon`. Own elements remain only where HA has none:
-  day bars, week view, the time stepper. HA guarantees none of these to a custom panel; they
-  come with chunks HA loads in the background, and the panel waits for them (`ha.ts`). HA
-  changes its internal elements between releases, so an HA update can require a release of
-  this integration (accepted by the user).
+  `ha-input`, `ha-switch`, `ha-settings-row`, `ha-list-base` with `ha-list-item-button`,
+  `ha-dropdown`, `ha-alert`, `ha-button`, `ha-icon-button`, `ha-svg-icon`. Own elements remain
+  only where HA has none: day bars, week view, the time stepper. HA guarantees none of these to
+  a custom panel; they come with chunks HA loads in the background, and the panel waits for
+  them (`ha.ts`). HA changes its internal elements between releases, so an HA update can
+  require a release of this integration (accepted by the user).
+- **List rows (2026-11-19).** HA 2026.11 removed `ha-md-list-item`; a browser shows an unknown
+  element's children as plain text in one line, which broke the Advanced page, Rooms, Zones,
+  Valves, the parts of a day and the copy dialog. The rows are now HA's own
+  `ha-list-item-button` in `ha-list-base`, which HA 2026.9 to 2026.11 all load before the panel
+  opens (checked in a browser on 2026.9.4, 2026.10.0 and 2026.11.2). The list gives the rows
+  the keyboard: one Tab stop, arrows, Home and End, Enter or Space. HA cuts a row's texts to
+  one line; ours wrap through the row's parts (`listStyles`), as HA's own pages do, so long
+  valve names stay readable on a phone. The days in the copy dialog are options of a list box
+  (`role="option"`, `aria-selected`).
 - Dialogs follow HA's dialog protocol (`showDialog` / `closeDialog` / `dialog-closed`) and
   are opened through HA's dialog manager, so Back closes them. Messages use HA's toast
   (`hass-notification`); a valve opens HA's entity dialog (`hass-more-info`).

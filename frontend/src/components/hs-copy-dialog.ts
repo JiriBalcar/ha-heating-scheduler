@@ -26,8 +26,8 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
       gap: var(--ha-space-2, 8px);
       margin-bottom: var(--ha-space-2, 8px);
     }
-    ha-md-list-item {
-      --md-list-item-leading-space: 0;
+    ha-list-item-button {
+      --ha-row-item-padding-inline: 0;
     }
     ha-svg-icon[slot="start"] {
       color: var(--secondary-text-color);
@@ -68,12 +68,9 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
     if (!this.args) return nothing;
     const t = this.t;
     const source = this.args.source;
+    const heading = t("editor.copy_title", { day: t(`day.acc.${source}` as TextKey) });
     return html`
-      <ha-dialog
-        .open=${this.open}
-        header-title=${t("editor.copy_title", { day: t(`day.acc.${source}` as TextKey) })}
-        @closed=${this.onClosed}
-      >
+      <ha-dialog .open=${this.open} header-title=${heading} @closed=${this.onClosed}>
         <div class="quick">
           <ha-button appearance="outlined" @click=${() => this.pick(WORKDAYS)}>
             ${t("editor.workdays")}
@@ -85,19 +82,22 @@ export class HsCopyDialog extends HsHaDialog<CopyParams> {
             ${t("editor.all_days")}
           </ha-button>
         </div>
-        ${ALL_DAYS.map((day) => {
-          const chosen = day === source || this.chosen.includes(day);
-          return html`<ha-md-list-item
-            type="button"
-            class=${chosen ? "chosen" : ""}
-            aria-pressed=${chosen ? "true" : "false"}
-            ?disabled=${day === source}
-            @click=${() => this.toggle(day)}
-          >
-            <ha-svg-icon slot="start" .path=${chosen ? mdiCheckboxMarked : mdiCheckboxBlankOutline}></ha-svg-icon>
-            <span slot="headline">${t(`day.${day}` as TextKey)}</span>
-          </ha-md-list-item>`;
-        })}
+        <ha-list-base role="listbox" aria-multiselectable="true" aria-label=${heading}>
+          ${ALL_DAYS.map((day) => {
+            const chosen = day === source || this.chosen.includes(day);
+            return html`<ha-list-item-button
+              role="option"
+              class=${chosen ? "chosen" : ""}
+              aria-selected=${chosen ? "true" : "false"}
+              aria-disabled=${day === source ? "true" : "false"}
+              ?disabled=${day === source}
+              @click=${() => this.toggle(day)}
+            >
+              <ha-svg-icon slot="start" .path=${chosen ? mdiCheckboxMarked : mdiCheckboxBlankOutline}></ha-svg-icon>
+              <span slot="headline">${t(`day.${day}` as TextKey)}</span>
+            </ha-list-item-button>`;
+          })}
+        </ha-list-base>
         <ha-dialog-footer slot="footer">
           <ha-button slot="secondaryAction" appearance="plain" @click=${() => this.closeDialog()}>
             ${t("common.cancel")}

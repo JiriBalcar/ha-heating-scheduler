@@ -39,3 +39,18 @@ export const baseStyles = css`
     white-space: nowrap;
   }
 `;
+
+/**
+ * Rows of HA's lists (`ha-list-item-button` in `ha-list-base`). HA cuts a row's texts to one line
+ * with "…"; ours wrap, so a long valve name or description stays readable on a phone. HA's own
+ * pages do the same through these parts.
+ */
+export const listStyles = css`
+  ha-list-item-button::part(headline),
+  ha-list-item-button::part(supporting-text) {
+    white-space: normal;
+  }
+  ha-list-item-button > ha-svg-icon[slot="end"] {
+    color: var(--secondary-text-color);
+  }
+`;
