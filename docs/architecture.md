@@ -437,8 +437,9 @@ detect an open window per room (see Open windows).
   accepted HA sizes because the Companion app's page zoom enlarges everything (115 % gives
   48 px).
 - One websocket subscription per connection (`store.ts`) feeds the panel and every card.
-- Panel strings are bundled (cs, en) and chosen from the user's HA language; Czech is the
-  default. Entity, service and error strings use HA translation files.
+- Panel strings are bundled (cs, en) and chosen from the user's HA language: Czech for Czech,
+  English for every other language (before 1.2.2 Czech was the default, so a German user saw
+  Czech). Entity, service and error strings use HA translation files.
 - All times are shown in the house's time zone (plans are house wall time).
 - Colours are HA theme colours (`--deep-orange-color`, ...); a mode colour always comes with
   an icon and a word.
