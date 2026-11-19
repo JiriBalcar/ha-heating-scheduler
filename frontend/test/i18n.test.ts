@@ -14,7 +14,13 @@ describe("translations", () => {
   it("pick the language and fill placeholders", () => {
     expect(languageOf({ language: "en-GB" } as never)).toBe("en");
     expect(languageOf({ language: "cs" } as never)).toBe("cs");
-    expect(languageOf({ language: "de" } as never)).toBe("cs");
+    expect(languageOf({ language: "cs-CZ" } as never)).toBe("cs");
+    // Any other language gets English, also a language whose code only starts like Czech.
+    expect(languageOf({ language: "de" } as never)).toBe("en");
+    expect(languageOf({ language: "csb" } as never)).toBe("en");
+    expect(languageOf(undefined)).toBe("en");
+    // The user's own language in their profile wins over the language of the system.
+    expect(languageOf({ language: "cs", locale: { language: "de" } } as never)).toBe("en");
     expect(translator("cs")("room.until", { until: "06:00" })).toBe("do 06:00");
   });
 });

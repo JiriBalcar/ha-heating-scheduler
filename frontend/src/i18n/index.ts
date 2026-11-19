@@ -1,4 +1,4 @@
-// Translation lookup. Czech is the default; English is used for English users.
+// Translation lookup. Czech for Czech users; English for everybody else.
 import { cs } from "./cs";
 import { en, type TextKey } from "./en";
 import type { HomeAssistant } from "../types";
@@ -8,11 +8,10 @@ export type { TextKey };
 
 const DICTIONARIES: Record<Lang, Record<TextKey, string>> = { cs, en };
 
-/** Pick the language from the user's Home Assistant language. */
+/** Pick the language from the user's Home Assistant language: Czech, or English for any other. */
 export function languageOf(hass: Pick<HomeAssistant, "language" | "locale"> | undefined): Lang {
   const tag = (hass?.locale?.language ?? hass?.language ?? "").toLowerCase();
-  if (tag.startsWith("en")) return "en";
-  return "cs";
+  return tag === "cs" || tag.startsWith("cs-") ? "cs" : "en";
 }
 
 export type Translate = (key: TextKey, params?: Record<string, string | number>) => string;

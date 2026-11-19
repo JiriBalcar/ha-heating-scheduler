@@ -23,6 +23,22 @@ function hour12Of(locale: string | undefined): boolean {
   return cycle === "h11" || cycle === "h12";
 }
 
+/**
+ * The language whose habits the clock and the decimal separator follow while the user's profile
+ * says "as in my language": the user's Home Assistant language, as in Home Assistant itself. It
+ * can differ from the language of the panel's texts: a German user reads English texts and still
+ * gets 22:00 and 21,5, not 10:00 PM and 21.5. `lang` if the browser does not know the language.
+ */
+function habitsOf(hass: HomeAssistant, lang: Lang): string {
+  const tag = hass.locale?.language ?? hass.language;
+  try {
+    if (tag && Intl.DateTimeFormat.supportedLocalesOf(tag).length) return tag;
+  } catch {
+    // Not a language tag.
+  }
+  return lang;
+}
+
 /** Build the formatting context from the user's Home Assistant profile settings. */
 export function formatContext(
   hass: HomeAssistant,
@@ -44,7 +60,7 @@ export function formatContext(
       decimalSeparator = separatorOf(undefined);
       break;
     default:
-      decimalSeparator = separatorOf(lang);
+      decimalSeparator = separatorOf(habitsOf(hass, lang));
   }
   let hour12: boolean;
   switch (locale?.time_format) {
@@ -58,7 +74,7 @@ export function formatContext(
       hour12 = hour12Of(undefined);
       break;
     default:
-      hour12 = hour12Of(lang);
+      hour12 = hour12Of(habitsOf(hass, lang));
   }
   // Plans run in the house's time zone, so the UI always shows house time.
   const timeZone = snapshot?.time_zone ?? hass.config?.time_zone ?? browserTimeZone();

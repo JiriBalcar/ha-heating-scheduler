@@ -122,7 +122,9 @@ declare global {
   }
 }
 
-const texts = TEXTS[(document.documentElement.lang || navigator.language).startsWith("en") ? "en" : "cs"];
+// Czech for Czech users, English for everybody else, as in the panel (i18n/index.ts).
+const language = (document.documentElement.lang || navigator.language || "").toLowerCase();
+const texts = TEXTS[language === "cs" || language.startsWith("cs-") ? "cs" : "en"];
 window.customCards = window.customCards ?? [];
 if (!window.customCards.some((card) => card.type === "heating-scheduler-card")) {
   window.customCards.push({ type: "heating-scheduler-card", ...texts, preview: true });

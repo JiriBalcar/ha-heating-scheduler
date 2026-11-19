@@ -28,7 +28,16 @@ NOW = prague(2026, 10, 5, 12)  # Monday
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [("cs", "cs"), ("en-GB", "en"), ("en_US", "en"), ("de", "cs"), (None, "cs"), ("", "cs")],
+    [
+        ("cs", "cs"),
+        ("cs-CZ", "cs"),
+        ("en-GB", "en"),
+        ("en_US", "en"),
+        # Every other language gets English.
+        ("de", "en"),
+        (None, "en"),
+        ("", "en"),
+    ],
 )
 def test_language(value: str | None, expected: str) -> None:
     assert language(value) == expected
@@ -88,6 +97,8 @@ def test_render_status_as_the_room_tile_shows_it() -> None:
     plan = _target(Source.PLAN, TargetMode.COMFORT, ends=True, upcoming=night)
     assert render_status(plan, NOW, PRAGUE, "en") == "Warm until 22:00 → Night 18.0 °C"
     assert render_status(plan, NOW, PRAGUE, "cs") == "Teplo do 22:00 → Noc 18,0 °C"
+    # A language without texts of its own gets English.
+    assert render_status(plan, NOW, PRAGUE, "de") == "Warm until 22:00 → Night 18.0 °C"
     assert render_status(plan, NOW, PRAGUE, "en", unit="°F") == "Warm until 22:00 → Night 64.4 °F"
     frost = _target(Source.PLAN, TargetMode.FROST, ends=False)
     assert render_status(frost, NOW, PRAGUE, "en") == "Frost guard"

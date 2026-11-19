@@ -25,7 +25,7 @@ for phones and tablets, and a Lovelace card.
 - The integration **reconciles** instead of firing actions at fixed times: after a restart,
   a missed timer or a valve that was offline for hours, every valve gets the right value.
 - Writes are verified and retried; our own confirmations are never taken for manual changes.
-- Czech and English. No cloud.
+- Czech and English; every other language gets English. No cloud.
 
 Boiler control, valve positions and temperature sensors of the valves are not touched.
 
